@@ -276,6 +276,9 @@ function getListAccountsPayable(input) {
             var refundAmount = getNumberField(file, ["pv.refund.amount"]);
             var paidAmount = getNumberField(file, ["pv.amount"]);
             var payableAmount = getNumberField(file, ["pe.amount"]);
+            var totalPayableAmountNotAccounted = getTotalPayableAmountNotAccounted(prepaymentId, currentPaymentId);
+            var totalPayableAmountAccounted = getTotalPayableAmountAccounted(prepaymentId, currentPaymentId);
+
 
             var item = {
                 requestId: accountingInformationId,
@@ -294,10 +297,10 @@ function getListAccountsPayable(input) {
                 description: currentPaymentEntryDescription,           // Nội dung diễn giải của đề nghị lần này
                 id: String(file["currentEntry.id"] || "").trim(),
                 totalTax: 0, // Cot thue - chua biet lay o dau
-                totalAmountPaid: approvedInvoiceAmount - refundAmount - paidAmount - payableAmount,  // Số tiền đã thanh toán (đã hạch toán xong và không thuộc ĐNTT hiện tại)
+                totalAmountPaid: approvedInvoiceAmount - refundAmount - paidAmount - totalPayableAmountAccounted,  // Số tiền đã thanh toán (đã hạch toán xong và không thuộc ĐNTT hiện tại)
                 other_pending_amount: 0,   // Số tiền chờ duyệt ở các ĐNTT khác
                 currentPaymentAmount: currentPaymentEntryAmount,   // Số tiền thanh toán lần này (của ĐNTT hiện tại)
-                totalRemainingAmount: 0,
+                totalRemainingAmount: payableAmount - totalPayableAmountNotAccounted,
                 currency: ""
             };
 
@@ -321,6 +324,66 @@ function getListAccountsPayable(input) {
     }
 
     return itemList;
+}
+
+
+
+function getTotalPayableAmountAccounted(prepaymentId, currentPaymentId) {
+    var totalAmount = 0;
+    var paymentEntryFile = null;
+
+    if (!prepaymentId) return totalAmount;
+
+    var query =
+            "SELECT amount FROM esdHTKTpaymentEntry " +
+            'WHERE entry.type = "PAYABLE" ' +
+            'AND account.type = "DEBIT" ' +
+            'AND accounting.request.id != NULL ' +
+            'AND ref.id = "' + escapeSmQueryValue(prepaymentId) + '"';
+
+    try {
+        paymentEntryFile = new SCFile("esdHTKTpaymentEntry", SCFILE_READONLY);
+        var rc = paymentEntryFile.doSelect(query);
+
+        while (rc == RC_SUCCESS) {
+            totalAmount += getNumberField(paymentEntryFile, ["amount"]);
+            rc = paymentEntryFile.getNext();
+        }
+    } finally {
+        closeSCFile(paymentEntryFile);
+    }
+
+    return totalAmount;
+}
+
+
+function getTotalPayableAmountNotAccounted(prepaymentId, currentPaymentId) {
+    var totalAmount = 0;
+    var paymentEntryFile = null;
+
+    if (!prepaymentId) return totalAmount;
+
+    var query =
+            "SELECT amount FROM esdHTKTpaymentEntry " +
+            'WHERE entry.type = "PAYABLE" ' +
+            'AND account.type = "DEBIT" ' +
+            'AND accounting.request.id = NULL ' +
+            'AND payment.id ~= NULL "' + escapeSmQueryValue(currentPaymentId) + '" '
+            'AND ref.id = "' + escapeSmQueryValue(prepaymentId) + '"';
+
+    try {
+        paymentEntryFile = new SCFile("esdHTKTpaymentEntry", SCFILE_READONLY);
+        var rc = paymentEntryFile.doSelect(query);
+
+        while (rc == RC_SUCCESS) {
+            totalAmount += getNumberField(paymentEntryFile, ["amount"]);
+            rc = paymentEntryFile.getNext();
+        }
+    } finally {
+        closeSCFile(paymentEntryFile);
+    }
+
+    return totalAmount;
 }
 
 
