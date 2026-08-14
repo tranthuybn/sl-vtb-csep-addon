@@ -169,12 +169,23 @@ function getListSupplierLedger(input) {
                         item.description = peDescription; // Gán description từ payment entry của đề nghị hiện tại
                     }
                 }
-                // 3. Nếu CHƯA Completed mà thuộc Phiếu khác (và không bị Hủy/Từ chối) -> "Chờ duyệt ở ĐNTT khác"
-                else if (oglStatus !== "rejected" && oglStatus !== "cancelled" && oglStatus !== "failed") {
+//                // 3. Nếu CHƯA Completed mà thuộc Phiếu khác (và không bị Hủy/Từ chối) -> "Chờ duyệt ở ĐNTT khác"
+//                else if (oglStatus !== "rejected" && oglStatus !== "cancelled" && oglStatus !== "failed") {
+//                    if (entryPaymentId) {
+//                        item.other_pending_amount += paymentEntryAmount;
+//                    }
+//                }
+                // 3. Nếu CHƯA Completed (tính cả phiếu hiện tại) (và không bị Hủy/Từ chối) -> "Chờ duyệt ở ĐNTT khác"
+                if (oglStatus !== "rejected" && oglStatus !== "cancelled" && oglStatus !== "failed") {
                     if (entryPaymentId) {
                         item.other_pending_amount += paymentEntryAmount;
                     }
                 }
+
+
+
+
+
             }
 
             rc = file.getNext();
