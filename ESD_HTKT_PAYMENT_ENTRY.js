@@ -2127,7 +2127,7 @@ function getPersonalExpenseAccounts(c) {
         result.push({
             account_number: c.vendor.debit_account,
             account_name: getGlAccountName(c.vendor.debit_account),
-            department: c.request.department,
+            department: '',
             branch: '',
             amount: null,
             from_cost_division: false
@@ -2170,7 +2170,7 @@ function getStandardExpenseAllocations(c) {
         result.push({
             account_number: c.vendor.debit_account,
             account_name: getGlAccountName(c.vendor.debit_account),
-            department: c.request.department,
+            department: '',
             branch: '',
             amount: Math.max(0, c.approvedAmount - (c.hasTax ? c.taxInfo.totalDeductibleTax : 0))
         });
