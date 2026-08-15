@@ -21,7 +21,7 @@ function run() {
                 var data = totalContractSuppliers(input);
                 result = { success: true, data: data };
                 break;
-                //Gỡ hóa đơn vào nhà cung cấp
+                //Xóa nhà cung cấp
             case 'deletePaymentVendor':
                 var data = deletePaymentVendor(input);
                 result = { success: true, data: data };
@@ -819,6 +819,7 @@ function updateListInvoinVendor(input) {
 function mapPaymentAttachment(itemRec, feeData) {
     itemRec['payment.id'] = feeData['transactionId'];
     itemRec['invoice.id'] = feeData['id'];
+    itemRec['vendor.id'] = feeData['vendorId'];
 
     if (feeData['totalTax'] === 0) {
         itemRec['deduction.type'] = "KHAUTRU_003"; // Không khấu trừ
@@ -849,7 +850,7 @@ function deletePaymentVendor(input) {
     }
 
 
-    // 1. Xóa bản ghi trong bảng esdHTKTprepaymentVendor
+    // 1. Xóa bản ghi trong bảng esdHTKTpaymentVendor
 
     var vendorFile = new SCFile("esdHTKTpaymentVendor");
     var vendorQuery = "vendor.id=\"" + vendorId + "\" and payment.id=\"" + paymentId + "\"";
@@ -862,45 +863,45 @@ function deletePaymentVendor(input) {
         }
     }
 
-    // thangnd add 31/7 Xóa tất cả bản ghi trong bảng esdHTKTpaymentEntry theo paymentId
+    // // thangnd add 31/7 Xóa tất cả bản ghi trong bảng esdHTKTpaymentEntry theo paymentId
 
-    var entryPaymentFile = new SCFile("esdHTKTpaymentEntry");
-    var entryPaymentQuery = "vendor.id=\"" + vendorId + "\" and payment.id=\"" + paymentId + "\"";
+    // var entryPaymentFile = new SCFile("esdHTKTpaymentEntry");
+    // var entryPaymentQuery = "vendor.id=\"" + vendorId + "\" and payment.id=\"" + paymentId + "\"";
 
 
-    if (entryPaymentFile.doSelect(entryPaymentQuery) === RC_SUCCESS) {
-        var rcDeleteEntry = entryPaymentFile.doDelete();
-        if (rcDeleteEntry !== RC_SUCCESS) {
-            return { status: "error", message: "Xóa payment entry thất bại" };
-        }
-    }
-    // 2. Xóa tất cả bản ghi trong bảng esdHTKTpaymentInvoice theo paymentId
-    var prepInvFile = new SCFile("esdHTKTpaymentInvoice");
-    var prepInvQuery = 'vendor.id="' + vendorId + '" and payment.id="' + paymentId + '"';
+    // if (entryPaymentFile.doSelect(entryPaymentQuery) === RC_SUCCESS) {
+    //     var rcDeleteEntry = entryPaymentFile.doDelete();
+    //     if (rcDeleteEntry !== RC_SUCCESS) {
+    //         return { status: "error", message: "Xóa payment entry thất bại" };
+    //     }
+    // }
+    // // 2. Xóa tất cả bản ghi trong bảng esdHTKTpaymentInvoice theo paymentId
+    // var prepInvFile = new SCFile("esdHTKTpaymentInvoice");
+    // var prepInvQuery = 'vendor.id="' + vendorId + '" and payment.id="' + paymentId + '"';
 
-    if (prepInvFile.doSelect(prepInvQuery) === RC_SUCCESS) {
+    // if (prepInvFile.doSelect(prepInvQuery) === RC_SUCCESS) {
 
-        do {
+    //     do {
 
-            // Lưu lại invoice.id trước khi xóa
-            var invoiceId = prepInvFile["invoice.id"];
+    //         // Lưu lại invoice.id trước khi xóa
+    //         var invoiceId = prepInvFile["invoice.id"];
 
-            // Xóa mapping
-            prepInvFile.doDelete();
+    //         // Xóa mapping
+    //         prepInvFile.doDelete();
 
-            // Update request.id của đúng invoice
-            var invFile = new SCFile("esdHTKTinvoice");
-            var invQuery =
-                'id="' + invoiceId +
-                '" and request.id="' + paymentId + '"';
+    //         // Update request.id của đúng invoice
+    //         var invFile = new SCFile("esdHTKTinvoice");
+    //         var invQuery =
+    //             'id="' + invoiceId +
+    //             '" and request.id="' + paymentId + '"';
 
-            if (invFile.doSelect(invQuery) === RC_SUCCESS) {
-                invFile["request.id"] = null;
-                invFile.doSave();
-            }
+    //         if (invFile.doSelect(invQuery) === RC_SUCCESS) {
+    //             invFile["request.id"] = null;
+    //             invFile.doSave();
+    //         }
 
-        } while (prepInvFile.getNext() === RC_SUCCESS);
-    }
+    //     } while (prepInvFile.getNext() === RC_SUCCESS);
+    // }
 
 
     return {
