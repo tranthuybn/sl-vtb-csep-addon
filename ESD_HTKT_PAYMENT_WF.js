@@ -195,38 +195,38 @@ function updateNextStatus(record, previousRecord) {
     }
 
     // trưởng thêm: Chỉ tạo bản trình ký khi rời phase initial_kttc.
-//    if (oldPhase === HTKT_WF_PHASE.INITIAL_KTTC) {
-//        htktWfAssertDependencies(true);
-//
-//        var paymentId = htktWfPaymentId(record);
-//        var currentDocument = htktWfDocument().getCurrentPresentation({
-//            paymentId: paymentId
-//        });
-//
-//        if (currentDocument && currentDocument.success === true) {
-//            documentResult = htktWfOk({
-//                idempotent: true,
-//                document: currentDocument.data
-//            }, "Bản trình ký đã được tạo trước đó.");
-//        } else if (currentDocument && currentDocument.code && currentDocument.code !== "DOCUMENT_NOT_FOUND") {
-//            throw new Error(currentDocument.message || "Không kiểm tra được bản trình ký hiện tại.");
-//        } else {
-//            documentResult = htktWfDocument().generateAndUploadPresentation({
-//                paymentId: paymentId,
-//                currentUser: htktWfCurrentUser()
-//            });
-//
-//            if (!documentResult || documentResult.success !== true) {
-//                var documentError = documentResult && documentResult.message
-//                    ? documentResult.message
-//                    : "Không sinh và lưu được bản trình ký.";
-//                if (documentResult && documentResult.detail) {
-//                    documentError += " " + documentResult.detail;
-//                }
-//                throw new Error(documentError);
-//            }
-//        }
-//    }
+    if (oldPhase === HTKT_WF_PHASE.INITIAL_KTTC) {
+        htktWfAssertDependencies(true);
+
+        var paymentId = htktWfPaymentId(record);
+        var currentDocument = htktWfDocument().getCurrentPresentation({
+            paymentId: paymentId
+        });
+
+        if (currentDocument && currentDocument.success === true) {
+            documentResult = htktWfOk({
+                idempotent: true,
+                document: currentDocument.data
+            }, "Bản trình ký đã được tạo trước đó.");
+        } else if (currentDocument && currentDocument.code && currentDocument.code !== "DOCUMENT_NOT_FOUND") {
+            throw new Error(currentDocument.message || "Không kiểm tra được bản trình ký hiện tại.");
+        } else {
+            documentResult = htktWfDocument().generateAndUploadPresentation({
+                paymentId: paymentId,
+                currentUser: htktWfCurrentUser()
+            });
+
+            if (!documentResult || documentResult.success !== true) {
+                var documentError = documentResult && documentResult.message
+                    ? documentResult.message
+                    : "Không sinh và lưu được bản trình ký.";
+                if (documentResult && documentResult.detail) {
+                    documentError += " " + documentResult.detail;
+                }
+                throw new Error(documentError);
+            }
+        }
+    }
 
 
 
@@ -243,6 +243,7 @@ function updateNextStatus(record, previousRecord) {
     } catch (e) {}
 
     createApprovalHistory(record);
+    return documentResult;
 }
 
 /**
@@ -677,7 +678,15 @@ function validateVendorAndPaymentDetails(record) {
             if (!record["beneficiary.bank"]) {
                 errorMss.push("Ngân hàng thụ hưởng không được để trống.");
             } else {
-                checkMaxLength(record["beneficiary.bank"], 255, "Ngân hàng thụ hưởng");
+               var bankValue = String(record["beneficiary.bank"]);
+                checkMaxLength(bankValue, 255, "Ngân hàng thụ hưởng");
+
+                // Kiểm tra theo format chuỗi trả về từ Droplist
+                // logic split('|') == 3, nên nếu người dùng gõ tay sẽ không có đủ 3 phần)
+                var bankSplit = bankValue.split('|');
+                if (bankSplit.length !== 3) {
+                    errorMss.push("Ngân hàng thụ hưởng không hợp lệ. Vui lòng chọn ngân hàng từ danh sách.");
+                }
             }
 
             if (!record["beneficiary.name"]) {
@@ -712,6 +721,24 @@ function validateVendorAndPaymentDetails(record) {
 
             if (!record["issued.date"]) {
                 errorMss.push("Ngày cấp giấy tờ tùy thân không được để trống.");
+            } else {
+                var issuedDate = new Date(record["issued.date"]);
+                
+                // Kiểm tra xem định dạng ngày có hợp lệ không
+                if (isNaN(issuedDate.getTime())) {
+                    errorMss.push("Định dạng ngày cấp giấy tờ tùy thân không hợp lệ.");
+                } else {
+                    var currentDate = new Date();
+                    
+                    // Set cả 2 mốc thời gian về 00:00:00 để so sánh chính xác theo ngày
+                    currentDate.setHours(0, 0, 0, 0);
+                    issuedDate.setHours(0, 0, 0, 0);
+
+                    // Validate nhỏ hơn ngày hiện tại (không được bằng hoặc lớn hơn)
+                    if (issuedDate.getTime() >= currentDate.getTime()) {
+                        errorMss.push("Ngày cấp giấy tờ tùy thân phải nhỏ hơn ngày hiện tại.");
+                    }
+                }
             }
 
             if (!record["issued.place"]) {
@@ -759,81 +786,52 @@ function validateVendorAndPaymentDetailsOnWorkflow(record) {
 
 /**
  * BR-002-16: Kiểm tra lại trạng thái hóa đơn trước khi trình phiếu
- * Chỉ kiểm tra đối với hóa đơn quá T+2 so với ngày kiểm tra gần nhất.
+ * @param {String} paymentId - ID của phiếu đề nghị thanh toán
+ * @returns {Array|null} Trả về mảng chứa thông báo lỗi nếu có
  */
 function validateInvoices(paymentId) {
     if (!paymentId) return null;
 
     var errorMss = [];
-    var invalidInvoices = [];
-    var currentDate = new Date();
-    var msInADay = 24 * 60 * 60 * 1000;
+    var hasInvalidInvoice = false;
 
-    var prepInvoiceFile = new SCFile("esdHTKTpaymentInvoice", SCFILE_READONLY);
+    var prepInvoiceFile = new SCFile('esdHTKTpaymentInvoice', SCFILE_READONLY);
+    var rc = prepInvoiceFile.doSelect('payment.id="' + paymentId + '"');
 
-    try {
-        var rc = prepInvoiceFile.doSelect('payment.id="' + paymentId + '"');
+    while (rc == RC_SUCCESS) {
+        var invoiceId = prepInvoiceFile['invoice.id'];
 
-        while (rc == RC_SUCCESS) {
-            var invoiceId = prepInvoiceFile["invoice.id"];
+        if (invoiceId) {
+            var invoiceFile = new SCFile('esdHTKTinvoice'); 
+            var invRc = invoiceFile.doSelect('id="' + invoiceId + '"');
 
-            if (invoiceId) {
-                var invoiceFile = new SCFile("esdHTKTinvoice", SCFILE_READONLY);
-                try {
-                    var invRc = invoiceFile.doSelect('id="' + invoiceId + '"');
+            if (invRc == RC_SUCCESS) {
+                var lastCheckDate = invoiceFile['last.check.date'];
+                
+                var timeStatus = lib.ESD_HTKT_PREPAYMENT_VENDOR.checkInvoiceStatus(lastCheckDate);
 
-                    if (invRc == RC_SUCCESS) {
-                        var invoiceNumber = invoiceFile["invoice.number"];
-                        var sellerTaxCode = invoiceFile["seller.tax.code"];
-                        var vendorName = invoiceFile["seller.name"] || "N/A";
-
-                        if (sellerTaxCode) {
-                            var vendorFile = new SCFile("esdHTKTvendor", SCFILE_READONLY);
-                            try {
-                                var venRc = vendorFile.doSelect('vendor.number="' + sellerTaxCode + '"');
-                                if (venRc == RC_SUCCESS && vendorFile["vendor.name"]) {
-                                    vendorName = vendorFile["vendor.name"];
-                                }
-                            } catch (eVen) {
-                            } finally {
-                                try { vendorFile.doClose(); } catch (e) {}
-                            }
-                        }
-
-                        var lastCheckDateStr = invoiceFile["last.check.date"];
-                        var lastCheckDate = lastCheckDateStr ? new Date(lastCheckDateStr) : new Date(0);
-                        var diffDays = Math.floor((currentDate.getTime() - lastCheckDate.getTime()) / msInADay);
-
-                        // KIỂM TRA QUÁ HẠN T+2
-                        if (diffDays > 2) {
-                            var apiResponse = lib.ESD_HTKT_SCHEDULE_OGL.callCheckInvoiceAPI(invoiceFile);
-
-                            if (apiResponse !== null && apiResponse.success === true) {
-                                // Hóa đơn Hợp lệ -> PASS
-                            } else {
-                                var errMsg = (apiResponse && apiResponse.message) ? apiResponse.message : "Kiểm tra thất bại/Không hợp lệ";
-                                invalidInvoices.push("- Số HĐ: " + invoiceNumber + " (NCC: " + vendorName + " - " + errMsg + ")");
-                            }
-                        }
-                    }
-                } catch (eInv) {
-                } finally {
-                    try { invoiceFile.doClose(); } catch (e) {}
+            if (timeStatus == "Quá hạn") {
+            
+                hasInvalidInvoice = true;
+            
+                var apiResponse = lib.ESD_HTKT_SCHEDULE_OGL.callCheckInvoiceAPI(invoiceFile);
+            
+                if (apiResponse && apiResponse.success === true) {
+                    invoiceFile['last.check.date'] = new Date();
+                    invoiceFile.doUpdate();
                 }
             }
-
-            rc = prepInvoiceFile.getNext();
-        }
-    } catch (ePrep) {
-    } finally {
-        try { prepInvoiceFile.doClose(); } catch (e) {}
+            }
+            try { invoiceFile.doClose(); } catch (e) {}
+        } 
+        
+        rc = prepInvoiceFile.getNext();
     }
 
-    if (invalidInvoices.length > 0) {
-        var finalErrorMessage = "Lỗi Trình phiếu (BR-002-16):\nCác hóa đơn sau không còn ở trạng thái Hợp lệ do quá hạn kiểm tra hoặc đã thay đổi trạng thái:\n"
-            + invalidInvoices.join("\n")
-            + "\n\nYêu cầu CB ĐMMS gỡ hoặc thay thế hóa đơn trên trước khi trình lại.";
-        errorMss.push(finalErrorMessage);
+    try { prepInvoiceFile.doClose(); } catch (e) {}
+
+    if (hasInvalidInvoice) {
+        errorMss.push("Đề nghị thanh toán đang chứa hóa đơn quá hạn kiểm tra. Vui lòng kiểm tra lại các hóa đơn");
     }
 
     return errorMss.length > 0 ? errorMss : null;
@@ -985,6 +983,21 @@ function isSignaturePhase(record) {
     return htktWfIsSignaturePhaseValue(htktWfPhase(record));
 }
 
+// Kiểm tra quyền hiển thị Workflow Action Test ký.
+function checkCanSign(record) {
+    var actorResult = validateCurrentActor(record);
+
+    if (!actorResult || actorResult.success !== true) {
+        return "F";
+    }
+
+    if (!actorResult.data || actorResult.data.isSignaturePhase !== true) {
+        return "F";
+    }
+
+    return "T";
+}
+
 function validateCurrentActor(record) {
     var contextResult = getWorkflowContext(record);
     if (contextResult.success !== true) return contextResult;
@@ -1059,42 +1072,16 @@ function submitForApproval(record) {
     var validationResult = htktWfValidateLegacy(record);
     if (validationResult.success !== true) return validationResult;
 
-    var currentResult = htktWfDocument().getCurrentPresentation({
-        paymentId: actorResult.data.paymentId
-    });
-
-    var documentResult;
-    if (currentResult && currentResult.success === true) {
-        if (currentResult.data.status !== "CURRENT" || Number(currentResult.data.versionNo || 0) !== 1) {
-            return htktWfFail("PRESENTATION_ALREADY_EXISTS", "Phiếu đã có bản trình ký không phù hợp để trình lại.", "", currentResult.data);
-        }
-        documentResult = htktWfOk({ idempotent: true, document: currentResult.data }, "Bản trình ký đã được tạo trước đó.");
-    } else if (currentResult && currentResult.code && currentResult.code !== "DOCUMENT_NOT_FOUND") {
-        return currentResult;
-    } else {
-        documentResult = htktWfDocument().generateAndUploadPresentation({
-            paymentId: actorResult.data.paymentId,
-            currentUser: actorResult.data.currentUser
-        });
-    }
-
-    if (!documentResult || documentResult.success !== true) {
-        return htktWfFail(
-            "PRESENTATION_CREATE_FAILED",
-            (documentResult && documentResult.message) ? documentResult.message : "Không sinh và lưu được bản trình ký.",
-            (documentResult && documentResult.detail) ? documentResult.detail : "",
-            documentResult ? documentResult.data : null
-        );
-    }
-
+    var documentResult = null;
     try {
-        updateNextStatus(record);
+        // updateNextStatus đọc oldrecord và tự lưu attachment khi rời initial_kttc.
+        documentResult = updateNextStatus(record);
     } catch (errorUpdate) {
         return htktWfFailException(
             "WORKFLOW_STATUS_UPDATE_EXCEPTION",
-            "Đã tạo bản trình ký nhưng không cập nhật được workflow.",
+            "Không tạo được bản trình ký hoặc không cập nhật được workflow.",
             errorUpdate,
-            { document: documentResult.data, retrySafe: true }
+            { document: documentResult ? documentResult.data : null, retrySafe: true }
         );
     }
 
@@ -1103,9 +1090,11 @@ function submitForApproval(record) {
         submittedBy: actorResult.data.currentUser,
         previousPhase: phase,
         nextStatus: htktWfRead(record, ["status"]),
-        document: documentResult.data,
+        document: documentResult ? documentResult.data : null,
         recordMustBeSaved: true
-    }, "Sinh bản trình ký và chuyển trạng thái thành công.");
+    }, phase === HTKT_WF_PHASE.INITIAL_KTTC
+        ? "Sinh bản trình ký và chuyển trạng thái thành công."
+        : "Chuyển trạng thái thành công.");
 }
 
 /* Rà soát chỉ xác nhận, không ký số */
@@ -1344,7 +1333,7 @@ function deleteDocumentsBeforeReturn(record) {
     } catch (error) {
         return htktWfFailException(
             "PRESENTATION_HARD_DELETE_EXCEPTION",
-            "Không xóa được tài liệu của vòng trình ký trên ECM.",
+            "Không xóa được tài liệu của vòng trình ký trên hệ thống lưu trữ.",
             error
         );
     }
@@ -1379,7 +1368,7 @@ function requestCorrection(record) {
     if (!deleteResult || deleteResult.success !== true) {
         return htktWfFail(
             "PRESENTATION_HARD_DELETE_FAILED",
-            (deleteResult && deleteResult.message) ? deleteResult.message : "Không xóa được tài liệu của vòng trình ký trên ECM.",
+            (deleteResult && deleteResult.message) ? deleteResult.message : "Không xóa được tài liệu của vòng trình ký trên hệ thống lưu trữ.",
             (deleteResult && deleteResult.detail) ? deleteResult.detail : "",
             deleteResult ? deleteResult.data : null
         );
@@ -1390,7 +1379,7 @@ function requestCorrection(record) {
     } catch (errorReturn) {
         return htktWfFailException(
             "RETURN_TO_UPDATE_EXCEPTION",
-            "Đã xóa tài liệu trên ECM nhưng không cập nhật được workflow.",
+            "Đã xóa tài liệu trên hệ thống lưu trữ nhưng không cập nhật được workflow.",
             errorReturn,
             { documentDeletion: deleteResult.data, retrySafe: true }
         );
@@ -1403,5 +1392,5 @@ function requestCorrection(record) {
         nextStatus: htktWfRead(record, ["status"]),
         documentDeletion: deleteResult.data,
         recordMustBeSaved: true
-    }, "Yêu cầu chỉnh sửa, xóa cứng tài liệu ECM và chuyển hồ sơ về cập nhật thành công.");
+    }, "Yêu cầu chỉnh sửa, xóa tài liệu và chuyển hồ sơ về cập nhật thành công.");
 }
