@@ -132,7 +132,7 @@ function getListSupplierLedger(input) {
                     // Các biến khởi tạo tính toán
                     advance_amount: advanceAmount,
                     refunded_amount: 0, // Số tiền đã hoàn ứng (đã hạch toán xong và không thuộc ĐNTT hiện tại)
-                    other_pending_amount: 0, // Số tiền chờ duyệt ở các ĐNTT khác
+                    other_pending_amount: 0, // Số tiền chờ duyệt ở các ĐNTT khác, không tính completed và không tính phiếu hiện tại
                     current_refund_amount: 0, // Số tiền hoàn ứng lần này (của ĐNTT hiện tại)
                     //Các biến lấy từ cột data bảng esdHTKTaccountingInformation
                     currency: ""
@@ -169,18 +169,18 @@ function getListSupplierLedger(input) {
                         item.description = peDescription; // Gán description từ payment entry của đề nghị hiện tại
                     }
                 }
-//                // 3. Nếu CHƯA Completed mà thuộc Phiếu khác (và không bị Hủy/Từ chối) -> "Chờ duyệt ở ĐNTT khác"
-//                else if (oglStatus !== "rejected" && oglStatus !== "cancelled" && oglStatus !== "failed") {
-//                    if (entryPaymentId) {
-//                        item.other_pending_amount += paymentEntryAmount;
-//                    }
-//                }
-                // 3. Nếu CHƯA Completed (tính cả phiếu hiện tại) (và không bị Hủy/Từ chối) -> "Chờ duyệt ở ĐNTT khác"
-                if (oglStatus !== "rejected" && oglStatus !== "cancelled" && oglStatus !== "failed") {
+                // 3. Nếu CHƯA Completed mà thuộc Phiếu khác (và không bị Hủy/Từ chối) -> "Chờ duyệt ở ĐNTT khác"
+                else if (oglStatus !== "rejected" && oglStatus !== "cancelled" && oglStatus !== "failed" && oglStatus !== "completed") {// đã complete thì tính vào refunded_amount nên không cộng vào đây nữa tránh bị tính 2 lần
                     if (entryPaymentId) {
                         item.other_pending_amount += paymentEntryAmount;
                     }
                 }
+//                // 3. Nếu CHƯA Completed (tính cả phiếu hiện tại) (và không bị Hủy/Từ chối) -> "Chờ duyệt ở ĐNTT khác"
+//                if (oglStatus !== "rejected" && oglStatus !== "cancelled" && oglStatus !== "failed") {
+//                    if (entryPaymentId) {
+//                        item.other_pending_amount += paymentEntryAmount;
+//                    }
+//                }
 
 
 
