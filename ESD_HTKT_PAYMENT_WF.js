@@ -195,38 +195,38 @@ function updateNextStatus(record, previousRecord) {
     }
 
     // trưởng thêm: Chỉ tạo bản trình ký khi rời phase initial_kttc.
-    if (oldPhase === HTKT_WF_PHASE.INITIAL_KTTC) {
-        htktWfAssertDependencies(true);
+    // if (oldPhase === HTKT_WF_PHASE.INITIAL_KTTC) {
+    //     htktWfAssertDependencies(true);
 
-        var paymentId = htktWfPaymentId(record);
-        var currentDocument = htktWfDocument().getCurrentPresentation({
-            paymentId: paymentId
-        });
+    //     var paymentId = htktWfPaymentId(record);
+    //     var currentDocument = htktWfDocument().getCurrentPresentation({
+    //         paymentId: paymentId
+    //     });
 
-        if (currentDocument && currentDocument.success === true) {
-            documentResult = htktWfOk({
-                idempotent: true,
-                document: currentDocument.data
-            }, "Bản trình ký đã được tạo trước đó.");
-        } else if (currentDocument && currentDocument.code && currentDocument.code !== "DOCUMENT_NOT_FOUND") {
-            throw new Error(currentDocument.message || "Không kiểm tra được bản trình ký hiện tại.");
-        } else {
-            documentResult = htktWfDocument().generateAndUploadPresentation({
-                paymentId: paymentId,
-                currentUser: htktWfCurrentUser()
-            });
+    //     if (currentDocument && currentDocument.success === true) {
+    //         documentResult = htktWfOk({
+    //             idempotent: true,
+    //             document: currentDocument.data
+    //         }, "Bản trình ký đã được tạo trước đó.");
+    //     } else if (currentDocument && currentDocument.code && currentDocument.code !== "DOCUMENT_NOT_FOUND") {
+    //         throw new Error(currentDocument.message || "Không kiểm tra được bản trình ký hiện tại.");
+    //     } else {
+    //         documentResult = htktWfDocument().generateAndUploadPresentation({
+    //             paymentId: paymentId,
+    //             currentUser: htktWfCurrentUser()
+    //         });
 
-            if (!documentResult || documentResult.success !== true) {
-                var documentError = documentResult && documentResult.message
-                    ? documentResult.message
-                    : "Không sinh và lưu được bản trình ký.";
-                if (documentResult && documentResult.detail) {
-                    documentError += " " + documentResult.detail;
-                }
-                throw new Error(documentError);
-            }
-        }
-    }
+    //         if (!documentResult || documentResult.success !== true) {
+    //             var documentError = documentResult && documentResult.message
+    //                 ? documentResult.message
+    //                 : "Không sinh và lưu được bản trình ký.";
+    //             if (documentResult && documentResult.detail) {
+    //                 documentError += " " + documentResult.detail;
+    //             }
+    //             throw new Error(documentError);
+    //         }
+    //     }
+    // }
 
 
 
