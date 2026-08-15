@@ -379,7 +379,7 @@ function getTotalPayableAmountNotAccounted(prepaymentId, currentPaymentId) {
             'WHERE entry.type = "PAYABLE" ' +
             'AND account.type = "DEBIT" ' +
             'AND accounting.request.id = NULL ' +
-            'AND payment.id ~= NULL "' + escapeSmQueryValue(currentPaymentId) + '" '
+            'AND payment.id ~= "' + escapeSmQueryValue(currentPaymentId) + '" '
             'AND ref.id = "' + escapeSmQueryValue(prepaymentId) + '"';
 
     try {
