@@ -62,7 +62,7 @@ if (paymentId || vars.$L_file['payment.id']) {
   var itemFile = new SCFile("esdHTKTpayment");
 
   var itemQuery =
-    `select hdVendor.supplier.id as supplier.id, hdVendor.supplier.name as supplier.name,` +
+    `select htktPayment.contract.id as contract.id, hdVendor.supplier.id as supplier.id, hdVendor.supplier.name as supplier.name,` +
     ` hdVendor.payment.method as payment.method, hdVendor.remaining.amount as remaining.amount,` +
     ` dmVendor.tax.code as tax.code,htktPayment.description as description, dmVendor.address as address, dmVendor.type as type,` +
     ` htktPayment.unit.lv1 as unit.lv1` + // Lấy unit.lv1 từ phiếu cha
@@ -109,7 +109,7 @@ if (paymentId || vars.$L_file['payment.id']) {
         currentContractId +
         `" and v.supplier.id = "` +
         currentSupplierId +
-        `" and (p.status = "approved" or p.status = "accounted")`;
+        `" and (p.status = "accounted")`;
 
       var rcCheck =
         checkFile.doSelect(checkQuery);
@@ -134,16 +134,66 @@ if (paymentId || vars.$L_file['payment.id']) {
         }
       } catch (e) { }
 
+      // Tổng tiền đã thanh toán của NCC trong các phiếu
+      var totalPaidAmount = "0";
+      var hasPaidTicket = false;
+      var paymentCheckFile =
+        new SCFile("esdHTKTpaymentVendor");
+
+      var paymentCheckQuery =
+        `select pv.amount as amount ` +
+        `from esdHTKTpaymentVendor pv ` +
+        `join esdHTKTpayment p ` +
+        `on (pv.payment.id = p.id) ` +
+        `join esdHTKTvendor v ` +
+        `on (pv.vendor.id = v.id) ` +
+        `where p.contract.id = "` +
+        currentContractId +
+        `" and v.supplier.id = "` +
+        currentSupplierId +
+        `" and (p.status = "accounted")`;
+
+      var rcPaymentCheck =
+        paymentCheckFile.doSelect(paymentCheckQuery);
+
+      while (rcPaymentCheck == RC_SUCCESS) {
+
+        hasPaidTicket = true;
+
+        totalPaidAmount =
+          lib.ESD_HTKT_Utils.addStringsManual(
+            totalPaidAmount,
+            String(paymentCheckFile["amount"] || "0")
+          );
+
+        rcPaymentCheck =
+          paymentCheckFile.getNext();
+      }
+
+      try {
+        if (paymentCheckFile) {
+          paymentCheckFile.doClose();
+        }
+      } catch (e) { }
+
 
       // ================================================================
       // Số tiền còn lại =
-      // Tổng tiền ban đầu - Tổng tiền đã tạm ứng
+      // Tổng tiền ban đầu - Tổng tiền đã tạm ứng - Tổng tiền đã thanh toán
       // ================================================================
       if (hasApprovedTicket) {
         finalRemainingAmount =
           lib.ESD_HTKT_Utils.subtractStringsManual(
             initialRemainingAmount,
             totalApprovedAmount
+          );
+      }
+
+      if (hasPaidTicket) {
+        finalRemainingAmount =
+          lib.ESD_HTKT_Utils.subtractStringsManual(
+            finalRemainingAmount,
+            totalPaidAmount
           );
       }
 
