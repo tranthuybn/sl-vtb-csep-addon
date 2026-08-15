@@ -947,9 +947,19 @@ function syncVendorOglFromPayment(record) {
         var itemPaymentVendor = new SCFile("esdHTKTpaymentVendor");
         var paymentVendorRc = itemPaymentVendor.doSelect(`payment.id = "${record.id}"`);
         while (paymentVendorRc == RC_SUCCESS) {
-            syncVendorToOgl(itemPaymentVendor, branchCode, entityCode);
+            if (!itemPaymentVendor['ogl.sync.status']) {
+                var result = lib.ESD_HTKT_PREPAYMENT_VENDOR.syncVendorToOgl(itemPaymentVendor,
+                    branchCode,
+                    entityCode,
+                    record['user.checker.kttc'] || vars.$lo_operator["contact.name"]);
+                if (result && result.success == true) {
+                    itemPaymentVendor['ogl.sync.status'] = true;
+                    itemPaymentVendor.doUpdate();
+                }
+            }
             paymentVendorRc = itemPaymentVendor.getNext();
         }
+        try { if (paymentVendorRc) paymentVendorRc.doClose(); } catch (e) {}
     }
 }
 
@@ -959,8 +969,7 @@ function syncVendorOglFromPayment(record) {
  * @param branchCode 
  * @param entityCode 
  */
-function syncVendorToOgl(paymentVendor, branchCode, entityCode) {
-
+function syncVendorToOgl(paymentVendor, branchCode, entityCode, username = vars.$lo_operator["contact.name"]) {
     var itemVendor = new SCFile("esdHTKTvendor");
     var rcItem = itemVendor.doSelect(`id="${paymentVendor['vendor.id']}"`);
     var defaultVendorSiteInfo = lib.ESD_HTKT_ACCOUNTING_UTILS.getVendorDefaultSiteInfo();
@@ -969,9 +978,8 @@ function syncVendorToOgl(paymentVendor, branchCode, entityCode) {
         if (itemVendor['vendor.name'] && itemVendor['vendor.number']) {
             var checkVendorReponse = lib.ESD_HTKT_INVOICE_OGL_INTEGRATION.getVendorSiteInfo({
                 "vendorNumber": itemVendor['vendor.number'],
-                "vendorName": itemVendor['vendor.name'],
+                //                "vendorName": itemVendor['vendor.name'],
                 "entity": branchCode,
-                // "vendorSiteCode": defaultVendorSiteInfo.siteCode
             });
 
             if (checkVendorReponse && checkVendorReponse['success'] === true &&
@@ -1025,9 +1033,13 @@ function syncVendorToOgl(paymentVendor, branchCode, entityCode) {
             if (!vendorExist) {
                 var vendorInfo = buildVendorAndSiteInfo(itemVendor, defaultVendorSiteInfo, branchCode, entityCode, username);
                 var response = createVendor(vendorInfo, itemVendor.id);
-                if (response && response['success'] === true) {
-
-                    vendorExist = true;
+                //                print('createVendor 1= ', JSON.stringify(response));
+                if (response) {
+                    if (response['success'] === true) {
+                        vendorExist = true;
+                    } else {
+                        return response;
+                    }
                 }
             }
             if (vendorExist) {
@@ -1092,7 +1104,7 @@ function buildVendorAndSiteInfo(esdHTKTvendor, defaultVendorSiteInfo, branchCode
 function createVendor(request, vendorId) {
 
     var response = lib.ESD_HTKT_INVOICE_OGL_INTEGRATION.createVendorSiteInfo(request);
-    print('save - create = ', JSON.stringify(response));
+    //    print('save - create = ', JSON.stringify(response));
     if (response && response['success'] === true) {
         saveVendorSite({
             'vendor.id': vendorId,
@@ -1150,7 +1162,7 @@ function loadPaymentVendorInfo(record) {
         ' hpv.approved.invoice.amount as approved.invoice.amount,' +
         ' hpv.refund.amount as refund.amount,' +
         ' hpv.vendor.type as vendor.type,' +
-        ' hdVendor.remaining.amount as remaining.amount,' +
+        ' hpv.contract.amount as remaining.amount,' +
         ' hv.vendor.number as tax.code,' +
         ' hpv.ogl.sync.status as ogl.sync.status,' +
         ' hvs.ogl.site.code as ogl.site.code,' +
@@ -1270,6 +1282,94 @@ function queryVendorData(record) {
             print("Không tìm thấy bản ghi phù hợp với điều kiện: " + sqlVendor);
         }
     }
+}
+
+
+
+/**
+ * Hàm cập nhật lại số tiền còn lại (contract.amount) cho TẤT CẢ các phiếu đề nghị thanh toán 
+ * đang chờ duyệt (cùng Hợp đồng, cùng NCC) ngay khi một phiếu được phê duyệt cuối.
+ */
+function updateRemainingAmountForPendingTickets(record) {
+    var paymentId = String(record.id || record["id"] || "");
+    if (!paymentId) return;
+
+    var currentContractId = String(record.contract_id || record["contract.id"] || "");
+    var currentRequestAmount = 0;
+    var currentSupplierId = "";
+
+    // 1. Lấy thông tin nhà cung cấp và số tiền của chính phiếu VỪA ĐƯỢC DUYỆT
+    var prepVendorFile = new SCFile("esdHTKTpaymentVendor", SCFILE_READONLY);
+    if (prepVendorFile.doSelect('payment.id="' + paymentId + '"') == RC_SUCCESS) {
+        currentRequestAmount = prepVendorFile["amount"] || 0;
+        if (!currentContractId) currentContractId = prepVendorFile["contract.id"];
+
+        var vendorId = prepVendorFile["vendor.id"];
+        if (vendorId) {
+            var vendorFile = new SCFile("esdHTKTvendor", SCFILE_READONLY);
+            if (vendorFile.doSelect('id="' + vendorId + '"') == RC_SUCCESS) {
+                currentSupplierId = vendorFile["supplier.id"];
+            }
+            try { if (vendorFile) vendorFile.doClose(); } catch (e) {}
+        }
+    }
+    try { if (prepVendorFile) prepVendorFile.doClose(); } catch (e) {}
+
+    if (!currentContractId || !currentSupplierId) return;
+
+    // 2. Bắt đầu tính toán
+    var contractSupplierFile = new SCFile("esdHDcontractSupplier", SCFILE_READONLY);
+    if (contractSupplierFile.doSelect('contract.id="' + currentContractId + '" and supplier.id="' + currentSupplierId + '"') == RC_SUCCESS) {
+
+        var initialAmount = contractSupplierFile["remaining.amount"] || 0;
+
+        // 2.1 Tính tổng tiền các phiếu ĐÃ DUYỆT TRƯỚC ĐÓ (Bỏ qua phiếu hiện tại vì nó chưa commit xuống DB)
+        var totalOtherApprovedAmount = 0;
+        var checkFile = new SCFile("esdHTKTpaymentVendor", SCFILE_READONLY);
+        var checkQuery = 'select pv.amount as amount from esdHTKTpaymentVendor pv ' +
+            'join esdHTKTpayment p on (pv.payment.id = p.id) ' +
+            'join esdHTKTvendor v on (pv.vendor.id = v.id) ' +
+            'where p.contract.id = "' + currentContractId + '" ' +
+            'and v.supplier.id = "' + currentSupplierId + '" ' +
+            'and (p.status = "approved" or p.status = "accounted") ' +
+            'and p.id ~= "' + paymentId + '"'; // Bỏ qua phiếu đang thao tác
+
+        var rcCheck = checkFile.doSelect(checkQuery);
+        while (rcCheck == RC_SUCCESS) {
+            totalOtherApprovedAmount += (checkFile["amount"] || 0);
+            rcCheck = checkFile.getNext();
+        }
+        try { if (checkFile) checkFile.doClose(); } catch (e) {}
+
+        // 2.2 Số dư mới = Tiền gốc - (Tiền các phiếu cũ đã duyệt + Tiền của phiếu vừa duyệt xong)
+        var newRemainingAmount = initialAmount - (totalOtherApprovedAmount + currentRequestAmount);
+
+        // 3. Cập nhật lại số dư mới này cho TẤT CẢ các phiếu đang chờ duyệt
+        var pendingFile = new SCFile("esdHTKTpaymentVendor");
+        var pendingQuery = 'select pv.id as id from esdHTKTpaymentVendor pv ' +
+            'join esdHTKTpayment p on (pv.payment.id = p.id) ' +
+            'join esdHTKTvendor v on (pv.vendor.id = v.id) ' +
+            'where p.contract.id = "' + currentContractId + '" ' +
+            'and v.supplier.id = "' + currentSupplierId + '" ' +
+            'and p.id ~= "' + paymentId + '" ' +
+            'and p.status ~= "approved" and p.status ~= "accounted" and p.status ~= "cancelled"';
+
+        var rcPending = pendingFile.doSelect(pendingQuery);
+        while (rcPending == RC_SUCCESS) {
+            var pvId = pendingFile["id"];
+
+            // Khởi tạo một đối tượng ghi (Write) trực tiếp để tránh lỗi khi update qua bảng Join
+            var updateFile = new SCFile("esdHTKTpaymentVendor");
+            if (updateFile.doSelect('id="' + pvId + '"') == RC_SUCCESS) {
+                updateFile["contract.amount"] = newRemainingAmount;
+                updateFile.doUpdate();
+            }
+
+            rcPending = pendingFile.getNext();
+        }
+        try { if (pendingFile) pendingFile.doClose(); } catch (e) {}
+    }
+    try { if (contractSupplierFile) contractSupplierFile.doClose(); } catch (e) {}
 }
 
 
