@@ -863,47 +863,6 @@ function deletePaymentVendor(input) {
         }
     }
 
-    // // thangnd add 31/7 Xóa tất cả bản ghi trong bảng esdHTKTpaymentEntry theo paymentId
-
-    // var entryPaymentFile = new SCFile("esdHTKTpaymentEntry");
-    // var entryPaymentQuery = "vendor.id=\"" + vendorId + "\" and payment.id=\"" + paymentId + "\"";
-
-
-    // if (entryPaymentFile.doSelect(entryPaymentQuery) === RC_SUCCESS) {
-    //     var rcDeleteEntry = entryPaymentFile.doDelete();
-    //     if (rcDeleteEntry !== RC_SUCCESS) {
-    //         return { status: "error", message: "Xóa payment entry thất bại" };
-    //     }
-    // }
-    // // 2. Xóa tất cả bản ghi trong bảng esdHTKTpaymentInvoice theo paymentId
-    // var prepInvFile = new SCFile("esdHTKTpaymentInvoice");
-    // var prepInvQuery = 'vendor.id="' + vendorId + '" and payment.id="' + paymentId + '"';
-
-    // if (prepInvFile.doSelect(prepInvQuery) === RC_SUCCESS) {
-
-    //     do {
-
-    //         // Lưu lại invoice.id trước khi xóa
-    //         var invoiceId = prepInvFile["invoice.id"];
-
-    //         // Xóa mapping
-    //         prepInvFile.doDelete();
-
-    //         // Update request.id của đúng invoice
-    //         var invFile = new SCFile("esdHTKTinvoice");
-    //         var invQuery =
-    //             'id="' + invoiceId +
-    //             '" and request.id="' + paymentId + '"';
-
-    //         if (invFile.doSelect(invQuery) === RC_SUCCESS) {
-    //             invFile["request.id"] = null;
-    //             invFile.doSave();
-    //         }
-
-    //     } while (prepInvFile.getNext() === RC_SUCCESS);
-    // }
-
-
     return {
         status: "success",
         message: "Xóa và cập nhật dữ liệu thành công"
