@@ -192,7 +192,7 @@ function getPaymentRemainingAmount(paymentId) {
         ['hdVendor.supplier.name', 'supplier_name', 'S'],
         ['hpv.payment.method', 'payment_method', 'S'],
         ['hpv.amount', 'amount', 'N'],
-        ['hdVendor.remaining.amount', 'remaining_amount', 'N'],
+        ['hpv.contract.amount', 'remaining_amount', 'N'],
         ['hv.vendor.number', 'tax_code', 'S'],
         ['hv.ogl.sync.status', 'ogl_sync_status', 'S'],
         ['hvs.ogl.site.code', 'ogl_site_code', 'S'],
