@@ -1329,7 +1329,7 @@ function normalizeEditedEntry(raw) {
         account_type: toStoredAccountType(raw.account_type),
         account_number: safeString(raw.account_number).trim(),
         account_name: safeString(raw.account_name).trim(),
-        branch: safeString(raw.branch).trim(),
+        branch: formatSegment1(raw.branch, GL_DEFAULT_ENTITY_CODE),
         department: safeString(raw.department).trim(),
         transaction_office: safeString(raw.transaction_office).trim(),
         amount: toNumber(raw.amount),
@@ -2280,6 +2280,7 @@ function buildEntryRow(params) {
     var account = params.accountOverride || resolveAccount(params.entryCode, params.vendor, params.taxInfo || {});
     var entryType = getEntryTypeByRuleCode(params.entryCode);
     var beneficiary = getBeneficiaryByEntryType(entryType, params.vendor);
+    var branch = params.branchOverride || params.request.creator_unit_code || '';
 
     return {
         id: '',
@@ -2290,10 +2291,9 @@ function buildEntryRow(params) {
         account_type: getAutoAccountType(params.entryCode),
         account_number: account.number,
         account_name: account.name,
-        branch: params.branchOverride || params.request.creator_unit_code || '',
-        department: params.departmentOverride || params.request.department,
-        transaction_office: params.transactionOfficeOverride ||
-                params.request.default_transaction_office_code || '',
+        branch: formatSegment1(branch, GL_DEFAULT_ENTITY_CODE),
+        department: params.departmentOverride,
+        transaction_office: params.transactionOfficeOverride,
         amount: params.amount,
         currency: params.vendor.currency,
         description: safeString(params.vendor.transaction_description).trim(),
@@ -2309,6 +2309,17 @@ function buildEntryRow(params) {
         // Chỉ dùng trong bước validate lúc khởi tạo case cá nhân; không lưu DB.
         allow_blank_amount: params.allowBlankAmount === true
     };
+}
+
+function formatSegment1(branch, defaultSegment1) {
+    var br = safeString(branch).trim();
+    if (br.length === 7 && br.substring(0, 2) === '10') {
+        return br;
+    }
+    if (br.length === 3 && /^\d+$/.test(br)) {
+        return '10' + br + '98';
+    }
+    return defaultSegment1;
 }
 
 /** Chuẩn hóa thông tin thụ hưởng theo loại bút toán hiển thị. */
