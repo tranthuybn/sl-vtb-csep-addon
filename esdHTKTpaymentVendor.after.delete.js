@@ -22,6 +22,7 @@ function handleRemoveVendorPaymentData(rec) {
 
     deleteTriggerRecords("esdHTKTpaymentInvoice", query);
     deleteTriggerRecords("esdHTKTpaymentCostDivision", query);
+    deleteTriggerRecords("esdHTKTpaymentEntry", query);
 }
 
 /** Xóa toàn bộ record của một bảng khớp query và trả về số dòng xóa thành công. */
