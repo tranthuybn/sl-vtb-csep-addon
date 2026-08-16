@@ -324,10 +324,6 @@ function getPaymentSummaryMeta(paymentId, request, metaParams) {
         additionalUnitCode: params.additionalUnitCode,
         additionalUnitEntityCode: params.additionalUnitEntityCode,
         additionalUnitName: params.additionalUnitName,
-        glUnitOptions: params.glUnitOptions,
-        glCostCenterOptions: params.glCostCenterOptions,
-        transactionOfficeOptions: params.transactionOfficeOptions,
-        defaultTransactionOfficeCode: params.defaultTransactionOfficeCode,
         // 1. Tổng số tiền thanh toán sau thuế (NUMBER) - Tổng số tiền đề nghị thanh toán của tất cả các NCC thuộc DNTT
         totalAmountAfterTax: totalPaidAmount,
         totalPaidAmount: totalPaidAmount,
@@ -391,18 +387,8 @@ function getListPaymentEntryByInputDetails(details) {
     var savedEntries = getSavedPaymentEntries(paymentId);
     debugPaymentEntry('GET-LIST', 'Đã đọc ' + savedEntries.length + ' dòng đã lưu, phase=' + currentPhase);
 
-    var glUnitOptions = [];
-    var glCostCenterOptions = [];
-    var transactionOfficeOptions = [];
-    var defaultTransactionOfficeCode = '';
-
     // Khi có dữ liệu đã lưu, không query options đồng bộ ở API load list để tối ưu hiệu năng (tách API call)
     // options sẽ được Frontend gọi bất đồng bộ riêng
-    if (savedEntries.length > 0) {
-        var creatorTransactionOfficeOptions = getTransactionOfficeOptions(creatorUnit.lv1Id);
-        defaultTransactionOfficeCode = getDefaultTransactionOfficeCode(creatorTransactionOfficeOptions);
-    }
-
     var summaryMeta = getPaymentSummaryMeta(paymentId, request, {
         currentPhase: currentPhase,
         userCheckerKttc: userCheckerKttc,
@@ -411,10 +397,7 @@ function getListPaymentEntryByInputDetails(details) {
         additionalUnitCode: creatorUnit.code,
         additionalUnitEntityCode: creatorUnit.entityCode,
         additionalUnitName: creatorUnit.name,
-        glUnitOptions: glUnitOptions,
-        glCostCenterOptions: glCostCenterOptions,
-        transactionOfficeOptions: transactionOfficeOptions,
-        defaultTransactionOfficeCode: defaultTransactionOfficeCode
+        
     });
 
     // Entry đã có thì trả ngay; dữ liệu nguồn được kiểm tra khi trigger gọi sinh lại.
@@ -422,9 +405,7 @@ function getListPaymentEntryByInputDetails(details) {
         debugPaymentEntry('GET-LIST', 'Trả dữ liệu đã lưu, không sinh lại');
         applyCreatorUnitToEntries(
                 savedEntries,
-                creatorUnit.code,
-                defaultTransactionOfficeCode,
-                glUnitOptions
+                creatorUnit.code
         );
         return makeResult(savedEntries, 'saved', summaryMeta);
     }
