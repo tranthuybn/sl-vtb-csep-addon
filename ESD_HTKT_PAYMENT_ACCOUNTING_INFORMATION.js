@@ -480,6 +480,17 @@ function formatSegment1(branch, defaultSegment1) {
     return defaultSegment1;
 }
 
+function formatBranchCode(branch, defaultBranchCode) {
+    var br = safeString(branch).trim();
+    if (br.length === 7 && br.substring(0, 2) === '10') {
+        return br.substring(2, 5);
+    }
+    if (br.length === 3 && /^\d+$/.test(br)) {
+        return br;
+    }
+    return defaultBranchCode;
+}
+
 function formatSegment2(segment1, department) {
     var seg1 = safeString(segment1).trim();
     var dept = safeString(department).trim();
@@ -540,7 +551,7 @@ function mapGlPayload(requestId, accountingDate, payment, context, entries) {
     }
     return { success: true, data: { requestId: requestId, accountingDate: accountingDate,
             currencyCode: entries[0].currency || 'VND', transactionDesc: payment.description || 'Hach toan GL',
-            branchCode: entries[0].branch || '000', source: 'QLTS', category: entries[0].type || TYPE_GL,
+            branchCode: formatBranchCode(entries[0].branch, '000'), source: 'QLTS', category: entries[0].type || TYPE_GL,
             createdby: context.maker, approvedby: context.approver, line: lines,
             text1: '', text2: '', text3: '', text4: '', text5: '' } };
 }
