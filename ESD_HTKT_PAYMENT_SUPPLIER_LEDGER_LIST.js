@@ -289,6 +289,7 @@ function getListAccountsPayable(input) {
             var payableAmount = getNumberField(file, ["pe.amount"]);
             var totalPayableAmountNotAccounted = getTotalPayableAmountNotAccounted(prepaymentId, currentPaymentId);
             var totalPayableAmountAccounted = getTotalPayableAmountAccounted(prepaymentId, currentPaymentId);
+            var totalTax = getTotalTax(prepaymentId);
 
 
             var item = {
@@ -307,7 +308,7 @@ function getListAccountsPayable(input) {
                 contractId: String(file["contractId"] || "").trim(),
                 description: currentPaymentEntryDescription,           // Nội dung diễn giải của đề nghị lần này
                 id: String(file["currentEntry.id"] || "").trim(),
-                totalTax: 0, // Cot thue - chua biet lay o dau
+                totalTax: totalTax,
                 totalAmountPaid: approvedInvoiceAmount - refundAmount - paidAmount - totalPayableAmountAccounted,  // Số tiền đã thanh toán (đã hạch toán xong và không thuộc ĐNTT hiện tại)
                 other_pending_amount: 0,   // Số tiền chờ duyệt ở các ĐNTT khác
                 currentPaymentAmount: currentPaymentEntryAmount,   // Số tiền thanh toán lần này (của ĐNTT hiện tại)
@@ -335,6 +336,35 @@ function getListAccountsPayable(input) {
     }
 
     return itemList;
+}
+
+
+
+function getTotalTax(prepaymentId) {
+    var totalTax = 0;
+    var paymentEntryFile = null;
+
+    if (!prepaymentId) return totalTax;
+
+    var query =
+            "SELECT amount FROM esdHTKTpaymentEntry " +
+            'WHERE entry.type = "TAX" ' +
+            'AND type = "AP" ' +
+            'AND payment.id = "' + escapeSmQueryValue(prepaymentId) + '"';
+
+    try {
+        paymentEntryFile = new SCFile("esdHTKTpaymentEntry", SCFILE_READONLY);
+        var rc = paymentEntryFile.doSelect(query);
+
+        while (rc == RC_SUCCESS) {
+            totalTax += getNumberField(paymentEntryFile, ["amount"]);
+            rc = paymentEntryFile.getNext();
+        }
+    } finally {
+        closeSCFile(paymentEntryFile);
+    }
+
+    return totalTax;
 }
 
 
