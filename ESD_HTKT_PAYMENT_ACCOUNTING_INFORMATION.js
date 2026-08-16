@@ -92,19 +92,6 @@ function generatePaymentAccountingInformation(paymentId, previewOnly) {
     if (!paymentId) return errorResult('Missing paymentId.');
     var payment = getPayment(paymentId);
     if (!payment.id) return errorResult('Khong tim thay de nghi thanh toan: ' + paymentId + '.');
-    // if (safeString(payment.current_phase).trim() !== CURRENT_PHASE_END) {
-    //     return {
-    //         success: true,
-    //         mode: 'skipped',
-    //         paymentId: paymentId,
-    //         currentPhase: paymentId.current_phase,
-    //         message: 'Chi sinh accounting information khi current.phase = end.',
-    //         deleted: 0,
-    //         inserted: 0,
-    //         updatedEntries: 0,
-    //         data: []
-    //     };
-    // }
 
     var vendors = getPaymentVendors(paymentId);
     var entries = getPaymentEntries(paymentId);
@@ -119,6 +106,15 @@ function generatePaymentAccountingInformation(paymentId, previewOnly) {
         var contextResult = buildVendorContext(payment, vendors[i]);
         if (!contextResult.success) return contextResult;
         var vendorEntries = filterEntriesByVendor(entries, vendors[i].vendor_id);
+        var totalDebit = sumEntryDebitAmounts(vendorEntries);
+        var totalCredit = sumEntryCreditAmounts(vendorEntries);
+        if (Math.abs(totalDebit - totalCredit) > 0.000001) {
+            return errorResult(
+                    'NCC ' + vendors[i].vendor_id +
+                    ': tong ghi no (' + totalDebit +
+                    ') khong bang tong ghi co (' + totalCredit + ').'
+            );
+        }
         var payloadResults = buildVendorPayloads(payment, vendors[i], vendorEntries,
                 contextResult.data, accountingDate);
         if (!payloadResults.success) return payloadResults;
@@ -269,6 +265,7 @@ function buildVendorPayloads(payment, vendorRow, entries, context, accountingDat
     var coreEntries = [];
     var payablePayments = [];
     var customerPaymentAmount = 0;
+    var payableDebitAmount = 0;
 
     for (var i = 0; i < entries.length; i++) {
         var entry = entries[i];
@@ -285,15 +282,15 @@ function buildVendorPayloads(payment, vendorRow, entries, context, accountingDat
             }
             continue;
         }
-        var isCase17 = toNumber(vendorRow.approved_invoice_amount) <= 0 &&
-                toNumber(vendorRow.amount) > 0 &&
-                toNumber(vendorRow.refund_amount) <= 0;
-        if (isCase17) {
-            if (debit) {
-                payablePayments.push(entry);
-            }
-            continue;
-        }
+        // var isCase17 = toNumber(vendorRow.approved_invoice_amount) <= 0 &&
+        //         toNumber(vendorRow.amount) > 0 &&
+        //         toNumber(vendorRow.refund_amount) <= 0;
+        // if (isCase17) {
+        //     if (debit) {
+        //         payablePayments.push(entry);
+        //     }
+        //     continue;
+        // }
         if (entryType === 'PAYABLE' && isCredit(entry.account_type)) {
             liabilityAccount = liabilityAccount || entry.account_number;
         }
@@ -302,13 +299,15 @@ function buildVendorPayloads(payment, vendorRow, entries, context, accountingDat
             apEntryIds.push(entry.id);
         }
         if (entryType === 'PAYABLE' && debit && toNumber(entry.amount) > 0) {
+            payableDebitAmount += toNumber(entry.amount);
             if (!safeString(entry.ap_code).trim()) {
                 return errorResult(
-                        'Entry ' + entry.id + ' tra khoan phai tra cu thieu ref.id.'
+                        'Entry ' + entry.id + ' tra khoan phai tra cu thieu ap.code.'
                 );
             }
-            applyList.push({ invoiceNumber: entry.ap_code, amount: entry.amount });
-            apEntryIds.push(entry.id);
+            // applyList.push({ invoiceNumber: entry.ap_code, amount: entry.amount });
+            // apEntryIds.push(entry.id);
+            payablePayments.push(entry);
             continue;
         }
         if (debit && (entryType === 'COST' || entryType === 'TAX')) {
@@ -324,9 +323,13 @@ function buildVendorPayloads(payment, vendorRow, entries, context, accountingDat
         var invoiceAmount = isPersonalVendor
                 ? sumInvoiceLineAmounts(apLines)
                 : vendorRow.approved_invoice_amount;
-        var amountPay = isPersonalVendor
+        var amountPayTemp = isPersonalVendor
                 ? customerPaymentAmount
                 : vendorRow.amount;
+        var remainingAmountPay = toNumber(amountPayTemp) - payableDebitAmount;
+        var amountPay = remainingAmountPay < 0
+                ? amountPayTemp
+                : remainingAmountPay;
         var invoicePayload = {
             requestId: invoiceRequestId, referenceId: payment.id,
             vendorNumber: context.vendorNumber,
@@ -345,7 +348,6 @@ function buildVendorPayloads(payment, vendorRow, entries, context, accountingDat
             invoiceLineList: apLines, applyList: applyList,
             vatList: getVatList(payment.id, context.vendorNumber, vendorRow.payment_vendor_count)
         };
-        print("validateInvoicePayload " + JSON.stringify(invoicePayload))
         var invoiceValidation = validateInvoicePayload(invoicePayload);
         if (!invoiceValidation.success) return invalidPayload('AP_INVOICE', invoiceValidation, invoicePayload);
         result.push(makePrepared(invoiceRequestId, TYPE_AP, SUB_PAYMENT,
@@ -356,7 +358,7 @@ function buildVendorPayloads(payment, vendorRow, entries, context, accountingDat
         var payableEntry = payablePayments[pp];
         var invoiceNumber = safeString(payableEntry.ap_code).trim();
         if (!invoiceNumber) return errorResult(
-                'Entry ' + payableEntry.id + ' cua TT-17 thieu ref.id (ma giao dich YCTT cu).');
+                'Entry ' + payableEntry.id + ' cua TT-17 thieu ap_code (ma giao dich YCTT cu).');
         var paymentRequestId = uuid();
         var paymentPayload = {
             requestId: paymentRequestId, referenceId: payment.id,
@@ -691,11 +693,11 @@ function getVatList(paymentId, vendorNumber, vendorCount) {
             });
     for (var i = 0; i < links.length; i++) {
         var invoice = selectOne(TABLE_INVOICE, 'id="' + escapeQueryValue(links[i].invoiceId) + '"', function (f) {
-            return { id: readText(f, 'id'), taxCode: readText(f, 'seller.tax.code') };
+            return { oglId: readText(f, 'ogl.id'), taxCode: readText(f, 'seller.tax.code') };
         });
         if (invoice && (toNumber(vendorCount) === 1 ||
                 normalizeIdentity(invoice.taxCode) === normalizeIdentity(vendorNumber))) {
-            result.push({ id: invoice.id, discountType: mapDiscountType(links[i].deductionType) });
+            result.push({ id: invoice.oglId, discountType: mapDiscountType(links[i].deductionType) });
         }
     }
     return result;
@@ -892,6 +894,16 @@ function sumEntryDebitAmounts(rows) {
     var n = 0;
     for (var i = 0; i < rows.length; i++) {
         if (isDebit(rows[i].account_type)) {
+            n += toNumber(rows[i].amount);
+        }
+    }
+    return n;
+}
+
+function sumEntryCreditAmounts(rows) {
+    var n = 0;
+    for (var i = 0; i < rows.length; i++) {
+        if (isCredit(rows[i].account_type)) {
             n += toNumber(rows[i].amount);
         }
     }
