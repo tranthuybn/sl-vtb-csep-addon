@@ -287,7 +287,7 @@ function getListAccountsPayable(input) {
             var refundAmount = getNumberField(file, ["pv.refund.amount"]);
             var paidAmount = getNumberField(file, ["pv.amount"]);
             var payableAmount = getNumberField(file, ["pe.amount"]);
-            var totalPayableAmountNotAccounted = getTotalPayableAmountNotAccounted(prepaymentId, currentPaymentId);
+            var totalPayableAmountNotAccounted = getTotalPayableAmount(prepaymentId, currentPaymentId);
             var totalPayableAmountAccounted = getTotalPayableAmountAccounted(prepaymentId, currentPaymentId);
             var totalTax = getTotalTax(prepaymentId);
 
@@ -309,7 +309,7 @@ function getListAccountsPayable(input) {
                 description: currentPaymentEntryDescription,           // Nội dung diễn giải của đề nghị lần này
                 id: String(file["currentEntry.id"] || "").trim(),
                 totalTax: totalTax,
-                totalAmountPaid: approvedInvoiceAmount - refundAmount - paidAmount - totalPayableAmountAccounted,  // Số tiền đã thanh toán (đã hạch toán xong và không thuộc ĐNTT hiện tại)
+                totalAmountPaid: paidAmount + refundAmount - totalPayableAmountAccounted,  // Số tiền đã thanh toán (đã hạch toán xong và không thuộc ĐNTT hiện tại)
                 other_pending_amount: 0,   // Số tiền chờ duyệt ở các ĐNTT khác
                 currentPaymentAmount: currentPaymentEntryAmount,   // Số tiền thanh toán lần này (của ĐNTT hiện tại)
                 totalRemainingAmount: payableAmount - totalPayableAmountNotAccounted,
@@ -398,7 +398,7 @@ function getTotalPayableAmountAccounted(prepaymentId, currentPaymentId) {
 }
 
 
-function getTotalPayableAmountNotAccounted(prepaymentId, currentPaymentId) {
+function getTotalPayableAmount(prepaymentId, currentPaymentId) {
     var totalAmount = 0;
     var paymentEntryFile = null;
 
@@ -408,7 +408,6 @@ function getTotalPayableAmountNotAccounted(prepaymentId, currentPaymentId) {
             "SELECT amount FROM esdHTKTpaymentEntry " +
             'WHERE entry.type = "PAYABLE" ' +
             'AND account.type = "DEBIT" ' +
-            'AND accounting.request.id = NULL ' +
             'AND payment.id ~= "' + escapeSmQueryValue(currentPaymentId) + '" '
             'AND ref.id = "' + escapeSmQueryValue(prepaymentId) + '"';
 
