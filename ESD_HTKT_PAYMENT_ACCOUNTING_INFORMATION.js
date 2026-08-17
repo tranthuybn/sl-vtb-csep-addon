@@ -311,7 +311,7 @@ function buildVendorPayloads(payment, vendorRow, entries, context, accountingDat
             continue;
         }
         if (debit && (entryType === 'COST' || entryType === 'TAX')) {
-            apLines.push(mapInvoiceLine(entry, context.segment1));
+            apLines.push(mapInvoiceLine(entry, context.segment1, apLines.length + 1));
             apEntryIds.push(entry.id);
         }
     }
@@ -521,9 +521,9 @@ function formatSegment2(segment1, department) {
     return dept.length === 6 || dept.length === 7 ? dept : SEGMENT_2_DEFAULT;
 }
 
-function mapInvoiceLine(entry, defaultSegment1) {
+function mapInvoiceLine(entry, defaultSegment1, lineNumber) {
     var segment1 = formatSegment1(entry.branch, defaultSegment1);
-    return { lineNum: entry.order, amount: entry.amount,
+    return { lineNum: lineNumber, amount: entry.amount,
         segment1: segment1,
         segment2: formatSegment2(segment1, entry.department),
         segment3: entry.account_number, segment4: SEGMENT_4_DEFAULT,
@@ -551,7 +551,7 @@ function mapGlPayload(requestId, accountingDate, payment, context, entries) {
     }
     return { success: true, data: { requestId: requestId, accountingDate: accountingDate,
             currencyCode: entries[0].currency || 'VND', transactionDesc: payment.description || 'Hach toan GL',
-            branchCode: formatBranchCode(entries[0].branch, '000'), source: 'QLTS', category: entries[0].type || TYPE_GL,
+            branchCode: formatBranchCode(entries[0].branch, '000'), source: 'QLTS', category: 'QLTS' || TYPE_GL,
             createdby: context.maker, approvedby: context.approver, line: lines,
             text1: '', text2: '', text3: '', text4: '', text5: '' } };
 }
