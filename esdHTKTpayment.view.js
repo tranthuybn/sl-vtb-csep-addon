@@ -50,11 +50,13 @@ vars["$showAccountingResultTab"] =
 
 if (vars.$L_file.department) {
     var unitId = vars.$L_file.department;
-    var orgUnitFile = new SCFile("esdQTorgUnit");
-
-    if (orgUnitFile.doSelect("unit.id=\"" + unitId + "\"") == RC_SUCCESS) {
-        vars.$departmentName = orgUnitFile["unit.name"];
-    }
+    try {
+        var orgUnitFile = new SCFile("esdQTorgUnit", SCFILE_READONLY);
+        if (orgUnitFile.doSelect("unit.id=\"" + unitId + "\"") == RC_SUCCESS) {
+            vars.$departmentName = orgUnitFile["unit.name"];
+        }
+        orgUnitFile.doClose();
+    } catch (eDept) { }
 }
 
 vars["$isKttc"] = false;
@@ -121,10 +123,9 @@ try {
     vars.$isDmms = false;
 }
 
-vars.$totalContractAmount = "0";
-vars.$totalPrepayment = 0;            // (1) Tổng giá trị đã tạm ứng
-vars.$totalPayment = 0;              // (2) Tổng giá trị đã thanh toán
-vars.$remainingContractValue = 0;   // (3) Tổng giá trị HĐ/KMS còn lại
+vars.$totalPrepayment = "0";            // (1) Tổng giá trị đã tạm ứng
+vars.$totalPayment = "0";              // (2) Tổng giá trị đã thanh toán
+vars.$remainingContractValue = "0";   // (3) Tổng giá trị HĐ/KMS còn lại
 
 var contractId = vars.$L_file.contract_id;
 
@@ -132,6 +133,7 @@ var contractId = vars.$L_file.contract_id;
 if (contractId) {
     try {
         // 1. Tính "Tổng giá trị đã tạm ứng" từ bảng esdHTKTprepaymentVendor
+        var totalPrepayment = "0";
         var prepaymentFile = new SCFile("esdHTKTprepayment", SCFILE_READONLY);
         var sqlPrepayment = 'contract.id="' + contractId + '"' +
             ' and (status="accounted")';
@@ -142,7 +144,12 @@ if (contractId) {
 
                 if (prepaymentVendorFile.doSelect('prepayment.id="' + prepaymentFile.id + '"') === RC_SUCCESS) {
                     do {
-                        vars.$totalPrepayment += Number(prepaymentVendorFile.amount || 0);
+
+                        totalPrepayment =
+                            lib.ESD_HTKT_Utils.addStringsManual(
+                                totalPrepayment,
+                                prepaymentVendorFile.amount
+                            );
                     } while (prepaymentVendorFile.getNext() === RC_SUCCESS);
                 }
 
@@ -153,25 +160,47 @@ if (contractId) {
 
         prepaymentFile.doClose();
         // 2. Tính "Tổng giá trị đã thanh toán" (ĐNTT có trạng thái = "Đã hạch toán")
+        var totalPayment = "0";
         var paymentFile = new SCFile("esdHTKTpayment", SCFILE_READONLY);
         var sqlPayment = 'contract.id="' + contractId + '" and status="accounted"';
         if (paymentFile.doSelect(sqlPayment) === RC_SUCCESS) {
             do {
-                vars.$totalPayment += (paymentFile["total.amount.paid"] || 0);
+                totalPayment =
+                    lib.ESD_HTKT_Utils.addStringsManual(
+                        totalPayment,
+                        paymentFile["total.amount.paid"]
+                    );
             } while (paymentFile.getNext() === RC_SUCCESS);
         }
         paymentFile.doClose();
 
         // 3. Tính "Tổng giá trị HĐ/KMS còn lại" 
-        var currentPrepaymentAmount = record["total.contract.amount"] || 0;
-        vars.$remainingContractValue = currentPrepaymentAmount - vars.$totalPrepayment - vars.$totalPayment;
-        function formatMoney(amount) {
-            return Math.round(amount).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-        }
+        var currentContractAmount = String(record["total.contract.amount"] || 0);
 
-        vars.$totalPrepayment = formatMoney(vars.$totalPrepayment);
-        vars.$totalPayment = formatMoney(vars.$totalPayment);
-        vars.$remainingContractValue = formatMoney(vars.$remainingContractValue);
+        var remainingContractValue =
+            lib.ESD_HTKT_Utils.subtractStringsManual(
+                currentContractAmount,
+                totalPrepayment
+            );
+
+        remainingContractValue =
+            lib.ESD_HTKT_Utils.subtractStringsManual(
+                remainingContractValue,
+                totalPayment
+            );
+
+
+        // =====================================================
+        // 4. GÁN KẾT QUẢ
+        // =====================================================
+        vars.$totalPrepayment =
+            totalPrepayment;
+
+        vars.$totalPayment =
+            totalPayment;
+
+        vars.$remainingContractValue =
+            remainingContractValue;
     } catch (eCalc) {
 
     }
