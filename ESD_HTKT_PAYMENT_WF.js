@@ -468,6 +468,13 @@ function validateFromCbKttc() {
             "Hóa đơn bắt buộc chọn loại khấu trừ"
         );
     }
+    //////////////////
+    // Validate số tiền hoàn ứng của tất cả nhà cung cấp có khớp nhau không
+    var refundMatchResult = validateAllVendorsRefundMatch(paymentId);
+    if (refundMatchResult.success !== true) {
+        errorMss.push(refundMatchResult.error);
+    }
+    //////////////////
 
     // Validate thông tin phê duyệt
     if (!record["user.approver.kttc"]) {
@@ -537,9 +544,9 @@ function validateRequiredEsdHTKTpaymentEntry(paymentId) {
             var amount = Number(f["amount"]) || 0;
             var accountType = f["account.type"];
 
-            if (accountType == "n\u1ee3") {
+            if (accountType == "DEBIT") {
                 totalDebit += amount;
-            } else if (accountType == "t\u00e0i s\u1ea3n") {
+            } else if (accountType == "ASSET") {
                 totalCredit += amount;
             }
 
@@ -1393,4 +1400,116 @@ function requestCorrection(record) {
         documentDeletion: deleteResult.data,
         recordMustBeSaved: true
     }, "Yêu cầu chỉnh sửa, xóa tài liệu và chuyển hồ sơ về cập nhật thành công.");
+}
+
+
+
+
+///START:SSAX01/////////////////////////////////////////////////////////////
+// --- CÁC HÀM HỖ TRỢ KIỂM TRA TẠM ỨNG TRÊN PHIẾU BỔ SUNG ---
+
+function checkRefundAmountMatch(paymentId, vendorId) {
+    if (!paymentId || !vendorId) {
+        return {
+            headerRefundAmount: 0,
+            totalListRefundAmount: 0,
+            isMatch: false
+        };
+    }
+
+    var headerRefundAmount = 0;
+    var paymentVendorFile = null;
+    try {
+        paymentVendorFile = new SCFile("esdHTKTpaymentVendor", SCFILE_READONLY);
+        var queryPv = 'payment.id = "' + escapeSmQueryValue(paymentId) + '" AND vendor.id = "' + escapeSmQueryValue(vendorId) + '"';
+        var rcPv = paymentVendorFile.doSelect(queryPv);
+        if (rcPv == RC_SUCCESS) {
+            headerRefundAmount = Number(paymentVendorFile["refund.amount"] || 0);
+        }
+    } catch (e) {
+        print("[DEBUG checkRefundAmountMatch] Error querying paymentVendor: " + e);
+    } finally {
+        if (paymentVendorFile) {
+            try { paymentVendorFile.doClose(); } catch (e) {}
+        }
+    }
+
+    var totalListRefundAmount = 0;
+    var entryFile = null;
+    try {
+        entryFile = new SCFile("esdHTKTpaymentEntry", SCFILE_READONLY);
+        var queryEntry = 'payment.id = "' + escapeSmQueryValue(paymentId) + '" AND vendor.id = "' + escapeSmQueryValue(vendorId) + '" AND entry.type = "PREPAYMENT"';
+        var rcEntry = entryFile.doSelect(queryEntry);
+        while (rcEntry == RC_SUCCESS) {
+            totalListRefundAmount += Number(entryFile["amount"] || 0);
+            rcEntry = entryFile.getNext();
+        }
+    } catch (e2) {
+        print("[DEBUG checkRefundAmountMatch] Error querying paymentEntry: " + e2);
+    } finally {
+        if (entryFile) {
+            try { entryFile.doClose(); } catch (e) {}
+        }
+    }
+
+    var intHeader = Math.round(headerRefundAmount * 100000);
+    var intTotalList = Math.round(totalListRefundAmount * 100000);
+    var isMatch = (intHeader === intTotalList);
+
+    return {
+        headerRefundAmount: headerRefundAmount,
+        totalListRefundAmount: totalListRefundAmount,
+        isMatch: isMatch
+    };
+}
+
+// Thêm hàm kiểm tra tất cả nhà cung cấp sử dụng JOIN để lấy vendor.number đưa vào thông báo lỗi
+function validateAllVendorsRefundMatch(paymentId) {
+    if (!paymentId) {
+        return { success: false, error: "Không tìm thấy mã đề nghị thanh toán." };
+    }
+
+    var pvFile = null;
+    try {
+        pvFile = new SCFile("esdHTKTpaymentVendor", SCFILE_READONLY);
+        
+        var select = "SELECT pv.vendor.id, v.vendor.number";
+        var mapping = " FROM esdHTKTpaymentVendor pv JOIN esdHTKTvendor v ON (pv.vendor.id = v.id)";
+        var control = ' WHERE pv.payment.id = "' + escapeSmQueryValue(paymentId) + '"';
+        
+        var rc = pvFile.doSelect(select + mapping + control);
+
+        while (rc == RC_SUCCESS) {
+            var vendorId = String(pvFile["vendor.id"] || "").trim();
+            // Lấy vendor.number từ bảng esdHTKTvendor đã join
+            var vendorNumber = String(pvFile["v.vendor.number"] || vendorId).trim();
+            
+            if (vendorId) {
+                var checkResult = checkRefundAmountMatch(paymentId, vendorId);
+                if (!checkResult.isMatch) {
+                    return {
+                        success: false,
+                        error: "Số tiền hoàn ứng lần này của nhà cung cấp " + vendorNumber + " không khớp với tổng số tiền hoàn ứng lần này trong danh sách công nợ (Trên phiếu: " + checkResult.headerRefundAmount + ", Tổng trên danh sách: " + checkResult.totalListRefundAmount + ")."
+                    };
+                }
+            }
+            rc = pvFile.getNext();
+        }
+        return { success: true };
+    } catch (e) {
+        return {
+            success: false,
+            error: "Lỗi kiểm tra số tiền hoàn ứng của nhà cung cấp: " + e
+        };
+    } finally {
+        if (pvFile) {
+            try { pvFile.doClose(); } catch (e) {}
+        }
+    }
+}
+
+function escapeSmQueryValue(value) {
+    return String(value || "")
+            .replace(/\\/g, "\\\\")
+            .replace(/"/g, '\\"');
 }
