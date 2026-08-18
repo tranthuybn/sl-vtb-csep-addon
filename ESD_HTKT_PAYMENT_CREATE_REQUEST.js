@@ -110,10 +110,12 @@ function createPaymentRequest(input) {
             );
 
             //Đồng bộ giá trị Tạm ứng/Thanh toán giữa Squad 6 và Squad 2
+            try {
+                lib.ESD_HD_Integration.createContractPayment(paymentRec);
+            } catch (ex) {
+                print("[ERROR] Đồng bộ createContractPayment thất bại cho ID: " + paymentRec["id"] + " | Detail: " + ex);
+            }
 
-            //
-            lib.ESD_HD_Integration.createContractPayment(paymentRec);
-            //
 
             return {
                 success: true,
@@ -134,17 +136,6 @@ function createPaymentRequest(input) {
 }
 
 function mapPaymentRecord(paymentRec, contractData, paymentId) {
-    var amount = lib.ESD_HD_COMMON.calculateContractAmount(contractData['id']);
-    var numericAmount = 0;
-    if (amount && amount.contractValueAfterTax) {
-        var cleanAmountStr = String(amount.contractValueAfterTax).replace(/[^0-9.-]/g, "");
-        numericAmount = Number(cleanAmountStr);
-    }
-
-    if (isNaN(numericAmount)) {
-        numericAmount = 0;
-    }
-
     // Để null để hệ thống tự động tăng ID khi insert
     paymentRec['id'] = paymentId;
 
@@ -173,7 +164,7 @@ function mapPaymentRecord(paymentRec, contractData, paymentId) {
     paymentRec['created.at'] = new Date();
     paymentRec['created.by'] = contractData['createdBy'];
     paymentRec['currency'] = "VND";
-    paymentRec['total.contract.amount'] = numericAmount;
+    paymentRec['total.contract.amount'] = contractData['totalValue'] || 0;
     paymentRec['contract.id'] = contractData['id'];
     paymentRec['contract.name'] = contractData['name'];
     paymentRec['current.phase'] = "start";
@@ -202,8 +193,6 @@ function mapPaymentRecord(paymentRec, contractData, paymentId) {
             " chưa có quyền phù hợp để lập phiếu thanh toán. Cần quyền lập đề nghị thanh toán; nếu là KTTC cần thêm quyền nhập liệu hạch toán."
         );
     }
-
-    //    lib.ESD_HTKT_INVOICE_INTEGRATION.get5MillionLimitStatus();
 
 }
 
@@ -322,7 +311,23 @@ function listPurchaseContracts() {
 }
 
 function mapRowToObject(scFileRecord, fieldMappings) {
+    var item = {};
+    for (var j = 0; j < fieldMappings.length; j++) {
+        var jsonKey = fieldMappings[j][1];
+        var dataType = fieldMappings[j][2];
+        var dbValue = scFileRecord[j];
+
+        if (dataType === "N") {
+            item[jsonKey] = dbValue ? Number(dbValue) : 0;
+        } else if (dataType === "D") {
+            item[jsonKey] = dbValue ? (dbValue.toISOString ? dbValue.toISOString() : String(dbValue)) : "";
+        } else {
+            item[jsonKey] = dbValue ? String(dbValue) : "";
+        }
+    }
+    return item;
 }
+
 
 
 function listPurchaseContracts(input) {
@@ -352,7 +357,7 @@ function listPurchaseContracts(input) {
     if (!currentUser) {
         return {
             success: false,
-            message: "Không xác định được người tạo phiếu tạm ứng."
+            message: "Không xác định được người tạo phiếu thanh toán."
         };
     }
 
@@ -407,6 +412,10 @@ function listPurchaseContracts(input) {
         conditions.push("status=\"" + params.status + "\"");
     }
     
+    var unitLv1Param = params.unitLv1 || params["unit.lv1"];
+    if (unitLv1Param) {
+        conditions.push("unit.lv1=\"" + unitLv1Param + "\"");
+    }
 
     var whereClause = conditions.length > 0 ? conditions.join(" and ") : "true";
 
@@ -427,6 +436,13 @@ function listPurchaseContracts(input) {
 
         while (rc == RC_SUCCESS) {
             var itemData = mapRowToObject(f, fieldMappings);
+
+            // --- XỬ LÝ ĐỔI GIÁ TRỊ CỦA NAME THEO CATEGORY ---
+            if (itemData.category === "HD_KMS") {
+                itemData.name = itemData["item.name"] || itemData.name;
+            } else if (itemData.category === "HD_GT") {
+                itemData.name = itemData.name; 
+            }
 
             var wrappedItem = {
                 "esdHTKTpaymentPurchaseContracts": itemData
