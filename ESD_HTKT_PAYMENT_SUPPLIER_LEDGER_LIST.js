@@ -379,7 +379,7 @@ function getTotalPayableAmountAccounted(prepaymentId) {
             "SELECT amount FROM esdHTKTpaymentEntry " +
             'WHERE entry.type = "PAYABLE" ' +
             'AND account.type = "DEBIT" ' +
-            'AND accounting.request.id != NULL ' +
+            'AND accounting.request.id ~= NULL ' +
             'AND payment.id = "' + escapeSmQueryValue(prepaymentId) + '"';
 
     try {
