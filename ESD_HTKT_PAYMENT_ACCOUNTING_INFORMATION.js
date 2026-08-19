@@ -159,7 +159,7 @@ function generatePaymentAccountingInformation(paymentId, previewOnly) {
         }
 
         var glMaker = safeString(payment.created_by).trim();
-        var glApprover = safeString(payment.user_approver_final).trim();
+        var glApprover = safeString(payment.user_approver_kttc).trim();
         var glContext = { maker: glMaker, approver: glApprover, checker: glApprover };
 
         for (var gk = 0; gk < glGroupKeys.length; gk++) {
