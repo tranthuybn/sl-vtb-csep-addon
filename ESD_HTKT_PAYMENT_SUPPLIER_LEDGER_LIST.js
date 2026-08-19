@@ -287,8 +287,8 @@ function getListAccountsPayable(input) {
             var refundAmount = getNumberField(file, ["pv.refund.amount"]);
             var paidAmount = getNumberField(file, ["pv.amount"]);
             var payableAmount = getNumberField(file, ["pe.amount"]);
-            var totalPayableAmountNotAccounted = getTotalPayableAmount(prepaymentId, currentPaymentId);
-            var totalPayableAmountAccounted = getTotalPayableAmountAccounted(prepaymentId, currentPaymentId);
+            var totalPayableAmount = getTotalPayableAmount(prepaymentId, currentPaymentId);
+            var totalPayableAmountAccounted = getTotalPayableAmountAccounted(prepaymentId);
             var totalTax = getTotalTax(prepaymentId);
 
 
@@ -312,7 +312,7 @@ function getListAccountsPayable(input) {
                 totalAmountPaid: paidAmount + refundAmount - totalPayableAmountAccounted,  // Số tiền đã thanh toán (đã hạch toán xong và không thuộc ĐNTT hiện tại)
                 other_pending_amount: 0,   // Số tiền chờ duyệt ở các ĐNTT khác
                 currentPaymentAmount: currentPaymentEntryAmount,   // Số tiền thanh toán lần này (của ĐNTT hiện tại)
-                totalRemainingAmount: payableAmount - totalPayableAmountNotAccounted,
+                totalRemainingAmount: payableAmount - totalPayableAmount,
                 currency: ""
             };
 
@@ -369,7 +369,7 @@ function getTotalTax(prepaymentId) {
 
 
 
-function getTotalPayableAmountAccounted(prepaymentId, currentPaymentId) {
+function getTotalPayableAmountAccounted(prepaymentId) {
     var totalAmount = 0;
     var paymentEntryFile = null;
 
@@ -380,7 +380,7 @@ function getTotalPayableAmountAccounted(prepaymentId, currentPaymentId) {
             'WHERE entry.type = "PAYABLE" ' +
             'AND account.type = "DEBIT" ' +
             'AND accounting.request.id != NULL ' +
-            'AND ref.id = "' + escapeSmQueryValue(prepaymentId) + '"';
+            'AND payment.id = "' + escapeSmQueryValue(prepaymentId) + '"';
 
     try {
         paymentEntryFile = new SCFile("esdHTKTpaymentEntry", SCFILE_READONLY);

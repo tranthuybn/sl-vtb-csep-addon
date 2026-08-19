@@ -180,7 +180,7 @@ var GL_DEFAULT_TRANSACTION_OFFICE = '0000000';
 var GL_UNIT_PREFERRED_PS_CODE = {
     '1010098': '99901000'
 };
-var CASH_CUSTOMER_ACCOUNT_NUMBER = '99999999';
+var CASH_CUSTOMER_ACCOUNT_NUMBER = '101110100';
 var CASH_CUSTOMER_ACCOUNT_NAME = 'Tài khoản tiền mặt';
 
 // =============================================================================
@@ -1958,7 +1958,8 @@ function buildPaymentNoCase(c) {
                 order: order++,
                 accountOverride: { number: division.account_number, name: division.account_name },
                 departmentOverride: division.department,
-                branchOverride: division.branch
+                branchOverride: division.branch,
+                transactionOfficeOverride: division.transactionCode
             }));
         }
 
@@ -2022,7 +2023,8 @@ function buildPersonalPaymentCase(c, includeRefund, includePayment, accountingCr
                 name: expenseAccounts[i].account_name
             },
             departmentOverride: expenseAccounts[i].department,
-            branchOverride: expenseAccounts[i].branch
+            branchOverride: expenseAccounts[i].branch,
+            transactionOfficeOverride: expenseAccounts[i].transactionCode
         }));
     }
 
@@ -2095,6 +2097,7 @@ function getPersonalExpenseAccounts(c) {
                 account_name: division.account_name || getGlAccountName(accountNumber),
                 department: division.department,
                 branch: division.branch,
+                transactionCode: division.transaction_code,
                 amount: 0,
                 from_cost_division: true
             };
@@ -2138,6 +2141,7 @@ function getStandardExpenseAllocations(c) {
                 account_name: division.account_name || getGlAccountName(accountNumber),
                 department: division.department,
                 branch: division.branch,
+                transactionCode: division.transaction_code,
                 amount: 0
             };
             allocationByAccount[accountNumber] = allocation;
@@ -2194,7 +2198,8 @@ function buildStandardPaymentCase(c, includeInvoice, includeTax, includeRefund, 
                 order: order++,
                 accountOverride: { number: division.account_number, name: division.account_name },
                 departmentOverride: division.department,
-                branchOverride: division.branch
+                branchOverride: division.branch,
+                transactionOfficeOverride: division.transactionCode
             }));
         }
 
@@ -2754,6 +2759,7 @@ function getPaymentCostDivisions(paymentId, vendorId) {
             currency: readText(f, 'currency'),
             department: readText(f, 'department'),
             department_name: readText(f, 'department.name'),
+            transaction_code: readText(f, 'transaction.code'),
             branch: readText(f, 'branch'),
             description: readText(f, 'description'),
             vendor_id: readText(f, 'vendor.id'),
@@ -4259,7 +4265,7 @@ function normalizeText(value) {
     var text = safeString(value).toLowerCase();
 
     try {
-        if (text.normalize) text = text.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        if (text.normalize) text =text.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     } catch (e) {}
 
     return text
