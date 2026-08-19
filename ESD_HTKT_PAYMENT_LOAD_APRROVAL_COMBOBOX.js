@@ -935,7 +935,6 @@ function loadPaymentApprovalComboBoxes() {
                 "contact.name",
                 "full.name",
                 "position",
-                "position.name",
                 "status"
             ]);
 
@@ -967,7 +966,6 @@ function loadPaymentApprovalComboBoxes() {
                     );
 
                     var position = normalizeValue(
-                        contactFile["position.name"] ||
                         contactFile["position"]
                     );
 
