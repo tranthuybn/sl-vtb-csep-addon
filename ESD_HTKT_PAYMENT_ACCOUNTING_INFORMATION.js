@@ -491,41 +491,16 @@ function formatBranchCode(branch, defaultBranchCode) {
     return defaultBranchCode;
 }
 
-function formatSegment2(segment1, department) {
-    var seg1 = safeString(segment1).trim();
+function formatSegment2(department) {
     var dept = safeString(department).trim();
-
-    if (!dept || dept === '000000' || dept === '0' || dept === '00') {
-        return SEGMENT_2_DEFAULT;
-    }
-
-    if (seg1.length === 7 && seg1.substring(0, 2) === '10') {
-        var prefix = seg1.substring(0, 5); // 10xxx
-        var suffix = '';
-        if (dept.length === 9) {
-            suffix = dept.substring(7, 9); // yy (last 2 digits)
-        } else if (dept.length === 6) {
-            suffix = dept.substring(4, 6); // yy (last 2 digits)
-        } else if (dept.length === 7 && dept.substring(0, 2) === '10') {
-            return dept;
-        } else if (dept.length === 2) {
-            suffix = dept;
-        }
-        if (suffix && suffix !== '00') {
-            return prefix + suffix; // 10xxxyy (7 characters)
-        }
-    }
-    if (dept.length === 9 && dept.charAt(0) === '0') {
-        return dept.substring(2, 8); // 6 characters
-    }
-    return dept.length === 6 || dept.length === 7 ? dept : SEGMENT_2_DEFAULT;
+    return dept.length === 6 ? dept : SEGMENT_2_DEFAULT;
 }
 
 function mapInvoiceLine(entry, defaultSegment1, lineNumber) {
     var segment1 = formatSegment1(entry.branch, defaultSegment1);
     return { lineNum: lineNumber, amount: entry.amount,
         segment1: segment1,
-        segment2: formatSegment2(segment1, entry.department),
+        segment2: formatSegment2(entry.department),
         segment3: entry.account_number, segment4: SEGMENT_4_DEFAULT,
         segment5: SEGMENT_5_DEFAULT,
         segment6: safeString(entry.transaction_code).trim() || SEGMENT_6_DEFAULT,
@@ -537,7 +512,7 @@ function mapGlPayload(requestId, accountingDate, payment, context, entries) {
     for (var i = 0; i < entries.length; i++) {
         var debit = isDebit(entries[i].account_type);
         var segment1 = formatSegment1(entries[i].branch, SEGMENT_1_DEFAULT);
-        var segment2 = formatSegment2(segment1, entries[i].department);
+        var segment2 = formatSegment2(entries[i].department);
         var segment6 = safeString(entries[i].transaction_code).trim() || SEGMENT_6_DEFAULT;
         lines.push({ segment1: segment1,
             segment2: segment2,
