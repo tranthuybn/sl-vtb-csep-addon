@@ -408,8 +408,9 @@ function getTotalPayableAmount(prepaymentId, currentPaymentId) {
             "SELECT amount FROM esdHTKTpaymentEntry " +
             'WHERE entry.type = "PAYABLE" ' +
             'AND account.type = "DEBIT" ' +
-            'AND payment.id ~= "' + escapeSmQueryValue(currentPaymentId) + '" '
-            'AND ref.id = "' + escapeSmQueryValue(prepaymentId) + '"';
+            'AND ref.id = "' + escapeSmQueryValue(prepaymentId) + '" '
+            'AND payment.id ~= "' + escapeSmQueryValue(currentPaymentId) + '"';
+
 
     try {
         paymentEntryFile = new SCFile("esdHTKTpaymentEntry", SCFILE_READONLY);
