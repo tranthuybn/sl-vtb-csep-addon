@@ -329,7 +329,18 @@ function cancelRequest(record) {
     }
 }
 
-function returnToUpdate(record) {
+function returnToUpdate(record, documentsAlreadyDeleted) {
+    if (documentsAlreadyDeleted !== true) {
+        var deleteResult = deleteDocumentsBeforeReturn(record);
+        if (!deleteResult || deleteResult.success !== true) {
+            throw new Error(
+                deleteResult && deleteResult.message
+                    ? deleteResult.message
+                    : "Khong xoa duoc tai lieu ECM truoc khi yeu cau chinh sua."
+            );
+        }
+    }
+
     record.status = "request_edit";
 
     try {
@@ -619,6 +630,16 @@ function validateVendorAndPaymentDetails(record) {
         }
     }
 
+    function parseAmount(value) {
+        if (value === null || value === undefined) return NaN;
+
+        var normalizedValue = String(value).replace(/,/g, "").trim();
+        if (!normalizedValue) return NaN;
+
+        var numberValue = Number(normalizedValue);
+        return isFinite(numberValue) ? numberValue : NaN;
+    }
+
     var vendorName = vars.$supplierId;
     if (!vendorName) {
         errorMss.push("Tên Nhà cung cấp là bắt buộc.");
@@ -633,14 +654,14 @@ function validateVendorAndPaymentDetails(record) {
         checkMaxLength(taxCode, 255, "Thông tin Mã số thuế");
     }
 
-    var amountField = parseFloat(vars.$amount);
-    var approvedInvoiceAmount = parseFloat(vars.$approvedInvoiceAmount);
-    var refundAmount = parseFloat(vars.$refundAmount);
-    var remainingAmount = parseFloat(vars.$remainingAmount || 0);
+    var amountField = parseAmount(vars.$amount);
+    var approvedInvoiceAmount = parseAmount(vars.$approvedInvoiceAmount);
+    var refundAmount = parseAmount(vars.$refundAmount);
+    var remainingAmount = parseAmount(vars.$remainingAmount);
     
     if (isNaN(amountField)) {
         errorMss.push("Số tiền đề nghị thanh toán là bắt buộc.");
-    } else if (isNaN(amountField) || amountField < 0) {
+    } else if (amountField < 0) {
         errorMss.push("Số tiền đề nghị thanh toán phải lớn hơn 0.");
     } else if (amountField > remainingAmount) {
         errorMss.push("Số tiền đề nghị thanh toán phải nhỏ hơn hoặc bằng Số tiền còn lại.");
@@ -685,14 +706,28 @@ function validateVendorAndPaymentDetails(record) {
             if (!record["beneficiary.bank"]) {
                 errorMss.push("Ngân hàng thụ hưởng không được để trống.");
             } else {
-               var bankValue = String(record["beneficiary.bank"]);
+                var bankValue = String(record["beneficiary.bank"]).trim();
                 checkMaxLength(bankValue, 255, "Ngân hàng thụ hưởng");
+                
+                // Lấy danh sách Value List từ biến $bankcode của hệ thống
+                var validBankCodes = vars.$bankcode;
+                var isBankValid = false;
 
-                // Kiểm tra theo format chuỗi trả về từ Droplist
-                // logic split('|') == 3, nên nếu người dùng gõ tay sẽ không có đủ 3 phần)
-                var bankSplit = bankValue.split('|');
-                if (bankSplit.length !== 3) {
-                    errorMss.push("Ngân hàng thụ hưởng không hợp lệ. Vui lòng chọn ngân hàng từ danh sách.");
+                if (validBankCodes != null) {
+                    // Ép kiểu về mảng Javascript chuẩn (phòng trường hợp là SCArray của HPSM)
+                    var bankCodeArray = (typeof validBankCodes.toArray === 'function') ? validBankCodes.toArray() : validBankCodes;
+                    
+                    // Kiểm tra giá trị có nằm trong Value List không
+                    for (var i = 0; i < bankCodeArray.length; i++) {
+                        if (bankCodeArray[i] != null && String(bankCodeArray[i]).trim() === bankValue) {
+                            isBankValid = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (!isBankValid) {
+                    errorMss.push("Ngân hàng thụ hưởng không hợp lệ. Vui lòng chọn ngân hàng có trong danh sách.");
                 }
             }
 
@@ -726,27 +761,19 @@ function validateVendorAndPaymentDetails(record) {
                 }
             }
 
-            if (!record["issued.date"]) {
-                errorMss.push("Ngày cấp giấy tờ tùy thân không được để trống.");
-            } else {
-                var issuedDate = new Date(record["issued.date"]);
-                
-                // Kiểm tra xem định dạng ngày có hợp lệ không
-                if (isNaN(issuedDate.getTime())) {
-                    errorMss.push("Định dạng ngày cấp giấy tờ tùy thân không hợp lệ.");
-                } else {
-                    var currentDate = new Date();
-                    
-                    // Set cả 2 mốc thời gian về 00:00:00 để so sánh chính xác theo ngày
-                    currentDate.setHours(0, 0, 0, 0);
-                    issuedDate.setHours(0, 0, 0, 0);
-
-                    // Validate nhỏ hơn ngày hiện tại (không được bằng hoặc lớn hơn)
-                    if (issuedDate.getTime() >= currentDate.getTime()) {
-                        errorMss.push("Ngày cấp giấy tờ tùy thân phải nhỏ hơn ngày hiện tại.");
-                    }
-                }
-            }
+         if (!record["issued.date"]) { 
+			    errorMss.push("Ngày cấp giấy tờ tùy thân không được để trống."); 
+			} else {
+			    var issuedDate = new Date(record["issued.date"]);
+			    var today = new Date();
+			
+			    issuedDate.setHours(0, 0, 0, 0);
+			    today.setHours(0, 0, 0, 0);
+			
+			   if (issuedDate > today) {
+			        errorMss.push("Ngày cấp giấy tờ tùy thân không được vượt quá ngày hiện tại.");
+			    }
+			}
 
             if (!record["issued.place"]) {
                 errorMss.push("Nơi cấp giấy tờ tùy thân không được để trống.");
@@ -1183,6 +1210,37 @@ function prepareApprovalForSignature(record) {
     }, "Đã chuẩn bị context ký số.");
 }
 
+/*
+ * Dùng trong Condition của RuleSet sau khi popup ký đóng.
+ * Chỉ trả T khi attachment hiện hành đã được thay bằng bản sau ký.
+ */
+function checkSignatureSucceeded(record) {
+    try {
+        htktWfAssertDependencies(true);
+
+        var oldAttachmentId = String(vars["$L.htktSignOldAttachmentId"] || "").trim();
+        var oldObjectId = String(vars["$L.htktSignOldObjectId"] || "").trim();
+        if (!record || !oldAttachmentId || !oldObjectId) return "F";
+
+        var currentResult = htktWfDocument().getCurrentPresentation({
+            paymentId: htktWfPaymentId(record)
+        });
+        if (!currentResult || currentResult.success !== true || !currentResult.data) return "F";
+
+        var currentAttachmentId = String(currentResult.data.id || "").trim();
+        var currentObjectId = String(currentResult.data.ecmObjectId || "").trim();
+
+        return currentAttachmentId &&
+            currentObjectId &&
+            currentAttachmentId !== oldAttachmentId &&
+            currentObjectId !== oldObjectId
+                ? "T"
+                : "F";
+    } catch (ignore) {
+        return "F";
+    }
+}
+
 function htktWfDsmStatus(value) {
     var status = htktWfCommon().trim(value);
     return status.length === 1 ? "0" + status : status;
@@ -1382,7 +1440,7 @@ function requestCorrection(record) {
     }
 
     try {
-        returnToUpdate(record);
+        returnToUpdate(record, true);
     } catch (errorReturn) {
         return htktWfFailException(
             "RETURN_TO_UPDATE_EXCEPTION",
