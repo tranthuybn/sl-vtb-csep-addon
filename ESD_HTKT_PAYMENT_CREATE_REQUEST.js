@@ -196,30 +196,32 @@ function mapPaymentRecord(paymentRec, contractData, paymentId) {
 
 }
 
-function nextId1(name) {
-    var nextNumber = new SCDatum();
-    funcs.rtecall("getnumber", 1, nextNumber, name);
-    return nextNumber;
-}
 
 function generateDocumentCode(docType, branchCode) {
     var now = new Date();
-    var year = (now.getFullYear() % 100).toString();
+    var year = (now.getFullYear() % 100).toString(); // "26"
+
+    var queryPattern = docType + ".*." + year + ".*";
+    var query = 'id like "' + queryPattern + '"';
 
     var file = new SCFile("esdHTKTpayment");
-    var query = "id like \"" + docType + ".*." + year + ".*\"";
-
-    file.setOrderBy(["id"], [SCFILE_DSC]);
     var rc = file.doSelect(query);
 
-    var newSeq = 1;
-    if (rc == RC_SUCCESS) {
-        var lastId = file.id; 
-        var parts = lastId.split(".");
-        var lastSeq = parseInt(parts[3], 10);
-        newSeq = lastSeq + 1;
+    var maxSeq = 0;
+
+    while (rc == RC_SUCCESS) {
+        var currentId = file.id;
+        if (currentId) {
+            var parts = currentId.split(".");
+            var seq = parseInt(parts[parts.length - 1], 10);
+            if (!isNaN(seq) && seq > maxSeq) {
+                maxSeq = seq;
+            }
+        }
+        rc = file.getNext();
     }
 
+    var newSeq = maxSeq + 1;
     var seqStr = ("0000000" + newSeq).slice(-7);
 
     return docType + "." + branchCode + "." + year + "." + seqStr;
