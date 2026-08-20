@@ -252,7 +252,8 @@ function getListAccountsPayable(input) {
             "JOIN esdHTKTpaymentEntry pe " +
             "ON (ai.prepayment.id = pe.payment.id " +
             'AND pe.entry.type = "PAYABLE" ' +
-            'AND pe.account.type = "ASSET") ' +
+            'AND pe.account.type = "ASSET" ' +
+            'AND pe.vendor.id = "' + escapeSmQueryValue(vendorId) + '") ' +
             "JOIN esdHTKTpaymentVendor pv " +
             "ON (pv.payment.id = pe.payment.id " +
             'AND pv.vendor.id = "' + escapeSmQueryValue(vendorId) + '") ' +
