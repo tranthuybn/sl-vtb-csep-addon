@@ -2,8 +2,6 @@ var createActivity = lib.ESD_Utils.createActivity;
 
 function run() {
 
-    print('esdAddonCustomAPI - ATTACHMENT');
-    console.log('log - esdAddonCustomAPI - ATTACHMENT');
     try {
         var input = vars['$L.file'];
 
@@ -105,38 +103,16 @@ function addFileAttachment(fileInput) {
     }
 }
 
-//function mapPaymentAttachment(itemRec, feeData, feeId) {
-//
-//    itemRec['id'] = feeId;                                     
-//    itemRec['payment.id'] = feeData['transactionId'];                  
-//    
-//    itemRec['ecm.doc.id'] = feeData['ecm.doc.id'] || feeData['attach.id']; 
-//    itemRec['ecm.object.id'] = feeData['id'] || feeData['ecm.object.id']; 
-//    itemRec['name'] = feeData['name'] || feeData['invoice.name']; 
-//    
-//    itemRec['uploaded.by'] = feeData['uploaded.by'] || feeData['executor'] 
-//    
-//    if (feeData['size'] !== undefined && feeData['size'] !== null) {
-//        itemRec['size'] = feeData['size'].toString();
-//    } else if (feeData['sizeKb'] !== undefined && feeData['sizeKb'] !== null) {
-//        itemRec['size'] = feeData['sizeKb'].toString();
-//    } else {
-//        itemRec['size'] = "0";
-//    }
-//
-//    itemRec['doc.code'] = feeData['doc.code'] || feeData['document.type'] || "DINH_KEM";
-//    itemRec['group.code'] = feeData['group.code'] || "";
-//}
-
 function mapPaymentAttachment(itemRec, feeData, feeId) {
     itemRec['id'] = feeId;
     itemRec['payment.id'] = feeData['transactionId'];
 
-    itemRec['ecm.doc.id'] = feeData['doc.id'] || feeData['ecm.doc.id'] || feeData['attach.id'];
-    itemRec['ecm.object.id'] = feeData['id'] || feeData['ecm.object.id'];
-
-    itemRec['name'] = feeData['name'] || feeData['file.name'] || feeData['invoice.name'];
-    itemRec['uploaded.by'] = feeData['uploaded.by'] || feeData['executor'];
+    itemRec['ecm.doc.id'] = feeData['doc.id'];
+    itemRec['ecm.object.id'] = feeData['attach.id'];
+    
+    itemRec['name'] = feeData['name']; 
+    
+    itemRec['uploaded.by'] = feeData['executor'] ;
 
     if (feeData['size'] !== undefined && feeData['size'] !== null) {
         itemRec['size'] = feeData['size'].toString();
@@ -145,13 +121,8 @@ function mapPaymentAttachment(itemRec, feeData, feeId) {
     } else {
         itemRec['size'] = "0";
     }
-
-    itemRec['doc.code'] = feeData['doc.code'] || feeData['document.type'] || "DINH_KEM";
-    itemRec['group.code'] = feeData['group.code'] || "";
-
+    itemRec['doc.code'] = feeData['document.type'] || "DINH_KEM";
     itemRec['uploaded.at'] = new Date();
-    itemRec['status'] = feeData['status'] || 'So hoa thanh cong';
-//    itemRec['version.no'] = feeData['version.no'] || 1;
 }
 
 function viewFileAttachment(fileInput) {
@@ -182,13 +153,16 @@ function downloadFileAttachment(fileInput) {
 
     try {
         var dataObj = JSON.parse(rawQueryString);
-        var ids = dataObj.docIds || dataObj.docId;
+        
+        var ids = dataObj.objectIds || dataObj.objectId;
 
         if (!ids || (Array.isArray(ids) && ids.length === 0)) {
-            return { success: false, message: "Thiếu 'docIds' hoặc 'docId' trong cấu trúc JSON" };
+            return { success: false, message: "Thiếu 'objectIds' hoặc 'objectId' trong cấu trúc JSON" };
         }
 
-        return lib.ESD_HTKT_INVOICE_ECM.downloadDocId(ids);
+        // Gọi hàm downloadObjectId xử lý tải theo objectId
+
+        return lib.ESD_HTKT_INVOICE_ECM.downloadObjectId(ids);
     } catch (parseError) {
         return { success: false, message: "Bị lỗi khi bóc tách JSON (JSON.parse): " + parseError.toString() };
     }
@@ -216,7 +190,10 @@ function deleteFileAttachment(fileInput) {
 }
 
 function nextId1(name) {
+    var rc = new SCDatum();
     var nextNumber = new SCDatum();
-    funcs.rtecall("getnumber", 1, nextNumber, name);
-    return nextNumber;
+
+    funcs.rtecall("getnumber", rc, nextNumber, name);
+
+    return String(nextNumber || "");
 }
