@@ -45,34 +45,7 @@ function run() {
 
                 // --- DANH MỤC ---
             case "getCreatorAccountingInfo":
-                var rawDetails = extractRawDetails(input);
-                var paymentId = "";
-                var currentUser = "";
-
-                if (rawDetails) {
-                    try {
-                        var parsedObj = JSON.parse(rawDetails);
-                        if (parsedObj.paymentId) {
-                            paymentId = safeString(parsedObj.paymentId).trim();
-                        }
-                        if (parsedObj.currentUser) {
-                            currentUser = safeString(parsedObj.currentUser).trim();
-                        }
-                    } catch (e) {}
-                }
-                var creatorUnit = getCreatorAccountingUnit(paymentId, currentUser);
-                // Lấy PGD thuộc Chi nhánh trực tiếp bằng entityCode (creatorUnit.value) thay vì lv1Id
-                var transactionOfficeOptions = getTransactionOfficeOptions(creatorUnit.value);
-                // Lấy Phòng ban lọc theo đầu mã org.code dựa trên đơn vị (creatorUnit.value)
-                var deparments = getGlCostCenterOptions(creatorUnit.value);
-                result = {
-                    success: true,
-                    data: {
-                        creatorUnit: creatorUnit,
-                        transactionOptions: transactionOfficeOptions,
-                        departmentOptions: deparments
-                    }
-                };
+                result = getCreatorAccountingInfo(input);
                 break;
             case "getGlUnits":
                 result = getGlUnitOptions(input);
@@ -123,6 +96,40 @@ var ENTITY_STATUS_ACTIVE = "ACTIVE";
  * 1. CÁC HÀM TRUY VẤN DANH MỤC (Dropdown)
  * =========================================================================
  */
+
+/** Lấy đơn vị kế toán cùng danh mục phòng ban và phòng giao dịch mặc định. */
+function getCreatorAccountingInfo(input) {
+    var rawDetails = extractRawDetails(input);
+    var paymentId = "";
+    var currentUser = "";
+
+    if (rawDetails) {
+        try {
+            var parsedObj = JSON.parse(rawDetails);
+            if (parsedObj.paymentId) {
+                paymentId = safeString(parsedObj.paymentId).trim();
+            }
+            if (parsedObj.currentUser) {
+                currentUser = safeString(parsedObj.currentUser).trim();
+            }
+        } catch (e) {}
+    }
+
+    var creatorUnit = getCreatorAccountingUnit(paymentId, currentUser);
+    // Lấy PGD thuộc Chi nhánh trực tiếp bằng entityCode (creatorUnit.value) thay vì lv1Id
+    var transactionOfficeOptions = getTransactionOfficeOptions(creatorUnit.value);
+    // Lấy Phòng ban lọc theo đầu mã org.code dựa trên đơn vị (creatorUnit.value)
+    var departments = getGlCostCenterOptions(creatorUnit.value);
+
+    return {
+        success: true,
+        data: {
+            creatorUnit: creatorUnit,
+            transactionOptions: transactionOfficeOptions,
+            departmentOptions: departments
+        }
+    };
+}
 
 /** lấy unit theo người đăng nhập hoặc người tạo. */
 function getCreatorAccountingUnit(paymentId, currentUser) {
