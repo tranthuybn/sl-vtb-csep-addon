@@ -75,7 +75,24 @@ function run() {
             case "getGlTransactionOffices":
                 result = lib.ESD_HTKT_PAYMENT_ENTRY.getTransactionOfficeOptionsApi(details);
                 break;
+            case "addFileAttachment":
+                result = lib.ESD_HTKT_PAYMENT_FILE_ATTACHMENT.addFileAttachment(input);
+                break; 
+                
+            case "viewFileAttachment":
+                result = lib.ESD_HTKT_PAYMENT_FILE_ATTACHMENT.viewFileAttachment(input);
+                break;
+                
+            case "downloadFileAttachment":
+                result = lib.ESD_HTKT_PAYMENT_FILE_ATTACHMENT.downloadFileAttachment(input);
+                break;
+                
+            case "deleteFileAttachment":
+                result = lib.ESD_HTKT_PAYMENT_FILE_ATTACHMENT.deleteFileAttachment(input);
             
+            case 'getListPaymentInvoice':
+                result =  lib.ESD_HTKT_PAYMENT_INVOICE.getListPaymentInvoice(input);
+
             default:
                 result = {
                     success: false,
