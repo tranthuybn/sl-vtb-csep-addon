@@ -1,5 +1,5 @@
 // Script Library cho Quản lý Phân bổ chi phí (esdHTKTpaymentCostDivision)
-// Updated: Thêm getEntities, getDepartments, getTransactionOffices, getGlAccounts
+// Updated: Thêm getCreatorUnitInfo, getDepartments, getTransactionOffices, getGlAccounts
 // Combined fix: bỏ trailing comma (lỗi compile ES3) + fix logic ghi đè/import trùng + dùng Native SM Query (sửa lỗi SQL) + Lọc PGD và Phòng ban theo org.code & Loại trừ 98
 
 function run() {
@@ -44,10 +44,10 @@ function run() {
                 break;
 
                 // --- DANH MỤC ---
-            case "getCreatorAccountingInfo":
+            case "getCreatorUnitInfo":
                 result = getCreatorAccountingInfo(input);
                 break;
-            case "getGlUnits":
+            case "getGlUnitsCostDivision":
                 result = getGlUnitOptions(input);
                 break;
             case "getGlDepartments":

@@ -1192,9 +1192,9 @@ function loadPaymentVendorInfo(record) {
         vars.$supplierdisplays = [itemFile["supplier.name"]];
         vars.$suppliervalues = [itemFile["supplier.id"]];
         vars.$oglSiteCode = itemFile["ogl.site.code"];
-        vars.$amount = Number(itemFile["amount"]);
-        vars.$approvedInvoiceAmount = Number(itemFile["approved.invoice.amount"]);
-        vars.$refundAmount = Number(itemFile["refund.amount"]);
+        vars.$amount = itemFile["amount"];
+        vars.$approvedInvoiceAmount = itemFile["approved.invoice.amount"];
+        vars.$refundAmount = itemFile["refund.amount"];
         vars.$unitLv1 = itemFile["unit.lv1"];
         vars.$unitLv2 = itemFile["unit.lv2"];
         
