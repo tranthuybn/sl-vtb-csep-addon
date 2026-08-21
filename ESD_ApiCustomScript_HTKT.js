@@ -5,6 +5,7 @@ function run() {
     var rawParams = input["queryString"];
     var name = input["name"];
     var parsed = {};
+    var details = getInputDetails(input);
 
     var startTime = system.functions.tod();
     var TIMEOUT_MS = 7000;
@@ -37,6 +38,43 @@ function run() {
             case "createPaymentRequest":
                 result = lib.ESD_HTKT_PAYMENT_CREATE_REQUEST.createPaymentRequest(input);
                 break;
+            case "getListPaymentEntry":
+                result = lib.ESD_HTKT_PAYMENT_ENTRY.getListPaymentEntryByInputDetails(details);
+                break;
+            case "getGLAddRowOptions":
+                result = lib.ESD_HTKT_PAYMENT_ENTRY.getGLAddRowOptions(details);
+                break;
+            case "syncPaymentEntry":
+                result = lib.ESD_HTKT_PAYMENT_ENTRY.syncPaymentEntryNowByInputDetails(details);
+                break;
+            case "syncPaymentEntryBySourceChange":
+                result = lib.ESD_HTKT_PAYMENT_ENTRY.syncPaymentEntryBySourceChange(
+                    String(details.sourceTable || input.sourceTable || "").trim(),
+                    details
+                );
+                break;
+            case "savePaymentEntryEdit":
+                result = lib.ESD_HTKT_PAYMENT_ENTRY.savePaymentEntryEdit(details);
+                break;
+            case "getListGLAccount":
+            case "getGlAccounts":
+                result = lib.ESD_HTKT_PAYMENT_ENTRY.getListGlAccount(details);
+                break;
+            case "getGlUnits":
+            case "getGLUnits":
+                result = lib.ESD_HTKT_PAYMENT_ENTRY.getGlUnitsApi(details);
+                break;
+            case "getCreatorAccountingInfo":
+                result = lib.ESD_HTKT_PAYMENT_ENTRY.getCreatorAccountingInfo(details);
+                break;
+            case "getCostCenterOptions":
+            case "getGlDepartments":
+                result = lib.ESD_HTKT_PAYMENT_ENTRY.getCostCenterOptions(details);
+                break;
+            case "getTransactionOfficeOptions":
+            case "getGlTransactionOffices":
+                result = lib.ESD_HTKT_PAYMENT_ENTRY.getTransactionOfficeOptionsApi(details);
+                break;
             
             default:
                 result = {
@@ -62,4 +100,40 @@ function run() {
 
     input["queryReturn"] = JSON.stringify(result);
     vars.$L_exit = "normal";
+}
+
+
+
+function getInputDetails(input) {
+    var parsed = {};
+
+    copyObject(parsed, parseJsonObject(input.queryString));
+    copyObject(parsed, parseJsonObject(input.details));
+
+    if (!parsed.paymentId) parsed.paymentId = input.paymentId || input.id;
+    if (!parsed.vendorId && input.vendorId) parsed.vendorId = input.vendorId;
+    if (!parsed.entries && input.entries) parsed.entries = input.entries;
+
+    return parsed;
+}
+
+function copyObject(target, source) {
+    if (!source) return target;
+
+    for (var key in source) {
+        if (source.hasOwnProperty(key)) target[key] = source[key];
+    }
+
+    return target;
+}
+
+function parseJsonObject(value) {
+    if (!value) return null;
+
+    try {
+        var parsed = typeof value === 'string' ? JSON.parse(value) : value;
+        return parsed && typeof parsed === 'object' ? parsed : null;
+    } catch (e) {
+        return null;
+    }
 }

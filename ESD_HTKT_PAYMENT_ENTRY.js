@@ -34,12 +34,26 @@ var logger = typeof getLog === 'function' ? getLog("ESD_HTKT_PAYMENT_ENTRY") : {
 // =============================================================================
 
 function run() {
+    var startTime = new Date().getTime();
     try {
         var input = vars['$L.file'];
         if (!input) return;
 
-        var action = input.name || '';
+        var rawName = input.name || '';
+        var action = rawName;
+        var nameParams = null;
+
+        // FE encode tham số vào name dạng: actionName::{"page":3,"pageSize":10,...}
+        // vì SM chỉ truyền qua trường name, ignore mọi trường khác.
+        var sepIdx = rawName.indexOf('::');
+        if (sepIdx >= 0) {
+            action = rawName.substring(0, sepIdx);
+            nameParams = parseJsonObject(rawName.substring(sepIdx + 2));
+        }
+
         var details = getInputDetails(input);
+        if (nameParams) copyObject(details, nameParams);
+
         var result;
         debugPaymentEntry('RUN', 'Bắt đầu action=' + action + ', paymentId=' + safeString(details.paymentId));
 
@@ -61,25 +75,30 @@ function run() {
         } else if (action === 'savePaymentEntryEdit') {
             result = savePaymentEntryEdit(details);
             // lay tai khoan GL
-        } else if (action === 'getListGLAccount') {
+        } else if (action === 'getListGLAccount' || action === 'getGlAccounts') {
             result = getListGlAccount(details);
+            // lay don vi GL
+        } else if (action === 'getGlUnits' || action === 'getGLUnits') {
+            result = getGlUnitsApi(details);
             // lay don vi ke toan hien tai theo nguoi dung
         } else if (action === 'getCreatorAccountingInfo') {
             result = getCreatorAccountingInfo(details);
             // lay danh sach phong ban (cost center)
-        } else if (action === 'getCostCenterOptions') {
+        } else if (action === 'getCostCenterOptions' || action === 'getGlDepartments') {
             result = getCostCenterOptions(details);
             // lay danh sach phong giao dich (transaction office)
-        } else if (action === 'getTransactionOfficeOptions') {
+        } else if (action === 'getTransactionOfficeOptions' || action === 'getGlTransactionOffices') {
             result = getTransactionOfficeOptionsApi(details);
         } else {
             result = { success: false, error: 'Invalid action: ' + action };
         }
 
-        debugPaymentEntry('RUN', 'Kết thúc action=' + action + ', mode=' + safeString(result && result.mode) + ', success=' + safeString(result && result.success));
+        var duration = new Date().getTime() - startTime;
+        debugPaymentEntry('RUN', 'Kết thúc action=' + action + ' trong ' + duration + 'ms, mode=' + safeString(result && result.mode) + ', success=' + safeString(result && result.success));
         input.queryReturn = JSON.stringify(result);
     } catch (e) {
-        debugPaymentEntry('RUN-ERROR', e.toString());
+        var errDuration = new Date().getTime() - startTime;
+        debugPaymentEntry('RUN-ERROR', 'Thất bại sau ' + errDuration + 'ms: ' + e.toString());
         if (vars['$L.file']) {
             vars['$L.file'].queryReturn = JSON.stringify({
                 success: false,
@@ -397,7 +416,7 @@ function getListPaymentEntryByInputDetails(details) {
         additionalUnitCode: creatorUnit.code,
         additionalUnitEntityCode: creatorUnit.entityCode,
         additionalUnitName: creatorUnit.name,
-        
+
     });
 
     // Entry đã có thì trả ngay; dữ liệu nguồn được kiểm tra khi trigger gọi sinh lại.
@@ -435,25 +454,36 @@ function enrichPaymentEntriesWithNames(entries) {
             }
         }
         if (entry.department) {
-            var deptName = selectOne(TABLE_COST_CENTER, 'cost.center="' + escapeQueryValue(entry.department) + '"', function (r) {
-                return readText(r, 'name');
-            });
-            if (deptName) {
-                entry.departmentLabel = entry.department + ' - ' + deptName;
-                entry.departmentName = deptName;
+            if (entry.department === '000000') {
+                entry.departmentLabel = '000000 - Không xác định';
+                entry.departmentName = 'Không xác định';
+            } else {
+                var deptName = selectOne(TABLE_COST_CENTER, 'cost.center="' + escapeQueryValue(entry.department) + '"', function (r) {
+                    return readText(r, 'name');
+                });
+                if (deptName) {
+                    entry.departmentLabel = entry.department + ' - ' + deptName;
+                    entry.departmentName = deptName;
+                }
             }
         }
         if (entry.transaction_office) {
-            var transOfficeName = selectOne(TABLE_ENTITY, 'entity.code="' + escapeQueryValue(entry.transaction_office) + '"', function (r) {
-                return readText(r, 'branch.name');
-            });
-            if (transOfficeName) {
-                var prefix = getTransFromNamePrefix(transOfficeName);
-                entry.transactionOfficeLabel = entry.transaction_office + ' - ' + prefix;
-                entry.transactionOfficeName = prefix;
+            if (entry.transaction_office === '0000000' || entry.transaction_office === '000000') {
+                entry.transactionOfficeLabel = '0000000 - Không xác định';
+                entry.transactionOfficeName = 'Không xác định';
+            } else {
+                var transOfficeName = selectOne(TABLE_ENTITY, 'entity.code="' + escapeQueryValue(entry.transaction_office) + '"', function (r) {
+                    return readText(r, 'branch.name');
+                });
+                if (transOfficeName) {
+                    var prefix = getTransFromNamePrefix(transOfficeName);
+                    entry.transactionOfficeLabel = entry.transaction_office + ' - ' + prefix;
+                    entry.transactionOfficeName = prefix;
+                }
             }
         }
     }
+    debugPaymentEntry('ENRICH', 'Đã enrich names/labels cho ' + entries.length + ' dòng');
 }
 
 function getTransFromNamePrefix(value) {
@@ -1176,13 +1206,49 @@ function mapAccountingTableItems(rows) {
 // -----------------------------------------------------------------------------
 
 function getListGlAccount(details) {
+    var startTime = new Date().getTime();
+    var page = 1;
+    var pageSize = details && details.pageSize ? Number(details.pageSize) : 30;
+    if (details && details.page && Number(details.page) > 0) page = Number(details.page);
+    var keyword = safeString(details && details.keyword).trim();
+
     var rows = [];
     var f = new SCFile(TABLE_GL_ACCOUNT, SCFILE_READONLY);
     var rc;
     var query = 'true';
-    var typeFilter = details && (details.type || details.accountType || details.account_type);
+    var rawType = details && (details.accountType || details.type || details.account_type);
+    var typeFilter = safeString(rawType).trim();
     if (typeFilter) {
-        query += ' and type="' + escapeQueryValue(typeFilter) + '"';
+        var upperType = normalizeText(typeFilter).toUpperCase();
+
+        // "DEBIT"/"CREDIT"/"ASSET" là loại Nợ/Có, không phải loại tài khoản GL → bỏ qua
+        var isDebitCredit = upperType === 'DEBIT' || upperType === 'CREDIT' || upperType === 'ASSET';
+        if (isDebitCredit) {
+            typeFilter = '';
+        } else if (upperType.indexOf('CHI PHI') >= 0 || upperType.indexOf('COST') >= 0 || upperType.indexOf('EXPENSE') >= 0 || upperType === 'CP') {
+            query += ' and (type="Chi phí" or type="CHI PHI" or type="COST" or type="Chi phi")';
+        } else if (upperType.indexOf('THUE') >= 0 || upperType.indexOf('TAX') >= 0 || upperType.indexOf('VAT') >= 0) {
+            query += ' and (type="Thuế" or type="THUE" or type="TAX" or type="Thue")';
+        } else if (upperType.indexOf('TAM UNG') >= 0 || upperType.indexOf('PREPAYMENT') >= 0 || upperType.indexOf('ADVANCE') >= 0 || upperType === 'TU') {
+            query += ' and (type="Tạm ứng" or type="TAM UNG" or type="PREPAYMENT" or type="Tam ung")';
+        } else if (upperType.indexOf('PHAI TRA') >= 0 || upperType.indexOf('PAYABLE') >= 0 || upperType.indexOf('LIABILITY') >= 0 || upperType === 'PT') {
+            query += ' and (type="Phải trả" or type="PHAI TRA" or type="PAYABLE" or type="Phai tra")';
+        } else {
+            query += ' and type="' + escapeQueryValue(typeFilter) + '"';
+        }
+    }
+
+    if (keyword) {
+        query += ' and (account like "*' + escapeQueryValue(keyword) + '*" or name like "*' + escapeQueryValue(keyword) + '*")';
+    }
+
+    var filterCategory = '';
+    if (typeFilter) {
+        var norm = normalizeText(typeFilter);
+        if (norm.indexOf('chi phi') >= 0 || norm.indexOf('cost') >= 0 || norm.indexOf('expense') >= 0 || norm === 'cp') filterCategory = 'chi phi';
+        else if (norm.indexOf('thue') >= 0 || norm.indexOf('tax') >= 0 || norm.indexOf('vat') >= 0) filterCategory = 'thue';
+        else if (norm.indexOf('tam ung') >= 0 || norm.indexOf('prepayment') >= 0 || norm.indexOf('advance') >= 0 || norm === 'tu') filterCategory = 'tam ung';
+        else if (norm.indexOf('phai tra') >= 0 || norm.indexOf('payable') >= 0 || norm.indexOf('liability') >= 0 || norm === 'pt') filterCategory = 'phai tra';
     }
 
     try {
@@ -1198,12 +1264,32 @@ function getListGlAccount(details) {
         if (account) {
             var accountType = readText(f, 'account.type');
             var type = readText(f, 'type');
+            var name = readText(f, 'name');
+
+            if (filterCategory) {
+                var rowNorm = normalizeText(type || accountType);
+                var match = false;
+                if (filterCategory === 'chi phi' && (rowNorm.indexOf('chi phi') >= 0 || rowNorm.indexOf('cost') >= 0 || rowNorm.indexOf('expense') >= 0 || rowNorm === 'cp')) match = true;
+                else if (filterCategory === 'thue' && (rowNorm.indexOf('thue') >= 0 || rowNorm.indexOf('tax') >= 0 || rowNorm.indexOf('vat') >= 0)) match = true;
+                else if (filterCategory === 'tam ung' && (rowNorm.indexOf('tam ung') >= 0 || rowNorm.indexOf('prepayment') >= 0 || rowNorm.indexOf('advance') >= 0 || rowNorm === 'tu')) match = true;
+                else if (filterCategory === 'phai tra' && (rowNorm.indexOf('phai tra') >= 0 || rowNorm.indexOf('payable') >= 0 || rowNorm.indexOf('liability') >= 0 || rowNorm === 'pt')) match = true;
+                else if (rowNorm.indexOf(filterCategory) >= 0) match = true;
+
+                if (!match) {
+                    rc = f.getNext();
+                    continue;
+                }
+            }
 
             rows.push({
                 account: account,
-                name: readText(f, 'name'),
+                accountCode: account,
+                accountNumber: account,
+                name: name,
+                accountName: name,
                 type: type,
                 account_type: accountType,
+                accountType: type,
                 is_debit_eligible: isDebitEligibleAccountType(accountType),
                 apply_currency: readText(f, 'apply.currency')
             });
@@ -1215,10 +1301,24 @@ function getListGlAccount(details) {
     closeFile(f);
     rows.sort(compareGlAccount);
 
+    var totalRecords = rows.length;
+    var totalPages = Math.ceil(totalRecords / pageSize);
+    var startIndex = (page - 1) * pageSize;
+    var sliced = rows.slice(startIndex, startIndex + pageSize);
+
+    var duration = new Date().getTime() - startTime;
+    debugPaymentEntry('GL-ACCOUNT', 'Đọc ' + totalRecords + ' tài khoản GL (trang ' + page + '/' + totalPages + ', ' + sliced.length + ' items) trong ' + duration + 'ms (query: ' + query + ')');
+
     return {
         success: true,
         mode: 'gl-account-list',
-        data: rows
+        data: sliced,
+        pagination: {
+            page: page,
+            pageSize: pageSize,
+            totalRecords: totalRecords,
+            totalPages: totalPages
+        }
     };
 }
 
@@ -2342,14 +2442,14 @@ function applyBeneficiaryByEntryType(rows) {
         var rawBranch = list[i].branch;
         if (rawBranch) {
             var matchingEntity = selectOne(
-                TABLE_ENTITY,
-                'ogl.branch.code="' + escapeQueryValue(rawBranch) + '" or ogl.branch.code="' + escapeQueryValue('0' + rawBranch) + '" or ogl.branch.code="' + escapeQueryValue(removeFirstLeadingZero(rawBranch)) + '"',
-                function (record) {
-                    return {
-                        entityCode: readText(record, 'entity.code'),
-                        branchName: getBranchNamePrefix(readText(record, 'branch.name'))
-                    };
-                }
+                    TABLE_ENTITY,
+                    'ogl.branch.code="' + escapeQueryValue(rawBranch) + '" or ogl.branch.code="' + escapeQueryValue('0' + rawBranch) + '" or ogl.branch.code="' + escapeQueryValue(removeFirstLeadingZero(rawBranch)) + '"',
+                    function (record) {
+                        return {
+                            entityCode: readText(record, 'entity.code'),
+                            branchName: getBranchNamePrefix(readText(record, 'branch.name'))
+                        };
+                    }
             );
             if (matchingEntity) {
                 list[i].branch_entity_code = matchingEntity.entityCode;
@@ -2869,6 +2969,7 @@ function getCreatorAccountingInfo(details) {
 }
 
 function getGLAddRowOptions(details) {
+    var startTime = new Date().getTime();
     var paymentId = safeString(details.paymentId).trim();
     if (!paymentId) {
         return { success: false, error: 'Thiếu mã đề nghị thanh toán.' };
@@ -2878,31 +2979,86 @@ function getGLAddRowOptions(details) {
     var createdBy = request.created_by;
     var currentUser = safeString(details.currentUser).trim();
     var creatorUnit = getCreatorAccountingUnit(currentUser || createdBy);
-    var glUnitOptions = getGlUnitOptions();
-    var glCostCenterOptions = getGlCostCenterOptions();
     var creatorTransactionOfficeOptions = creatorUnit ? getTransactionOfficeOptions(creatorUnit.lv1Id) : [];
-    var transactionOfficeOptions = getGlTransactionOfficeOptions();
     var defaultTransactionOfficeCode = creatorTransactionOfficeOptions ? getDefaultTransactionOfficeCode(creatorTransactionOfficeOptions) : '';
+
+    var creatorUnitOption = creatorUnit && (creatorUnit.entityCode || creatorUnit.code) ? {
+        value: creatorUnit.entityCode || creatorUnit.code,
+        label: (creatorUnit.entityCode || creatorUnit.code) + ' - ' + creatorUnit.name,
+        entityCode: creatorUnit.entityCode || creatorUnit.code,
+        branchCode: creatorUnit.code,
+        name: creatorUnit.name,
+        matchBranchCode: creatorUnit.code
+    } : null;
+
+    var glUnitOptions = creatorUnitOption ? [creatorUnitOption] : [];
+
+    var duration = new Date().getTime() - startTime;
+    debugPaymentEntry('GET-ADD-OPTIONS', 'getGLAddRowOptions hoàn thành trong ' + duration + 'ms (1 đơn vị theo user)');
 
     return {
         success: true,
         glUnitOptions: glUnitOptions,
-        glCostCenterOptions: glCostCenterOptions,
-        transactionOfficeOptions: transactionOfficeOptions,
+        glCostCenterOptions: [],
+        transactionOfficeOptions: [],
         defaultTransactionOfficeCode: defaultTransactionOfficeCode,
-        creatorUnit: creatorUnit ? {
-            value: creatorUnit.entityCode || creatorUnit.code,
-            label: (creatorUnit.entityCode || creatorUnit.code) + ' - ' + creatorUnit.name,
-            entityCode: creatorUnit.entityCode || creatorUnit.code,
-            branchCode: creatorUnit.code,
-            name: creatorUnit.name,
-            matchBranchCode: creatorUnit.code
-        } : null
+        creatorUnit: creatorUnitOption
+    };
+}
+
+function getGlUnitsApi(details) {
+    var startTime = new Date().getTime();
+    var page = 1;
+    var pageSize = details && details.pageSize ? Number(details.pageSize) : 100;
+    if (details && details.page && Number(details.page) > 0) page = Number(details.page);
+    var keyword = safeString(details && details.keyword).trim();
+
+    var options = getGlUnitOptions();
+    if (keyword) {
+        var kw = normalizeText(keyword);
+        var filtered = [];
+        for (var i = 0; i < options.length; i++) {
+            var o = options[i];
+            if (
+                    normalizeText(o.label).indexOf(kw) >= 0 ||
+                    normalizeText(o.value).indexOf(kw) >= 0 ||
+                    normalizeText(o.entityCode).indexOf(kw) >= 0 ||
+                    normalizeText(o.branchCode).indexOf(kw) >= 0
+            ) {
+                filtered.push(o);
+            }
+        }
+        options = filtered;
+    }
+
+    var totalRecords = options.length;
+    var totalPages = Math.ceil(totalRecords / pageSize);
+    var startIndex = (page - 1) * pageSize;
+    var sliced = options.slice(startIndex, startIndex + pageSize);
+
+    var duration = new Date().getTime() - startTime;
+    debugPaymentEntry('GL-UNITS-API', 'Đọc ' + options.length + ' đơn vị trong ' + duration + 'ms');
+
+    return {
+        success: true,
+        data: sliced,
+        pagination: {
+            page: page,
+            pageSize: pageSize,
+            totalRecords: totalRecords,
+            totalPages: totalPages
+        }
     };
 }
 
 function getCostCenterOptions(details) {
-    var entityCode = safeString(details.entityCode || details.entity_code || details.code).trim();
+    var startTime = new Date().getTime();
+    var page = 1;
+    var pageSize = details && details.pageSize ? Number(details.pageSize) : 100;
+    if (details && details.page && Number(details.page) > 0) page = Number(details.page);
+    var keyword = safeString(details && details.keyword).trim();
+    var entityCode = safeString(details && (details.entityCode || details.entity_code || details.unitId || details.code)).trim();
+
     if (!entityCode) {
         return {
             success: true,
@@ -2910,14 +3066,50 @@ function getCostCenterOptions(details) {
                 value: '000000',
                 label: '000000 - Không xác định',
                 name: 'Không xác định'
-            }]
+            }],
+            pagination: {
+                page: 1,
+                pageSize: pageSize,
+                totalRecords: 1,
+                totalPages: 1
+            }
         };
     }
 
     var options = getCostCenterOptionsForUnit(entityCode);
+    if (keyword) {
+        var kw = normalizeText(keyword);
+        var filtered = [];
+        for (var i = 0; i < options.length; i++) {
+            var o = options[i];
+            if (
+                    normalizeText(o.label).indexOf(kw) >= 0 ||
+                    normalizeText(o.value).indexOf(kw) >= 0 ||
+                    normalizeText(o.name).indexOf(kw) >= 0
+            ) {
+                filtered.push(o);
+            }
+        }
+        options = filtered;
+    }
+
+    var totalRecords = options.length;
+    var totalPages = Math.ceil(totalRecords / pageSize);
+    var startIndex = (page - 1) * pageSize;
+    var sliced = options.slice(startIndex, startIndex + pageSize);
+
+    var duration = new Date().getTime() - startTime;
+    debugPaymentEntry('COST-CENTER-OPTIONS', 'Đọc ' + options.length + ' phòng ban của unit ' + entityCode + ' trong ' + duration + 'ms');
+
     return {
         success: true,
-        data: options
+        data: sliced,
+        pagination: {
+            page: page,
+            pageSize: pageSize,
+            totalRecords: totalRecords,
+            totalPages: totalPages
+        }
     };
 }
 
@@ -2984,7 +3176,13 @@ function getCostCenterOptionsForUnit(entityCode) {
 }
 
 function getTransactionOfficeOptionsApi(details) {
-    var entityCode = safeString(details.entityCode || details.entity_code || details.code).trim();
+    var startTime = new Date().getTime();
+    var page = 1;
+    var pageSize = details && details.pageSize ? Number(details.pageSize) : 100;
+    if (details && details.page && Number(details.page) > 0) page = Number(details.page);
+    var keyword = safeString(details && details.keyword).trim();
+    var entityCode = safeString(details && (details.entityCode || details.entity_code || details.unitId || details.code)).trim();
+
     if (!entityCode) {
         return {
             success: true,
@@ -2992,15 +3190,71 @@ function getTransactionOfficeOptionsApi(details) {
                 value: '000000',
                 label: '000000 - Không xác định',
                 name: 'Không xác định'
-            }]
+            }],
+            pagination: {
+                page: 1,
+                pageSize: pageSize,
+                totalRecords: 1,
+                totalPages: 1
+            }
         };
     }
 
     var options = getTransactionOfficeOptionsForUnit(entityCode);
+    if (keyword) {
+        var kw = normalizeText(keyword);
+        var filtered = [];
+        for (var i = 0; i < options.length; i++) {
+            var o = options[i];
+            if (
+                    normalizeText(o.label).indexOf(kw) >= 0 ||
+                    normalizeText(o.value).indexOf(kw) >= 0 ||
+                    normalizeText(o.name).indexOf(kw) >= 0
+            ) {
+                filtered.push(o);
+            }
+        }
+        options = filtered;
+    }
+
+    var totalRecords = options.length;
+    var totalPages = Math.ceil(totalRecords / pageSize);
+    var startIndex = (page - 1) * pageSize;
+    var sliced = options.slice(startIndex, startIndex + pageSize);
+
+    var duration = new Date().getTime() - startTime;
+    debugPaymentEntry('TRANS-OFFICE-OPTIONS', 'Đọc ' + options.length + ' PGD của unit ' + entityCode + ' trong ' + duration + 'ms');
+
     return {
         success: true,
-        data: options
+        data: sliced,
+        pagination: {
+            page: page,
+            pageSize: pageSize,
+            totalRecords: totalRecords,
+            totalPages: totalPages
+        }
     };
+}
+
+function getUnitPrefix5(unitId) {
+    var code = safeString(unitId).trim();
+    if (!code) return "";
+    if (code.length >= 5 && code.substring(0, 2) === "10") {
+        return code.substring(0, 5);
+    }
+    if (code.length === 3) {
+        return "10" + code;
+    }
+    if (code.length === 4) {
+        return "10" + code.slice(-3);
+    }
+    return "";
+}
+
+function getUnitXxx(unitId) {
+    var prefix = getUnitPrefix5(unitId);
+    return prefix ? prefix.substring(2, 5) : "";
 }
 
 function getTransactionOfficeOptionsForUnit(entityCode) {
@@ -3013,20 +3267,12 @@ function getTransactionOfficeOptionsForUnit(entityCode) {
         name: 'Không xác định'
     });
 
-    var code = safeString(entityCode).trim();
-    if (!code) return options;
+    var prefix = getUnitPrefix5(entityCode);
+    if (!prefix) return options;
 
-    // Tìm ogl.branch.code từ esdDMentity dựa trên entity.code
-    var branchCode = selectOne(
-            'esdDMentity',
-            'entity.code="' + escapeQueryValue(code) + '"',
-            function (record) { return readText(record, 'ogl.branch.code'); }
-    );
-
-    if (!branchCode) return options;
-
-    var query = 'status="ACTIVE" and ogl.branch.code="' + escapeQueryValue(branchCode) + '"';
+    var query = 'status="ACTIVE" and entity.code like "' + escapeQueryValue(prefix) + '*"';
     var list = [];
+    var optionMap = { '000000': true };
     var f = new SCFile('esdDMentity', SCFILE_READONLY);
     var rc;
     try {
@@ -3042,7 +3288,8 @@ function getTransactionOfficeOptionsForUnit(entityCode) {
 
         var isMainUnit = (entCode.length >= 2 && entCode.substring(entCode.length - 2) === '98');
 
-        if (entCode && entCode !== '0000000' && !isMainUnit) {
+        if (entCode && entCode.length === 7 && entCode.substring(0, 5) === prefix && !isMainUnit && !optionMap[entCode]) {
+            optionMap[entCode] = true;
             var branchNameSeparatorIndex = branchName.indexOf('-');
             if (branchNameSeparatorIndex >= 0) {
                 branchName = branchName.substring(branchNameSeparatorIndex + 1).trim();
@@ -3188,10 +3435,7 @@ function getGlCostCenterOptions(unitId) {
         var unitCode = safeString(unitOptions[u].entityCode).trim();
         if (!unitCode) continue;
 
-        var xxx = '';
-        if (unitCode.length >= 5 && unitCode.substring(0, 2) === '10') {
-            xxx = unitCode.substring(2, 5);
-        }
+        var xxx = getUnitXxx(unitCode);
 
         // Thêm mã mặc định 000000 - Không xác định cho đơn vị này
         options.push({
@@ -3311,10 +3555,7 @@ function getGlTransactionOfficeOptions(unitId) {
         var unitCode = safeString(unitOptions[u].entityCode).trim();
         if (!unitCode) continue;
 
-        var prefix = '';
-        if (unitCode.length >= 5 && unitCode.substring(0, 2) === '10') {
-            prefix = unitCode.substring(0, 5);
-        }
+        var prefix = getUnitPrefix5(unitCode);
 
         // Thêm mã mặc định 0000000 - Không xác định cho đơn vị này
         options.push({
@@ -3478,14 +3719,14 @@ function applyCreatorUnitToEntries(entries, unitCode, defaultOffice, options) {
         var rawBranch = entries[i].branch;
         if (rawBranch) {
             var matchingEntity = selectOne(
-                TABLE_ENTITY,
-                'ogl.branch.code="' + escapeQueryValue(rawBranch) + '" or ogl.branch.code="' + escapeQueryValue('0' + rawBranch) + '" or ogl.branch.code="' + escapeQueryValue(removeFirstLeadingZero(rawBranch)) + '"',
-                function (record) {
-                    return {
-                        entityCode: readText(record, 'entity.code'),
-                        branchName: getBranchNamePrefix(readText(record, 'branch.name'))
-                    };
-                }
+                    TABLE_ENTITY,
+                    'ogl.branch.code="' + escapeQueryValue(rawBranch) + '" or ogl.branch.code="' + escapeQueryValue('0' + rawBranch) + '" or ogl.branch.code="' + escapeQueryValue(removeFirstLeadingZero(rawBranch)) + '"',
+                    function (record) {
+                        return {
+                            entityCode: readText(record, 'entity.code'),
+                            branchName: getBranchNamePrefix(readText(record, 'branch.name'))
+                        };
+                    }
             );
             if (matchingEntity) {
                 entries[i].branch_entity_code = matchingEntity.entityCode;
@@ -3686,7 +3927,9 @@ function getSavedPaymentEntries(paymentId) {
             escapeQueryValue(paymentId) +
             '" ORDER BY e.order ASC';
 
-    return applyBeneficiaryByEntryType(selectList(TABLE_PAYMENT_ENTRY, sql, fields));
+    var entries = applyBeneficiaryByEntryType(selectList(TABLE_PAYMENT_ENTRY, sql, fields));
+    enrichPaymentEntriesWithNames(entries);
+    return entries;
 }
 
 function getPaymentEntryFields() {
