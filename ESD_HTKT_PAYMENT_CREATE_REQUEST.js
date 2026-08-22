@@ -334,9 +334,6 @@ function mapRowToObject(scFileRecord, fieldMappings) {
 
 function listPurchaseContracts(input) {
 
-    print("conditions " + JSON.stringify(input))
-
-
     // 1. Lấy dữ liệu linh hoạt từ details hoặc queryString
     var rawData = input ? (input.details || input.queryString) : null;
     if (!rawData) return { success: false, message: "Thiếu dữ liệu đầu vào." };

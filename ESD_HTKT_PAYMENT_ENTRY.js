@@ -39,20 +39,9 @@ function run() {
         var input = vars['$L.file'];
         if (!input) return;
 
-        var rawName = input.name || '';
-        var action = rawName;
-        var nameParams = null;
-
-        // FE encode tham số vào name dạng: actionName::{"page":3,"pageSize":10,...}
-        // vì SM chỉ truyền qua trường name, ignore mọi trường khác.
-        var sepIdx = rawName.indexOf('::');
-        if (sepIdx >= 0) {
-            action = rawName.substring(0, sepIdx);
-            nameParams = parseJsonObject(rawName.substring(sepIdx + 2));
-        }
+        var action = input.name || '';
 
         var details = getInputDetails(input);
-        if (nameParams) copyObject(details, nameParams);
 
         var result;
         debugPaymentEntry('RUN', 'Bắt đầu action=' + action + ', paymentId=' + safeString(details.paymentId));

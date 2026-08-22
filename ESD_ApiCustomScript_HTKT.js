@@ -4,26 +4,8 @@ function run() {
     var input = vars["$L.file"];
     var rawParams = input["queryString"];
     var name = input["name"];
-    var parsed = {};
-    var nameParams = null;
-    var glAccountPrefix = "getListGLAccount::";
-
-    // Chỉ action getListGLAccount hỗ trợ truyền tham số trong name.
-    if (name && name.indexOf(glAccountPrefix) === 0) {
-        try {
-            nameParams = JSON.parse(name.substring(glAccountPrefix.length));
-            name = "getListGLAccount";
-        } catch (e) {
-            input["queryReturn"] = JSON.stringify({
-                success: false,
-                error: "Invalid JSON in getListGLAccount name"
-            });
-            return;
-        }
-    }
 
     var details = getInputDetails(input);
-    if (nameParams) copyObject(details, nameParams);
 
     var startTime = system.functions.tod();
     var TIMEOUT_MS = 7000;
@@ -35,18 +17,6 @@ function run() {
     function safeReturn(obj) {
         input["queryReturn"] = JSON.stringify(obj);
         vars.$L_exit = "normal";
-    }
-
-    if (!nameParams) {
-        try {
-            parsed = JSON.parse(rawParams);
-        } catch (e) {
-            input["queryReturn"] = JSON.stringify({
-                success: false,
-                error: "Invalid JSON in queryString"
-            });
-            return;
-        }
     }
 
     var result = null;
