@@ -415,7 +415,7 @@ function getListPaymentEntryByInputDetails(details) {
                 savedEntries,
                 creatorUnit.code
         );
-        return makeResult(savedEntries, 'saved', summaryMeta);
+        return makeResult(getUniqueCostEntriesByAccountNumber(savedEntries), 'saved', summaryMeta);
     }
 
     if (isGenerationPhaseLocked(currentPhase)) {
@@ -426,6 +426,36 @@ function getListPaymentEntryByInputDetails(details) {
 
     debugPaymentEntry('GET-LIST', 'Không có dữ liệu, trả empty và không tự động sinh');
     return makeResult([], 'empty', summaryMeta);
+}
+
+/**
+ * API danh sách chỉ trả một dòng COST cho mỗi account.number. Các thông tin khác
+ * lấy theo dòng đầu tiên, còn amount là tổng của tất cả dòng COST cùng tài khoản.
+ * Việc gộp chỉ áp dụng trên dữ liệu trả về; các paymentEntry được sinh và lưu
+ * theo từng costDivision vẫn được giữ nguyên.
+ */
+function getUniqueCostEntriesByAccountNumber(entries) {
+    var result = [];
+    var usedCostAccounts = {};
+
+    for (var i = 0; i < entries.length; i++) {
+        var entry = entries[i];
+        if (normalizeEntryType(entry.entry_type) === ENTRY_TYPE.COST) {
+            var accountNumber = safeString(entry.account_number).trim();
+            var accountKey = 'vendor|' + safeString(entry.vendor_id).trim() + '|account|' + accountNumber;
+            if (accountNumber && usedCostAccounts[accountKey]) {
+                usedCostAccounts[accountKey].amount += toNumber(entry.amount);
+                continue;
+            }
+            if (accountNumber) {
+                entry.amount = toNumber(entry.amount);
+                usedCostAccounts[accountKey] = entry;
+            }
+        }
+        result.push(entry);
+    }
+
+    return result;
 }
 
 function enrichPaymentEntriesWithNames(entries) {
@@ -1010,6 +1040,10 @@ function savePaymentEntryEdit(details) {
     var normalized = normalizeEditedEntries(paymentId, entries, previousEntries);
     if (!normalized.success) return normalized;
 
+    // UI chỉ hiển thị một dòng COST đã cộng tổng theo NCC + tài khoản. Khôi phục
+    // lại từng dòng chi tiết trước khi lưu để không làm mất các segment PCCP.
+    normalized.entries = restoreCostDivisionEntries(normalized.entries, previousEntries);
+
     // Dòng AP/PREPAYMENT được tạo từ tab Công nợ: tab Hạch toán không được
     // thêm/xóa dòng hoặc thay đổi số tài khoản tạm ứng.
     var prepaymentValidation = validateProtectedPrepaymentEntries(
@@ -1384,6 +1418,80 @@ function normalizeEditedEntries(paymentId, entries, savedEntries) {
         success: true,
         entries: result
     };
+}
+
+/**
+ * Tách dòng COST đã được gộp khi trả về UI thành các dòng đã lưu ban đầu.
+ * Branch/department/transaction office và ID giữ theo từng dòng cũ; tài khoản,
+ * tên tài khoản và diễn giải lấy từ dòng UI. Nếu tổng tiền được sửa, số tiền mới
+ * được phân bổ theo tỷ trọng cũ và dòng cuối nhận phần chênh lệch làm tròn.
+ */
+function restoreCostDivisionEntries(editedEntries, previousEntries) {
+    var previousById = {};
+    var previousCostGroups = {};
+    var result = [];
+    var i;
+
+    for (i = 0; i < previousEntries.length; i++) {
+        var previous = previousEntries[i];
+        previousById[safeString(previous.id).trim()] = previous;
+
+        if (normalizeEntryType(previous.entry_type) !== ENTRY_TYPE.COST) continue;
+        var previousKey = makeCostGroupKey(previous.vendor_id, previous.account_number);
+        if (!previousCostGroups[previousKey]) previousCostGroups[previousKey] = [];
+        previousCostGroups[previousKey].push(previous);
+    }
+
+    for (i = 0; i < editedEntries.length; i++) {
+        var edited = editedEntries[i];
+        if (normalizeEntryType(edited.entry_type) !== ENTRY_TYPE.COST) {
+            result.push(edited);
+            continue;
+        }
+
+        var original = previousById[safeString(edited.id).trim()];
+        if (!original || normalizeEntryType(original.entry_type) !== ENTRY_TYPE.COST) {
+            result.push(edited);
+            continue;
+        }
+
+        var groupKey = makeCostGroupKey(original.vendor_id, original.account_number);
+        var sourceRows = previousCostGroups[groupKey] || [];
+        if (sourceRows.length <= 1) {
+            result.push(edited);
+            continue;
+        }
+
+        var oldTotal = 0;
+        for (var sourceIndex = 0; sourceIndex < sourceRows.length; sourceIndex++) {
+            oldTotal += toNumber(sourceRows[sourceIndex].amount);
+        }
+
+        var newTotal = toNumber(edited.amount);
+        var allocatedTotal = 0;
+        for (sourceIndex = 0; sourceIndex < sourceRows.length; sourceIndex++) {
+            var restored = copyObject({}, sourceRows[sourceIndex]);
+            var isLast = sourceIndex === sourceRows.length - 1;
+            var restoredAmount = isLast
+                    ? newTotal - allocatedTotal
+                    : oldTotal > 0
+                            ? newTotal * toNumber(sourceRows[sourceIndex].amount) / oldTotal
+                            : newTotal / sourceRows.length;
+
+            restored.account_number = edited.account_number;
+            restored.account_name = edited.account_name;
+            restored.description = edited.description;
+            restored.amount = restoredAmount;
+            allocatedTotal += restoredAmount;
+            result.push(restored);
+        }
+    }
+
+    return result;
+}
+
+function makeCostGroupKey(vendorId, accountNumber) {
+    return 'vendor|' + safeString(vendorId).trim() + '|account|' + safeString(accountNumber).trim();
 }
 
 
@@ -2172,28 +2280,21 @@ function buildPersonalPaymentCase(c, includeRefund, includePayment, accountingCr
 
 function getPersonalExpenseAccounts(c) {
     var result = [];
-    var allocationByAccount = {};
 
     for (var i = 0; i < c.costDivisions.length; i++) {
         var division = c.costDivisions[i];
         var accountNumber = safeString(division.account_number).trim();
         if (!accountNumber) continue;
 
-        var allocation = allocationByAccount[accountNumber];
-        if (!allocation) {
-            allocation = {
-                account_number: accountNumber,
-                account_name: division.account_name || getGlAccountName(accountNumber),
-                department: division.department,
-                branch: division.branch,
-                transactionCode: division.transaction_code,
-                amount: 0,
-                from_cost_division: true
-            };
-            allocationByAccount[accountNumber] = allocation;
-            result.push(allocation);
-        }
-        allocation.amount += toNumber(division.amount);
+        result.push({
+            account_number: accountNumber,
+            account_name: division.account_name || getGlAccountName(accountNumber),
+            department: division.department,
+            branch: division.branch,
+            transactionCode: division.transaction_code,
+            amount: toNumber(division.amount),
+            from_cost_division: true
+        });
     }
 
     if (result.length === 0) {
@@ -2211,32 +2312,25 @@ function getPersonalExpenseAccounts(c) {
 }
 
 /**
- * Gom PCCP theo tài khoản để mỗi tài khoản chỉ sinh một dòng chi phí.
+ * Mỗi PCCP sinh một dòng chi phí riêng, kể cả khi trùng tài khoản.
  * Khi không có PCCP, dùng đúng một dòng từ vendorSite.debit.account.
  */
 function getStandardExpenseAllocations(c) {
     var result = [];
-    var allocationByAccount = {};
 
     for (var i = 0; i < c.costDivisions.length; i++) {
         var division = c.costDivisions[i];
         var accountNumber = safeString(division.account_number).trim();
         if (!accountNumber) continue;
 
-        var allocation = allocationByAccount[accountNumber];
-        if (!allocation) {
-            allocation = {
-                account_number: accountNumber,
-                account_name: division.account_name || getGlAccountName(accountNumber),
-                department: division.department,
-                branch: division.branch,
-                transactionCode: division.transaction_code,
-                amount: 0
-            };
-            allocationByAccount[accountNumber] = allocation;
-            result.push(allocation);
-        }
-        allocation.amount += toNumber(division.amount);
+        result.push({
+            account_number: accountNumber,
+            account_name: division.account_name || getGlAccountName(accountNumber),
+            department: division.department,
+            branch: division.branch,
+            transactionCode: division.transaction_code,
+            amount: toNumber(division.amount)
+        });
     }
 
     if (result.length === 0) {
@@ -2250,7 +2344,7 @@ function getStandardExpenseAllocations(c) {
         });
     }
 
-    debugPaymentEntry('COST-GROUP', 'NCC ' + (c.vendor.vendor_id || '?') + ': ' + c.costDivisions.length + ' PCCP => ' + result.length + ' dòng chi phí');
+    debugPaymentEntry('COST-ALLOCATE', 'NCC ' + (c.vendor.vendor_id || '?') + ': ' + c.costDivisions.length + ' PCCP => ' + result.length + ' dòng chi phí');
     return result;
 }
 
@@ -3695,7 +3789,7 @@ function isTransactionOfficeCodeAllowed(value, options) {
 
 function applyCreatorUnitToEntries(entries, unitCode, defaultOffice, options) {
     for (var i = 0; i < entries.length; i++) {
-        if (unitCode && !isAdditionalEntryType(entries[i].type)) {
+        if (unitCode && !isAdditionalEntryType(entries[i].type) && !safeString(entries[i].branch).trim()) {
             entries[i].branch = unitCode;
         }
 

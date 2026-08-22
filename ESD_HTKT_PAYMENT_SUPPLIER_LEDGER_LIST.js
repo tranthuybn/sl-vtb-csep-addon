@@ -203,9 +203,8 @@ function getListSupplierLedger(input) {
         // Còn lại = Số tiền tạm ứng - Đã hoàn ứng - Hoàn ứng chờ duyệt trên các ĐNTT khác
         resultItem.remaining_amount = resultItem.advance_amount - resultItem.refunded_amount - resultItem.other_pending_amount;
 
-        if (resultItem.remaining_amount < 0) resultItem.remaining_amount = 0;
-
-        itemList.push(resultItem);
+        // Chỉ trả các khoản tạm ứng vẫn còn số dư.
+        if (resultItem.remaining_amount > 0) itemList.push(resultItem);
     }
 
     return itemList;
@@ -289,6 +288,14 @@ function getListAccountsPayable(input) {
             var paidAmount = getNumberField(file, ["pv.amount"]);
             var payableAmount = getNumberField(file, ["pe.amount"]);
             var totalPayableAmount = getTotalPayableAmount(prepaymentId, currentPaymentId);
+            var totalRemainingAmount = payableAmount - totalPayableAmount;
+
+            // Không xử lý thêm các khoản phải trả đã hết số dư.
+            if (totalRemainingAmount <= 0) {
+                rc = file.getNext();
+                continue;
+            }
+
             var totalPayableAmountAccounted = getTotalPayableAmountAccounted(prepaymentId);
             var totalTax = getTotalTax(prepaymentId);
 
@@ -313,7 +320,7 @@ function getListAccountsPayable(input) {
                 totalAmountPaid: paidAmount + refundAmount - totalPayableAmountAccounted,  // Số tiền đã thanh toán (đã hạch toán xong và không thuộc ĐNTT hiện tại)
                 other_pending_amount: 0,   // Số tiền chờ duyệt ở các ĐNTT khác
                 currentPaymentAmount: currentPaymentEntryAmount,   // Số tiền thanh toán lần này (của ĐNTT hiện tại)
-                totalRemainingAmount: payableAmount - totalPayableAmount,
+                totalRemainingAmount: totalRemainingAmount,
                 currency: ""
             };
 
