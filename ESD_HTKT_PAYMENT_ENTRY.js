@@ -2648,8 +2648,8 @@ function getInvoiceTaxInfo(paymentId, vendor, vendorCount) {
         var invoice = getInvoiceById(links[i].invoice_id);
         if (!isInvoiceForVendor(invoice, vendor, vendorCount)) continue;
 
-        // Khấu trừ toàn bộ lấy nguyên total.tax; khấu trừ tỷ lệ nhân exchange.rate,
-        // trong đó tỷ lệ được chặn trong khoảng 0..1.
+        // Số tiền ghi Nợ TAX luôn giữ nguyên theo total.tax của hóa đơn.
+        // Loại khấu trừ chỉ dùng để xác định tài khoản thuế, không điều chỉnh số tiền.
         var taxAmount = toNumber(invoice.total_tax);
         if (taxAmount <= 0) continue;
 
@@ -2667,13 +2667,7 @@ function getInvoiceTaxInfo(paymentId, vendor, vendorCount) {
             continue;
         }
 
-        if (deductionTypeCode === DEDUCTION_TYPE_RATE) {
-            var deductionRate = Math.max(0, Math.min(1, toNumber(invoice.exchange_rate)));
-            taxAmount = taxAmount * deductionRate;
-            debugPaymentEntry('TAX-RATE', 'Hóa đơn ' + links[i].invoice_id + ': totalTax=' + invoice.total_tax + ', exchangeRate=' + deductionRate + ', deductibleTax=' + taxAmount);
-        }
-
-        // Gom số thuế được khấu trừ theo loại để sinh đúng tài khoản TT-BK-02.
+        // Gom nguyên số thuế theo loại để sinh đúng tài khoản TT-BK-02.
         taxAmounts[deductionTypeCode] += taxAmount;
     }
 
