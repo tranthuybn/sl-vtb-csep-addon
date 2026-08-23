@@ -77,11 +77,7 @@ function mapPsToEntity(psUnitCode = '') {
         }
         try { if (fileItem) fileItem.doClose(); } catch (e) {}
     }
-    return {
-        entity: "1010698",
-        oglBranchCode: "0100",
-        branchName: "branchName default"
-    }
+    return null;
 }
 
 // get vendorSite theo loai HHDV
@@ -185,7 +181,7 @@ function processAccounting(esdHTKTprepayment) {
     var result = itemEsdHTKTaccountingInfo.doSelect(`prepayment.id = "${esdHTKTprepayment.id}"`);
     var arrAPItem = [];
     var arrGLItem = [];
-    var arrCoreItem = [];
+    //    var arrCoreItem = [];
     var fields = ['request.id', 'prepayment.id', 'type', 'sub.type', 'data'];
     while (result == RC_SUCCESS) {
         if (accountingInTime) {
@@ -194,13 +190,17 @@ function processAccounting(esdHTKTprepayment) {
                 //            print(`${k}: ${itemEsdHTKTaccountingInfo[k]}`)
                 obj[k] = itemEsdHTKTaccountingInfo[k];
             });
-            if (obj.type == ACCOUNTING_TYPE.AP) {
-                arrAPItem.push(obj);
-            } else if (obj.type == ACCOUNTING_TYPE.GL) {
-                arrGLItem.push(obj);
+            if (itemEsdHTKTaccountingInfo.status == ACCOUNTING_STATUS.CREATED ||
+                itemEsdHTKTaccountingInfo.status == ACCOUNTING_STATUS.IN_QUEUE) {
+                if (obj.type == ACCOUNTING_TYPE.AP) {
+                    arrAPItem.push(obj);
+                } else if (obj.type == ACCOUNTING_TYPE.GL) {
+                    arrGLItem.push(obj);
 
-            } else if (obj.type == ACCOUNTING_TYPE.CORE) {
-                arrCoreItem.push(obj);
+                }
+                //            else if (obj.type == ACCOUNTING_TYPE.CORE) {
+                //                arrCoreItem.push(obj);
+                //            }
             }
         } else {
             itemEsdHTKTaccountingInfo.status = ACCOUNTING_STATUS.IN_QUEUE;
@@ -210,43 +210,30 @@ function processAccounting(esdHTKTprepayment) {
     }
     //    print('done');
     if (accountingInTime) {
-        var hasOGLError = false;
+        //        var hasOGLError = false;
         arrAPItem.forEach(itemHt => {
-            if (!callApiAp(itemHt)) {
-                hasOGLError = true;
-            }
+            callApiAp(itemHt);
+            //            if (!callApiAp(itemHt)) {
+            //                hasOGLError = true;
+            //            }
         });
         arrGLItem.forEach(itemHt => {
-            if (!callApiGl(itemHt)) {
-                hasOGLError = true;
-            }
+            callApiGl(itemHt);
+            //            if (!callApiGl(itemHt)) {
+            //                hasOGLError = true;
+            //            }
         });
-        if (!hasOGLError) {
-            arrCoreItem.forEach(itemHt => {
-                callApiCore(itemHt);
-            });
-        }
+        //        if (!hasOGLError) {
+        //            arrCoreItem.forEach(itemHt => {
+        //                callApiCore(itemHt);
+        //            });
+        //        }
     }
     try { if (itemEsdHTKTaccountingInfo) itemEsdHTKTaccountingInfo.doClose(); } catch (e) {}
 }
 
 //processAccounting({ id: 'TU.106.26.0000060' });
 //processAccounting({ id: 'TU.106.26.0000193' });
-
-//function processAccountingByType(esdHTKTacountingInfo) {
-//    switch (esdHTKTacountingInfo.type) {
-//        case ACCOUNTING_TYPE.AP:
-//            callApiAp(esdHTKTacountingInfo);
-//            break;
-//        case ACCOUNTING_TYPE.GL:
-//            callApiGl(esdHTKTacountingInfo);
-//            break;
-//        case ACCOUNTING_TYPE.CORE:
-//            callApiCore(esdHTKTacountingInfo);
-//        default:
-//            break;
-//    }
-//}
 
 function callApiAp(esdHTKTacountingInfo) {
     var success = false;
@@ -267,7 +254,7 @@ function callApiAp(esdHTKTacountingInfo) {
             esdHTKTacountingInfo['sub.type'] == ACCOUNTING_SUB_TYPE.TAM_UNG ||
             esdHTKTacountingInfo['sub.type'] == ACCOUNTING_SUB_TYPE.THUE) {
             response = lib.ESD_HTKT_INVOICE_OGL_INTEGRATION.createApInvoice(payload);
-        } else if (subType == ACCOUNTING_SUB_TYPE.TAT_TOAN) {
+        } else if (esdHTKTacountingInfo['sub.type'] == ACCOUNTING_SUB_TYPE.TAT_TOAN) {
             response = lib.ESD_HTKT_INVOICE_OGL_INTEGRATION.createApPayment(payload);
         } else {
             logger.info("ESD_HTKT_ACCOUNTING_UTILS::callApiAp: sub.type không xác định");
@@ -397,10 +384,11 @@ function checkAccountingInfo(requestId) {
         }
         if (response) {
             itemAccounting.response = rteJSONStringify(response);
-            var status = "UNKNOWN"
-            if (response.success && response.data && response.data.status) {
-                status = ACCOUNTING_API_STATUS_MAP[response.data.status] || "UNKNOWN";
-                itemAccounting.status = status;
+            var status = "UNKNOWN";
+            if (response.data) {
+                if (response.data.status) {
+                    status = ACCOUNTING_API_STATUS_MAP[response.data.status] || "UNKNOWN";
+                }
                 itemAccounting['checked.time'] = funcs.tod();
                 if (response.data.invoiceNumber) {
                     itemAccounting['ap.code'] = response.data.invoiceNumber;
@@ -411,7 +399,15 @@ function checkAccountingInfo(requestId) {
                 if (response.data.referenceId) {
                     itemAccounting['ref.id'] = response.data.referenceId;
                 }
+                if (response.data.paymentNumber) {
+                    itemAccounting['payment.number'] = response.data.paymentNumber;
+                }
             }
+            if (!response.success) {
+                status = ACCOUNTING_STATUS.ERROR;
+                itemAccounting.message = response.message;
+            }
+            itemAccounting.status = status;
             itemAccounting.doUpdate();
         }
         checkCompleteAccounting(itemAccounting['prepayment.id']);
@@ -425,7 +421,7 @@ function createJobCheckAccounting(requestId) {
     lib.ESD_HTKT_Utils.createSchedule({
         name: workerName,
         script: `lib.ESD_HTKT_ACCOUNTING_UTILS.checkAccountingInfo("${requestId}");`,
-        actionDelaySeconds: 300
+        actionDelaySeconds: 120
     });
 }
 
@@ -436,15 +432,32 @@ function createJobCheckAccounting(requestId) {
 // Kiem tra de nghi da hach toan thanh cong chua
 // duyet ds accountingInformation, neu tat ca ban ghi da complete -> cap nhat esdHTKTprepayment.status = ACCOUNTED;
 function checkCompleteAccounting(prepaymentId) {
+    var fields = ['request.id', 'prepayment.id', 'type', 'sub.type', 'data'];
     var countRecord = 0;
     var countRecordCompleted = 0;
+    var countOGL = 0;
+    var countOGLCompleted = 0;
+    var itemAccountingCore = [];
     var isPayment = false;
     var accountingInfoItem = new SCFile('esdHTKTaccountingInformation');
     var result = accountingInfoItem.doSelect(`prepayment.id = "${prepaymentId}"`);
     while (result == RC_SUCCESS) {
         countRecord++;
-        if (accountingInfoItem.status == ACCOUNTING_STATUS.COMPLETED || accountingInfoItem.status == ACCOUNTING_STATUS.ERROR) {
+        if (accountingInfoItem.type == ACCOUNTING_TYPE.AP || accountingInfoItem.type == ACCOUNTING_TYPE.GL) {
+            countOGL++;
+        } else if (accountingInfoItem.type == ACCOUNTING_TYPE.CORE &&
+            (accountingInfoItem.status == ACCOUNTING_STATUS.CREATED || accountingInfoItem.status == ACCOUNTING_STATUS.IN_QUEUE)) {
+            var obj = {};
+            fields.forEach(k => {
+                obj[k] = accountingInfoItem[k];
+            });
+            itemAccountingCore.push(obj);
+        }
+        if (accountingInfoItem.status == ACCOUNTING_STATUS.COMPLETED) {
             countRecordCompleted++;
+            if (accountingInfoItem.type == ACCOUNTING_TYPE.AP || accountingInfoItem.type == ACCOUNTING_TYPE.GL) {
+                countOGLCompleted++;
+            }
         }
 
         if (accountingInfoItem["sub.type"] == ACCOUNTING_SUB_TYPE.THANH_TOAN ||
@@ -457,23 +470,37 @@ function checkCompleteAccounting(prepaymentId) {
     try { if (accountingInfoItem) accountingInfoItem.doClose(); } catch (e) {}
     //    print(`countRecord: ${countRecord} === countRecordCompleted: ${countRecordCompleted}`);
     if (countRecord == countRecordCompleted && countRecordCompleted > 0) {
-        var tableName = isPayment ?
-            "esdHTKTpayment" :
-            "esdHTKTprepayment";
-
-        var itemPrepayment = new SCFile(tableName);
-        //        var itemPrepayment = new SCFile('esdHTKTprepayment');
-        var prResult = itemPrepayment.doSelect(`id = "${prepaymentId}"`);
-        if (prResult == RC_SUCCESS) {
-            itemPrepayment.status = 'accounted';
-            itemPrepayment["completed.date"] = system.functions.tod();
-            itemPrepayment.doUpdate();
+        updatePaymentAccountingCompletedStatus(prepaymentId, isPayment);
+    }
+    if (countOGL == countOGLCompleted && itemAccountingCore.length > 0) {
+        itemAccountingCore.forEach(itemHT => {
+            if (callApiCore(itemHT)) {
+                countRecordCompleted++;
+            }
+        });
+        if (countRecord == countRecordCompleted && countRecordCompleted > 0) {
+            updatePaymentAccountingCompletedStatus(prepaymentId, isPayment);
         }
-        try { if (itemPrepayment) itemPrepayment.doClose(); } catch (e) {}
     }
 }
 
-//checkCompleteAccounting('TU.106.26.0000193');
+function updatePaymentAccountingCompletedStatus(prepaymentId, isPayment) {
+    var tableName = isPayment ?
+        "esdHTKTpayment" :
+        "esdHTKTprepayment";
+
+    var itemPrepayment = new SCFile(tableName);
+    //        var itemPrepayment = new SCFile('esdHTKTprepayment');
+    var prResult = itemPrepayment.doSelect(`id = "${prepaymentId}"`);
+    if (prResult == RC_SUCCESS) {
+        itemPrepayment.status = 'accounted';
+        itemPrepayment["completed.date"] = system.functions.tod();
+        itemPrepayment.doUpdate();
+    }
+    try { if (itemPrepayment) itemPrepayment.doClose(); } catch (e) {}
+}
+
+//checkCompleteAccounting('TU.106.26.0000028');
 
 // Liet ke danh sach cac ban ghi hach toan AP, GL can check trang thai: 
 function jobCallCheckAccoutingStatus() {
@@ -537,9 +564,10 @@ function checkAccount(accountId, napasCode) {
     if (napasCode == '970415') { // kiem tra trong he thong
         var response = lib.ESD_HTKT_FUND_TRANSFER_INTEGRATION.checkNameAccount(accountId);
         if (response && response.data && response.data.acctName) {
+            if (response.data.stat !== "0") {
+                return null;
+            }
             return response.data.acctName;
-        } else if (response.status && response.status.code != "0" && response.status.detail) {
-            print('Kiểm tra tên tài khoản không thành công: ' + response.status.detail);
         }
     } else if (napasCode) { // kiem tra ngoai he thong
         var response = lib.ESD_HTKT_FUND_TRANSFER_INTEGRATION.checkNameAccountNapas(accountId, napasCode);
@@ -548,12 +576,8 @@ function checkAccount(accountId, napasCode) {
             if (custInfo && custInfo.length > 0 && response.data.custInfo[0].depAcctIdTo &&
                 response.data.custInfo[0].depAcctIdTo.refVal) {
                 return response.data.custInfo[0].depAcctIdTo.refVal;
-            } else if (response.status && response.status.code != "0" && response.status.detail) {
-                print('Kiểm tra tên tài khoản không thành công: ' + response.status.detail);
             }
         }
-    } else {
-        print('Không đủ thông tin để kiểm tra tên người thụ hưởng, vui lòng nhập thủ công');
     }
     return null;
 }

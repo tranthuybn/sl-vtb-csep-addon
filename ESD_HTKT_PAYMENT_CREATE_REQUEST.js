@@ -19,7 +19,7 @@ function run() {
                 result = createPaymentRequest(input);
                 break;
             case 'listPurchaseContracts':
-                listPurchaseContracts(input);
+                result = listPurchaseContracts(input);
                 break;
 
             default:
@@ -443,22 +443,24 @@ function listPurchaseContracts(input) {
                 itemData.name = itemData.name; 
             }
 
-            var wrappedItem = {
-                "esdHTKTpaymentPurchaseContracts": itemData
-            };
-
-            dataArray.push(JSON.stringify(wrappedItem));
+            dataArray.push(itemData);
 
             rc = f.getNext();
         }
     } catch (e) {
         print("[ERROR listPurchaseContracts] Lỗi doSelect: " + e);
+        return {
+            success: false,
+            message: "Lỗi lấy danh sách hợp đồng mua sắm: " + e.toString()
+        };
     } finally {
         try { if (f) f.doClose(); } catch (e) {}
     }
 
-    // Trả mảng kết quả
-    input.queryReturnArray = system.functions.denull(dataArray);
+    return {
+        success: true,
+        data: dataArray
+    };
 }
 
 function mapRowToObject(scFileRecord, fieldMappings) {
