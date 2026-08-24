@@ -181,11 +181,6 @@ function canUpdateApprovalInfo(record, field) {
 
 function updateNextStatus(record, previousRecord) {
     var currentPhase = record.current_phase || record["current.phase"];
-    var initialStatus = record.status;
-
-    print("[PAYMENT_WF.updateNextStatus] >>> START -> record.id=" + (record.id || record["id"]) + ", currentPhase=" + currentPhase + ", status=" + initialStatus);
-
-    // thang add logic sign KS
     var oldPhase = currentPhase;
     var documentResult = null;
 
@@ -196,8 +191,6 @@ function updateNextStatus(record, previousRecord) {
     if (previousRecord && previousRecord["current.phase"]) {
         oldPhase = String(previousRecord["current.phase"]).trim();
     }
-
-    print("[PAYMENT_WF.updateNextStatus] oldPhase resolved=" + oldPhase + ", target HTKT_WF_PHASE.INITIAL_KTTC=" + HTKT_WF_PHASE.INITIAL_KTTC);
 
     // trưởng thêm: Chỉ tạo bản trình ký khi rời phase initial_kttc.
     if (oldPhase === HTKT_WF_PHASE.INITIAL_KTTC) {
@@ -252,9 +245,6 @@ function updateNextStatus(record, previousRecord) {
         record.status = "initialized";
     } else if (NEXT_PHASE_MAP[currentPhase]) {
         record.status = NEXT_PHASE_MAP[currentPhase];
-        print("[PAYMENT_WF.updateNextStatus] Mapped status from NEXT_PHASE_MAP[" + currentPhase + "] -> " + record.status);
-    } else {
-        print("[PAYMENT_WF.updateNextStatus] WARNING: currentPhase '" + currentPhase + "' not found in NEXT_PHASE_MAP!");
     }
 
     print("[PAYMENT_WF.updateNextStatus] Final record.status=" + record.status);
@@ -263,17 +253,9 @@ function updateNextStatus(record, previousRecord) {
         if (currentPhase == "initial_dmms") {
             lib.ESD_HTKT_PAYMENT_VENDOR.syncVendorOglFromPayment(record);
         }
-    } catch (e) {
-        print("[PAYMENT_WF.updateNextStatus] syncVendorOglFromPayment exception: " + e);
-    }
+    } catch (e) {}
 
-    try {
-        createApprovalHistory(record);
-    } catch (histErr) {
-        print("[PAYMENT_WF.updateNextStatus] createApprovalHistory exception: " + histErr);
-    }
-
-    print("[PAYMENT_WF.updateNextStatus] <<< END updateNextStatus successfully");
+    createApprovalHistory(record);
     return documentResult;
 }
 
