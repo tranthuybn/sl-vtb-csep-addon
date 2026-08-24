@@ -384,6 +384,9 @@ function checkAccountingInfo(requestId) {
         }
         if (response) {
             itemAccounting.response = rteJSONStringify(response);
+//            response.success = false;
+//            response.data = null;
+//            response.message = "Test giao dich loi"
             var status = "UNKNOWN";
             if (response.data) {
                 if (response.data.status) {
@@ -409,6 +412,10 @@ function checkAccountingInfo(requestId) {
             }
             itemAccounting.status = status;
             itemAccounting.doUpdate();
+
+            if (!response.success) {
+                lib.ESD_HTKT_ACCOUNTING_ERROR_HANDLING.saveAccountingErrorHandling(itemAccounting);
+            }
         }
         checkCompleteAccounting(itemAccounting['prepayment.id']);
     }
@@ -433,30 +440,31 @@ function createJobCheckAccounting(requestId) {
 // duyet ds accountingInformation, neu tat ca ban ghi da complete -> cap nhat esdHTKTprepayment.status = ACCOUNTED;
 function checkCompleteAccounting(prepaymentId) {
     var fields = ['request.id', 'prepayment.id', 'type', 'sub.type', 'data'];
-    var countRecord = 0;
-    var countRecordCompleted = 0;
     var countOGL = 0;
     var countOGLCompleted = 0;
+    var countAccountingCore = 0;
+    var countAccountingCoreCompleted = 0;
     var itemAccountingCore = [];
     var isPayment = false;
     var accountingInfoItem = new SCFile('esdHTKTaccountingInformation');
     var result = accountingInfoItem.doSelect(`prepayment.id = "${prepaymentId}"`);
     while (result == RC_SUCCESS) {
-        countRecord++;
         if (accountingInfoItem.type == ACCOUNTING_TYPE.AP || accountingInfoItem.type == ACCOUNTING_TYPE.GL) {
             countOGL++;
-        } else if (accountingInfoItem.type == ACCOUNTING_TYPE.CORE &&
-            (accountingInfoItem.status == ACCOUNTING_STATUS.CREATED || accountingInfoItem.status == ACCOUNTING_STATUS.IN_QUEUE)) {
-            var obj = {};
-            fields.forEach(k => {
-                obj[k] = accountingInfoItem[k];
-            });
-            itemAccountingCore.push(obj);
-        }
-        if (accountingInfoItem.status == ACCOUNTING_STATUS.COMPLETED) {
-            countRecordCompleted++;
-            if (accountingInfoItem.type == ACCOUNTING_TYPE.AP || accountingInfoItem.type == ACCOUNTING_TYPE.GL) {
+            if (accountingInfoItem.status == ACCOUNTING_STATUS.COMPLETED) {
                 countOGLCompleted++;
+            }
+        } else if (accountingInfoItem.type == ACCOUNTING_TYPE.CORE) {
+            countAccountingCore++;
+            if (accountingInfoItem.status == ACCOUNTING_STATUS.COMPLETED) {
+                countAccountingCoreCompleted++;
+            } else if (accountingInfoItem.status == ACCOUNTING_STATUS.CREATED ||
+                    accountingInfoItem.status == ACCOUNTING_STATUS.IN_QUEUE) {
+                var obj = {};
+                fields.forEach(k => {
+                    obj[k] = accountingInfoItem[k];
+                });
+                itemAccountingCore.push(obj);
             }
         }
 
@@ -468,19 +476,23 @@ function checkCompleteAccounting(prepaymentId) {
         result = accountingInfoItem.getNext();
     }
     try { if (accountingInfoItem) accountingInfoItem.doClose(); } catch (e) {}
-    //    print(`countRecord: ${countRecord} === countRecordCompleted: ${countRecordCompleted}`);
-    if (countRecord == countRecordCompleted && countRecordCompleted > 0) {
-        updatePaymentAccountingCompletedStatus(prepaymentId, isPayment);
-    }
+
+    // Chỉ gọi CORE sau khi toàn bộ giao dịch AP/GL đã hoàn tất.
     if (countOGL == countOGLCompleted && itemAccountingCore.length > 0) {
         itemAccountingCore.forEach(itemHT => {
             if (callApiCore(itemHT)) {
-                countRecordCompleted++;
+                countAccountingCoreCompleted++;
             }
         });
-        if (countRecord == countRecordCompleted && countRecordCompleted > 0) {
-            updatePaymentAccountingCompletedStatus(prepaymentId, isPayment);
-        }
+    }
+
+    // Chỉ hoàn tất phiếu khi cả nhóm OGL và nhóm CORE đều hoàn tất.
+    if (
+        countOGL == countOGLCompleted &&
+        countAccountingCore == countAccountingCoreCompleted &&
+        countOGL + countAccountingCore > 0
+    ) {
+        updatePaymentAccountingCompletedStatus(prepaymentId, isPayment);
     }
 }
 
