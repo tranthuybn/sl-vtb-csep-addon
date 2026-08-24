@@ -1,4 +1,5 @@
 function run() {
+
     try {
         var input = vars['$L.file'];
         if (!input) { return; }
@@ -780,14 +781,8 @@ function updateListInvoinVendor(input) {
                         successInvoiceIds.push(invoiceId);
                        
                         affectedPaymentIds[paymentId] = true;
-                    } else {
-                        console.error("Lỗi hệ thống khi cập nhật DB cho hóa đơn ID: " + invoiceId);
                     }
-                } else {
-                    console.error("Không tìm thấy bản ghi liên kết để cập nhật trong bảng esdHTKTpaymentInvoice với điều kiện: " + query);
                 }
-            } else {
-                console.error("Bỏ qua dòng số " + (i + 1) + " do thiếu thông tin id hoặc transactionId");
             }
         }
 
