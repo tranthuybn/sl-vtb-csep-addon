@@ -76,11 +76,6 @@ if (paymentId || vars.$L_file['payment.id']) {
   var rcItem = itemFile.doSelect(itemQuery);
 
   while (rcItem == RC_SUCCESS) {
-    // Lưu lại unit.lv1 vào biến $L.file để dùng khi bấm Lưu
-    if (itemFile["unit.lv1"]) {
-      vars.$L_file['unit.lv1'] = itemFile["unit.lv1"];
-    }
-
     var currentSupplierId = itemFile["supplier.id"];
     var currentContractId = itemFile['contract.id'];
 
@@ -89,7 +84,8 @@ if (paymentId || vars.$L_file['payment.id']) {
     if (!usedSupplierIds[currentSupplierId]) {
       // TÍNH SỐ TIỀN CÒN LẠI CỦA NHÀ CUNG CẤP
 
-      var initialRemainingAmount = String(itemFile['remaining.amount'] || "0");
+//      var initialRemainingAmount = String(itemFile['remaining.amount'] || "0");
+      var initialRemainingAmount = itemFile['remaining.amount'];
       var finalRemainingAmount = initialRemainingAmount;
 
       // Tổng tiền đã tạm ứng của NCC trong các phiếu
@@ -118,7 +114,7 @@ if (paymentId || vars.$L_file['payment.id']) {
 
         hasApprovedTicket = true;
 
-        totalApprovedAmount =
+        totalApprovedAmount = 
           lib.ESD_HTKT_Utils.addStringsManual(
             totalApprovedAmount,
             String(checkFile["amount"] || "0")
@@ -160,7 +156,7 @@ if (paymentId || vars.$L_file['payment.id']) {
 
         hasPaidTicket = true;
 
-        totalPaidAmount =
+        totalPaidAmount = 
           lib.ESD_HTKT_Utils.addStringsManual(
             totalPaidAmount,
             String(paymentCheckFile["amount"] || "0")
@@ -190,13 +186,23 @@ if (paymentId || vars.$L_file['payment.id']) {
       }
 
       if (hasPaidTicket) {
-        finalRemainingAmount =
+        finalRemainingAmount = 
           lib.ESD_HTKT_Utils.subtractStringsManual(
             finalRemainingAmount,
             totalPaidAmount
           );
       }
-
+    // KIỂM TRA NẾU KẾT QUẢ LÀ SỐ ÂM THÌ ĐẶT VỀ "0"
+      if (
+        finalRemainingAmount && 
+        (finalRemainingAmount.charAt(0) === "-" || 
+         lib.ESD_HTKT_Utils.compareMoneyStrings(finalRemainingAmount, "0") < 0)
+      ) {
+        finalRemainingAmount = "0";
+      }
+      // 
+      
+      
       arrVendors.push({
         "supplier.id": currentSupplierId,
         "supplier.name": itemFile["supplier.name"],
@@ -228,4 +234,3 @@ if (paymentId || vars.$L_file['payment.id']) {
 var bankList = lib.ESD_HTKT_ACCOUNTING_UTILS.getBankDroplist();
 vars.$bankcode = bankList.map(b => `${b.code}|${b.citad}|${b.napas}`);
 vars.$bankname = bankList.map(b => b.name);
-
