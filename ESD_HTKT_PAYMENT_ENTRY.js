@@ -1061,7 +1061,7 @@ function savePaymentEntryEdit(details) {
         });
     }
 
-    var creatorUnit = getCreatorAccountingUnit(request.created_by);
+    var creatorUnit = getCreatorAccountingUnit(safeString(details.currentUser).trim());
     var transactionOfficeOptions = getTransactionOfficeOptions(creatorUnit.lv1Id);
     var defaultTransactionOfficeCode = getDefaultTransactionOfficeCode(transactionOfficeOptions);
     applyCreatorUnitToEntries(
@@ -2520,7 +2520,7 @@ function applyBeneficiaryByEntryType(rows) {
         list[i].beneficiary_account = beneficiary.account;
         list[i].beneficiary_name = beneficiary.name;
         list[i].beneficiary_bank = beneficiary.bank;
-        list[i].bank_name = beneficiary.bank_name;
+        list[i].bank_name = beneficiary.bank_name || "Vietinbank";
 
         var rawBranch = list[i].branch;
         if (rawBranch) {
@@ -3789,6 +3789,16 @@ function isTransactionOfficeCodeAllowed(value, options) {
 
 function applyCreatorUnitToEntries(entries, unitCode, defaultOffice, options) {
     for (var i = 0; i < entries.length; i++) {
+        var isManualCost =
+                normalizeEntryType(entries[i].entry_type) === ENTRY_TYPE.COST &&
+                isUserAddedEntryId(entries[i].id);
+
+        if (isManualCost) {
+            if (unitCode) entries[i].branch = formatSegment1(unitCode, GL_DEFAULT_ENTITY_CODE);
+            if (!entries[i].transaction_office) entries[i].transaction_office = GL_DEFAULT_TRANSACTION_OFFICE;
+            if (!entries[i].department) entries[i].department = GL_DEFAULT_COST_CENTER;
+        }
+
         if (unitCode && !isAdditionalEntryType(entries[i].type) && !safeString(entries[i].branch).trim()) {
             entries[i].branch = unitCode;
         }
