@@ -181,6 +181,9 @@ function canUpdateApprovalInfo(record, field) {
 
 function updateNextStatus(record, previousRecord) {
     var currentPhase = record.current_phase || record["current.phase"];
+    var initialStatus = record.status;
+
+    print("[PAYMENT_WF.updateNextStatus] >>> START -> record.id=" + (record.id || record["id"]) + ", currentPhase=" + currentPhase + ", status=" + initialStatus);
 
     // thang add logic sign KS
     var oldPhase = currentPhase;
@@ -194,55 +197,83 @@ function updateNextStatus(record, previousRecord) {
         oldPhase = String(previousRecord["current.phase"]).trim();
     }
 
+    print("[PAYMENT_WF.updateNextStatus] oldPhase resolved=" + oldPhase + ", target HTKT_WF_PHASE.INITIAL_KTTC=" + HTKT_WF_PHASE.INITIAL_KTTC);
+
     // trưởng thêm: Chỉ tạo bản trình ký khi rời phase initial_kttc.
-    // if (oldPhase === HTKT_WF_PHASE.INITIAL_KTTC) {
-    //     htktWfAssertDependencies(true);
+    if (oldPhase === HTKT_WF_PHASE.INITIAL_KTTC) {
+        try {
+            htktWfAssertDependencies(true);
 
-    //     var paymentId = htktWfPaymentId(record);
-    //     var currentDocument = htktWfDocument().getCurrentPresentation({
-    //         paymentId: paymentId
-    //     });
+            var paymentId = htktWfPaymentId(record);
+            print("[PAYMENT_WF.updateNextStatus] Checking presentation for paymentId=" + paymentId);
 
-    //     if (currentDocument && currentDocument.success === true) {
-    //         documentResult = htktWfOk({
-    //             idempotent: true,
-    //             document: currentDocument.data
-    //         }, "Bản trình ký đã được tạo trước đó.");
-    //     } else if (currentDocument && currentDocument.code && currentDocument.code !== "DOCUMENT_NOT_FOUND") {
-    //         throw new Error(currentDocument.message || "Không kiểm tra được bản trình ký hiện tại.");
-    //     } else {
-    //         documentResult = htktWfDocument().generateAndUploadPresentation({
-    //             paymentId: paymentId,
-    //             currentUser: htktWfCurrentUser()
-    //         });
+            var currentDocument = htktWfDocument().getCurrentPresentation({
+                paymentId: paymentId
+            });
 
-    //         if (!documentResult || documentResult.success !== true) {
-    //             var documentError = documentResult && documentResult.message
-    //                 ? documentResult.message
-    //                 : "Không sinh và lưu được bản trình ký.";
-    //             if (documentResult && documentResult.detail) {
-    //                 documentError += " " + documentResult.detail;
-    //             }
-    //             throw new Error(documentError);
-    //         }
-    //     }
-    // }
+            print("[PAYMENT_WF.updateNextStatus] currentDocument check result=" + JSON.stringify(currentDocument));
 
+            if (currentDocument && currentDocument.success === true) {
+                documentResult = htktWfOk({
+                    idempotent: true,
+                    document: currentDocument.data
+                }, "Bản trình ký đã được tạo trước đó.");
+                print("[PAYMENT_WF.updateNextStatus] Presentation already existed, skip generate.");
+            } else if (currentDocument && currentDocument.code && currentDocument.code !== "DOCUMENT_NOT_FOUND") {
+                print("[PAYMENT_WF.updateNextStatus] Error checking presentation: " + currentDocument.message);
+                throw new Error(currentDocument.message || "Không kiểm tra được bản trình ký hiện tại.");
+            } else {
+                print("[PAYMENT_WF.updateNextStatus] Generating new presentation...");
+                documentResult = htktWfDocument().generateAndUploadPresentation({
+                    paymentId: paymentId,
+                    currentUser: htktWfCurrentUser()
+                });
 
+                print("[PAYMENT_WF.updateNextStatus] generateAndUploadPresentation result=" + JSON.stringify(documentResult));
+
+                if (!documentResult || documentResult.success !== true) {
+                    var documentError = documentResult && documentResult.message
+                            ? documentResult.message
+                            : "Không sinh và lưu được bản trình ký.";
+                    if (documentResult && documentResult.detail) {
+                        documentError += " " + documentResult.detail;
+                    }
+                    print("[PAYMENT_WF.updateNextStatus] ERROR generating presentation: " + documentError);
+                    throw new Error(documentError);
+                }
+            }
+        } catch (docErr) {
+            print("[PAYMENT_WF.updateNextStatus] EXCEPTION in presentation handling: " + docErr);
+            throw docErr;
+        }
+    }
 
     if (currentPhase === "start") {
         record.status = "initialized";
     } else if (NEXT_PHASE_MAP[currentPhase]) {
         record.status = NEXT_PHASE_MAP[currentPhase];
+        print("[PAYMENT_WF.updateNextStatus] Mapped status from NEXT_PHASE_MAP[" + currentPhase + "] -> " + record.status);
+    } else {
+        print("[PAYMENT_WF.updateNextStatus] WARNING: currentPhase '" + currentPhase + "' not found in NEXT_PHASE_MAP!");
     }
+
+    print("[PAYMENT_WF.updateNextStatus] Final record.status=" + record.status);
 
     try {
         if (currentPhase == "initial_dmms") {
             lib.ESD_HTKT_PAYMENT_VENDOR.syncVendorOglFromPayment(record);
         }
-    } catch (e) {}
+    } catch (e) {
+        print("[PAYMENT_WF.updateNextStatus] syncVendorOglFromPayment exception: " + e);
+    }
 
-    createApprovalHistory(record);
+    try {
+        createApprovalHistory(record);
+    } catch (histErr) {
+        print("[PAYMENT_WF.updateNextStatus] createApprovalHistory exception: " + histErr);
+    }
+
+    print("[PAYMENT_WF.updateNextStatus] <<< END updateNextStatus successfully");
     return documentResult;
 }
 
@@ -762,18 +793,18 @@ function validateVendorAndPaymentDetails(record) {
             }
 
          if (!record["issued.date"]) { 
-			    errorMss.push("Ngày cấp giấy tờ tùy thân không được để trống."); 
-			} else {
-			    var issuedDate = new Date(record["issued.date"]);
-			    var today = new Date();
-			
-			    issuedDate.setHours(0, 0, 0, 0);
-			    today.setHours(0, 0, 0, 0);
-			
-			   if (issuedDate > today) {
-			        errorMss.push("Ngày cấp giấy tờ tùy thân không được vượt quá ngày hiện tại.");
-			    }
-			}
+                errorMss.push("Ngày cấp giấy tờ tùy thân không được để trống."); 
+            } else {
+                var issuedDate = new Date(record["issued.date"]);
+                var today = new Date();
+            
+                issuedDate.setHours(0, 0, 0, 0);
+                today.setHours(0, 0, 0, 0);
+            
+               if (issuedDate > today) {
+                    errorMss.push("Ngày cấp giấy tờ tùy thân không được vượt quá ngày hiện tại.");
+                }
+            }
 
             if (!record["issued.place"]) {
                 errorMss.push("Nơi cấp giấy tờ tùy thân không được để trống.");
