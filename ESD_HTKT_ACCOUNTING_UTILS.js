@@ -335,9 +335,13 @@ function callApiCore(esdHTKTacountingInfo) {
         var status = "UNKNOWN";
         var statusDetail = null;
         if (esdHTKTacountingInfo['sub.type'] == ACCOUNTING_SUB_TYPE.INHOUSE) {
-            response = lib.ESD_HTKT_FUND_TRANSFER_INTEGRATION.fundTranfer(payload);
+            // Tạm thời không gọi sang CORE.
+            // response = lib.ESD_HTKT_FUND_TRANSFER_INTEGRATION.fundTranfer(payload);
+            response = { status: { code: "0", detail: "Giả lập CORE thành công" } };
         } else if (esdHTKTacountingInfo['sub.type'] == ACCOUNTING_SUB_TYPE.CITAD) {
-            response = lib.ESD_HTKT_FUND_TRANSFER_INTEGRATION.fundTranferOut(payload);
+            // Tạm thời không gọi sang CORE.
+            // response = lib.ESD_HTKT_FUND_TRANSFER_INTEGRATION.fundTranferOut(payload);
+            response = { status: { code: "0", detail: "Giả lập CORE thành công" } };
         } else {
             logger.info("ESD_HTKT_ACCOUNTING_UTILS::callApiCore: sub.type không xác định");
         }
