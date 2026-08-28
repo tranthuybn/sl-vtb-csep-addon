@@ -336,12 +336,12 @@ function callApiCore(esdHTKTacountingInfo) {
         var statusDetail = null;
         if (esdHTKTacountingInfo['sub.type'] == ACCOUNTING_SUB_TYPE.INHOUSE) {
             // Tạm thời không gọi sang CORE.
-            // response = lib.ESD_HTKT_FUND_TRANSFER_INTEGRATION.fundTranfer(payload);
-            response = { status: { code: "0", detail: "Giả lập CORE thành công" } };
+            response = lib.ESD_HTKT_FUND_TRANSFER_INTEGRATION.fundTranfer(payload);
+//            response = { status: { code: "0", detail: "Thành công (Giả lập)" } };
         } else if (esdHTKTacountingInfo['sub.type'] == ACCOUNTING_SUB_TYPE.CITAD) {
             // Tạm thời không gọi sang CORE.
-            // response = lib.ESD_HTKT_FUND_TRANSFER_INTEGRATION.fundTranferOut(payload);
-            response = { status: { code: "0", detail: "Giả lập CORE thành công" } };
+            response = lib.ESD_HTKT_FUND_TRANSFER_INTEGRATION.fundTranferOut(payload);
+//            response = { status: { code: "0", detail: "Thành công (Giả lập)" } };
         } else {
             logger.info("ESD_HTKT_ACCOUNTING_UTILS::callApiCore: sub.type không xác định");
         }
@@ -388,9 +388,6 @@ function checkAccountingInfo(requestId) {
         }
         if (response) {
             itemAccounting.response = rteJSONStringify(response);
-//            response.success = false;
-//            response.data = null;
-//            response.message = "Test giao dich loi"
             var status = "UNKNOWN";
             if (response.data) {
                 if (response.data.status) {
@@ -417,9 +414,6 @@ function checkAccountingInfo(requestId) {
             itemAccounting.status = status;
             itemAccounting.doUpdate();
             
-            if (!response.success) {
-                lib.ESD_HTKT_ACCOUNTING_ERROR_HANDLING.saveAccountingErrorHandling(itemAccounting);
-            }
         }
         checkCompleteAccounting(itemAccounting['prepayment.id']);
     }
