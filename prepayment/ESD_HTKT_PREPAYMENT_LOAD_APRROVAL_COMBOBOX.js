@@ -63,20 +63,6 @@ function loadPrepaymentApprovalComboBoxes() {
     var RIGHTS_VIEW_CREATE = [RIGHT_VIEW_INVOICE_CREATE, RIGHT_VIEW_PREPAYMENT_CREATE];
     var RIGHTS_VIEW_APPROVAL = [RIGHT_VIEW_INVOICE_APPROVAL, RIGHT_VIEW_PREPAYMENT_APPROVAL];
 
-    var RIGHTS_FULL = [
-        RIGHT_VIEW_INVOICE_CREATE,
-        RIGHT_VIEW_INVOICE_APPROVAL,
-        RIGHT_VIEW_PREPAYMENT_CREATE,
-        RIGHT_VIEW_PREPAYMENT_APPROVAL,
-        RIGHT_CREATE_PREPAYMENT,
-        RIGHT_ACCOUNTING_INPUT,
-        RIGHT_CHECK_1,
-        RIGHT_APPROVE_1,
-        RIGHT_APPROVE_2,
-        RIGHT_CHECK_2,
-        RIGHT_APPROVE_3
-    ];
-
     var configs = [
         {
             key: "kttc",
@@ -149,6 +135,8 @@ function loadPrepaymentApprovalComboBoxes() {
         targetLv1Source: "",
         configs: []
     };
+    var contactPermissionGroupCache = {};
+    var permissionGroupRightsCache = {};
 
     var file = vars["$L.file"];
     var targetInfo = getPrepaymentTargetLv1(file);
@@ -275,7 +263,7 @@ function loadPrepaymentApprovalComboBoxes() {
                 continue;
             }
 
-            if (!contactHasRightRule(contactId, includeRights, excludeRights)) {
+            if (!contactHasAssignedRoleRule(contactId, seedRights, includeRights, excludeRights)) {
                 output.rejectedCount++;
                 continue;
             }
@@ -309,7 +297,7 @@ function loadPrepaymentApprovalComboBoxes() {
         return [];
     }
 
-    function contactHasRightRule(contactId, includeRights, excludeRights) {
+    function contactHasAssignedRoleRule(contactId, seedRights, includeRights, excludeRights) {
         var userRights = [];
         try {
             userRights = normalizeArray(lib.ESD_PERMS_RIGHTS.permsRight(contactId) || []);
@@ -322,24 +310,135 @@ function loadPrepaymentApprovalComboBoxes() {
             map[userRights[i]] = true;
         }
 
-        var isFullRights = true;
-        for (var f = 0; f < RIGHTS_FULL.length; f++) {
-            if (!map[RIGHTS_FULL[f]]) {
-                isFullRights = false;
-                break;
-            }
-        }
-        if (isFullRights) return true;
-
+        // Quyền bắt buộc có thể được cấp từ nhiều permission group khác nhau.
         for (var j = 0; j < includeRights.length; j++) {
             if (!map[includeRights[j]]) return false;
         }
 
-        for (var k = 0; k < excludeRights.length; k++) {
-            if (map[excludeRights[k]]) return false;
+        // Role phải được nhận diện từ ít nhất một permission group được gán trực tiếp.
+        // Không dùng tổng quyền hiệu lực để tránh quyền của role cao loại nhầm một role khác.
+        var groupIds = getActivePermissionGroupIds(contactId);
+        for (var g = 0; g < groupIds.length; g++) {
+            var groupRights = getRightsByPermissionGroup(groupIds[g]);
+            var groupRightMap = {};
+
+            for (var r = 0; r < groupRights.length; r++) {
+                groupRightMap[groupRights[r]] = true;
+            }
+
+            var hasAllSeedRights = true;
+            for (var s = 0; s < seedRights.length; s++) {
+                if (!groupRightMap[seedRights[s]]) {
+                    hasAllSeedRights = false;
+                    break;
+                }
+            }
+            if (!hasAllSeedRights) continue;
+
+            var hasExcludedRight = false;
+            for (var e = 0; e < excludeRights.length; e++) {
+                if (groupRightMap[excludeRights[e]]) {
+                    hasExcludedRight = true;
+                    break;
+                }
+            }
+
+            if (!hasExcludedRight) return true;
         }
 
-        return true;
+        return false;
+    }
+
+    function getActivePermissionGroupIds(contactId) {
+        if (contactPermissionGroupCache[contactId]) {
+            return contactPermissionGroupCache[contactId].slice();
+        }
+
+        var result = [];
+        var assignments = [];
+        var joinFile = null;
+        var groupFile = null;
+
+        try {
+            joinFile = new SCFile("esdjoinContactsPermissionGroup", SCFILE_READONLY);
+            joinFile.setFields(["permission.group.id", "start.date", "end.date"]);
+
+            var rc = joinFile.doSelect('contact.id="' + escapeQueryValue(contactId) + '"');
+            while (rc === RC_SUCCESS) {
+                var groupId = normalizeValue(joinFile["permission.group.id"]);
+                var assignmentActive = isCurrentInRange(joinFile["start.date"], joinFile["end.date"]);
+
+                if (groupId && assignmentActive) {
+                    assignments.push(groupId);
+                }
+                rc = joinFile.getNext();
+            }
+
+            assignments = normalizeArray(assignments);
+            if (assignments.length === 0) return result;
+
+            var conditions = [];
+            for (var i = 0; i < assignments.length; i++) {
+                conditions.push('id="' + escapeQueryValue(assignments[i]) + '"');
+            }
+
+            groupFile = new SCFile("esdQTpermissionGroup", SCFILE_READONLY);
+            groupFile.setFields(["id", "status", "start.date", "end.date"]);
+
+            var groupRc = groupFile.doSelect("(" + conditions.join(" or ") + ")");
+            while (groupRc === RC_SUCCESS) {
+                var activeGroupId = normalizeValue(groupFile["id"]);
+                var groupActive = normalizeValue(groupFile["status"]) === "Dang hoat dong" &&
+                                  isCurrentInRange(groupFile["start.date"], groupFile["end.date"]);
+
+                if (activeGroupId && groupActive) {
+                    result.push(activeGroupId);
+                }
+                groupRc = groupFile.getNext();
+            }
+        } finally {
+            try { if (joinFile) joinFile.doClose(); } catch (eJoinClose) {}
+            try { if (groupFile) groupFile.doClose(); } catch (eGroupClose) {}
+        }
+
+        result = normalizeArray(result);
+        contactPermissionGroupCache[contactId] = result;
+        return result.slice();
+    }
+
+    function getRightsByPermissionGroup(groupId) {
+        if (permissionGroupRightsCache[groupId]) {
+            return permissionGroupRightsCache[groupId].slice();
+        }
+
+        var result = [];
+        var rightFile = null;
+
+        try {
+            rightFile = new SCFile("esdjoinRightsPermission", SCFILE_READONLY);
+            rightFile.setFields(["permission.group.id", "rights.id"]);
+
+            var rc = rightFile.doSelect('permission.group.id="' + escapeQueryValue(groupId) + '"');
+            while (rc === RC_SUCCESS) {
+                var rightId = normalizeValue(rightFile["rights.id"]);
+                if (rightId) result.push(rightId);
+                rc = rightFile.getNext();
+            }
+        } finally {
+            try { if (rightFile) rightFile.doClose(); } catch (eRightClose) {}
+        }
+
+        result = normalizeArray(result);
+        permissionGroupRightsCache[groupId] = result;
+        return result.slice();
+    }
+
+    function isCurrentInRange(startDate, endDate) {
+        try {
+            return lib.ESD_DateTime_Utils.isCurrentInRange(startDate, endDate) === true;
+        } catch (e) {
+            return false;
+        }
     }
 
     function contactDataPermissionInLv1(contactId, targetLv1) {
