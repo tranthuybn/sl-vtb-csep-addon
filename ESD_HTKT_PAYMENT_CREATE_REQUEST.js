@@ -19,7 +19,7 @@ function run() {
                 result = createPaymentRequest(input);
                 break;
             case 'listPurchaseContracts':
-                listPurchaseContracts(input);
+                result = listPurchaseContracts(input);
                 break;
 
             default:
@@ -44,6 +44,62 @@ function createPaymentRequest(input) {
         var contractList = JSON.parse(rawData);
         var contractData = contractList[0];
 
+        // =========================================================================
+        // BỔ SUNG: Tính toán động số tiền còn lại của hợp đồng trước khi tạo phiếu
+        // =========================================================================
+        var contractId = contractData['id'];
+
+        if (contractId) {
+            try {
+                // 1. TỔNG GIÁ TRỊ ĐÃ TẠM ỨNG
+                var totalPrepayment = "0";
+                var prepaymentFile = new SCFile("esdHTKTprepayment", SCFILE_READONLY);
+                var sqlPrepayment = 'contract.id="' + contractId + '" and (status="approved" or status="accounted")';
+
+                if (prepaymentFile.doSelect(sqlPrepayment) === RC_SUCCESS) {
+                    do {
+                        var prepaymentVendorFile = new SCFile("esdHTKTprepaymentVendor", SCFILE_READONLY);
+                        if (prepaymentVendorFile.doSelect('prepayment.id="' + prepaymentFile.id + '"') === RC_SUCCESS) {
+                            do {
+                                // Đảm bảo amount không bị rỗng/null để thư viện cộng chuỗi không báo lỗi
+                                var vendorAmt = prepaymentVendorFile.amount ? String(prepaymentVendorFile.amount) : "0";
+                                totalPrepayment = lib.ESD_HTKT_Utils.addStringsManual(totalPrepayment, vendorAmt);
+
+                            } while (prepaymentVendorFile.getNext() === RC_SUCCESS);
+                        }
+                        prepaymentVendorFile.doClose();
+
+                    } while (prepaymentFile.getNext() === RC_SUCCESS);
+                }
+                prepaymentFile.doClose();
+
+                // 2. TỔNG GIÁ TRỊ ĐÃ THANH TOÁN
+                var totalPayment = "0";
+
+                // 3. GIÁ TRỊ HĐ/KMS CÒN LẠI
+                var currentContractAmount = String(contractData['totalValue'] || contractData['contract.amount'] || "0");
+
+                var remainingContractValue = lib.ESD_HTKT_Utils.subtractStringsManual(currentContractAmount, totalPrepayment);
+                remainingContractValue = lib.ESD_HTKT_Utils.subtractStringsManual(remainingContractValue, totalPayment);
+
+                // 4. KIỂM TRA CHẶN
+                // Ép kiểu về số để kiểm tra <= 0
+                if (Number(remainingContractValue) <= 0) {
+                    return {
+                        success: false,
+                        message: "Tổng giá trị HĐ/KMS còn lại của hợp đồng đã về 0. Không thể tạo thêm phiếu thanh toán mới."
+                    };
+                }
+
+            } catch (eCalc) {
+                return {
+                    success: false,
+                    message: "Lỗi hệ thống khi tính toán số dư hợp đồng: " + eCalc.toString()
+                };
+            }
+        }
+        // =========================================================================
+
         /*
          * HTKT PAYMENT CURRENT USER
          */
@@ -59,9 +115,9 @@ function createPaymentRequest(input) {
         contractData["currentUser"] = currentUser;
         contractData["user"] = currentUser;
         contractData["createdBy"] = currentUser;
-        
+
         var rawDepartment = contractData['unitLv1'] || contractData['unitLv2'] || contractData['unitLv3'];
-        
+
         var entityInfo = lib.ESD_HTKT_ACCOUNTING_UTILS.mapPsToEntity(rawDepartment);
 
         // 2. Lấy giá trị oglBranchCode từ Object trả về
@@ -79,7 +135,7 @@ function createPaymentRequest(input) {
         mapPaymentRecord(paymentRec, contractData, newPaymentId);
         print("New Payment", paymentRec);
 
-       
+
         var returnCode;
         var previousSkipAutoPaymentActivity = htktCreatePay_normalizeValue(
             vars["$L.skipAutoPaymentActivity"]
@@ -331,9 +387,7 @@ function mapRowToObject(scFileRecord, fieldMappings) {
 }
 
 
-
 function listPurchaseContracts(input) {
-
     // 1. Lấy dữ liệu linh hoạt từ details hoặc queryString
     var rawData = input ? (input.details || input.queryString) : null;
     if (!rawData) return { success: false, message: "Thiếu dữ liệu đầu vào." };
@@ -400,24 +454,49 @@ function listPurchaseContracts(input) {
         ['contract.end.date', 'contract.end.date', 'S'],
         ['duration.unit', 'duration.unit', 'S'],
         ['contact.list', 'contact.list', 'S']
-        
+
     ];
 
     // 2. Xây dựng điều kiện lọc WHERE
     var conditions = [];
 
-    conditions.push("contract.value.after.tax > 0");
+    conditions.push("((category=\"HD_GT\" and contract.value.after.tax > 0) or (category=\"HD_KMS\" and total.budget > 0))");
+
+    var role = params.initialRole || (input ? input.initialRole : null);
+    if (role) {
+        role = String(role).trim().toLowerCase();
+        if (role === "dmms") {
+            conditions.push("executor.id=\"" + params.currentUser + "\"");
+        }
+    }
+
     if (params.status) {
         conditions.push("status=\"" + params.status + "\"");
     }
-    
+
     var unitLv1Param = params.unitLv1 || params["unit.lv1"];
-    if (unitLv1Param) {
+    print("unitLv1Param: " + unitLv1Param);
+    if (unitLv1Param && String(unitLv1Param).trim() === "099917000") {
+        conditions.push("unit.lv1 like \"0999*\"");
+    } else {
         conditions.push("unit.lv1=\"" + unitLv1Param + "\"");
     }
 
-    var whereClause = conditions.length > 0 ? conditions.join(" and ") : "true";
+    //    var unitLv1Param = params.unitLv1 || params["unit.lv1"];
+    //    if (unitLv1Param && String(unitLv1Param).trim() !== "099917000") {
+    //        conditions.push("unit.lv1=\"" + unitLv1Param + "\"");
+    //    }
+    //    conditions.push("contract.value.after.tax > 0");
+    //    if (params.status) {
+    //        conditions.push("status=\"" + params.status + "\"");
+    //    }
+    //    var unitLv1Param = params.unitLv1 || params["unit.lv1"];
+    //    if (unitLv1Param) {
+    //        conditions.push("unit.lv1=\"" + unitLv1Param + "\"");
+    //    }
 
+
+    var whereClause = conditions.length > 0 ? conditions.join(" and ") : "true";
 
 
     var sqlFields = fieldMappings.map(function(item) {
@@ -440,25 +519,27 @@ function listPurchaseContracts(input) {
             if (itemData.category === "HD_KMS") {
                 itemData.name = itemData["item.name"] || itemData.name;
             } else if (itemData.category === "HD_GT") {
-                itemData.name = itemData.name; 
+                itemData.name = itemData.name;
             }
 
-            var wrappedItem = {
-                "esdHTKTpaymentPurchaseContracts": itemData
-            };
-
-            dataArray.push(JSON.stringify(wrappedItem));
+            dataArray.push(itemData);
 
             rc = f.getNext();
         }
     } catch (e) {
         print("[ERROR listPurchaseContracts] Lỗi doSelect: " + e);
+        return {
+            success: false,
+            message: "Lỗi lấy danh sách hợp đồng mua sắm: " + e.toString()
+        };
     } finally {
         try { if (f) f.doClose(); } catch (e) {}
     }
 
-    // Trả mảng kết quả
-    input.queryReturnArray = system.functions.denull(dataArray);
+    return {
+        success: true,
+        data: dataArray
+    };
 }
 
 function mapRowToObject(scFileRecord, fieldMappings) {
@@ -634,10 +715,10 @@ function getOglBranchCodeByDepartment(departmentCode) {
 
     try {
         var entityFile = new SCFile("esdDMentity", SCFILE_READONLY);
-        
+
         var safeDeptCode = String(departmentCode).trim().replace(/^0+/, "");
         var query = 'ps.code="' + safeDeptCode + '"';
-        
+
         if (entityFile.doSelect(query) === RC_SUCCESS) {
             var rawOglCode = entityFile["ogl.branch.code"] || "";
             return String(rawOglCode).trim().replace(/^0+/, "");
@@ -645,6 +726,6 @@ function getOglBranchCodeByDepartment(departmentCode) {
     } catch (e) {
         print("Lỗi truy vấn esdDMentity: " + e.toString());
     }
-    
+
     return "";
 }

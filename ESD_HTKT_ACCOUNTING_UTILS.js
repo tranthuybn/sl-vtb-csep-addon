@@ -336,13 +336,13 @@ function callApiCore(esdHTKTacountingInfo) {
         var statusDetail = null;
         if (esdHTKTacountingInfo['sub.type'] == ACCOUNTING_SUB_TYPE.INHOUSE) {
             // Tạm thời không gọi sang CORE.
-//            response = lib.ESD_HTKT_FUND_TRANSFER_INTEGRATION.fundTranfer(payload);
-            response = { status: { code: "0", detail: "Thành công (Giả lập)" } };
+            response = lib.ESD_HTKT_FUND_TRANSFER_INTEGRATION.fundTranfer(payload);
+//            response = { status: { code: "0", detail: "Thành công (Giả lập)" } };
 //            response = { status: { code: "1", detail: "That bai (Giả lập)" } };
         } else if (esdHTKTacountingInfo['sub.type'] == ACCOUNTING_SUB_TYPE.CITAD) {
             // Tạm thời không gọi sang CORE.
-//            response = lib.ESD_HTKT_FUND_TRANSFER_INTEGRATION.fundTranferOut(payload);
-            response = { status: { code: "0", detail: "Thành công (Giả lập)" } };
+            response = lib.ESD_HTKT_FUND_TRANSFER_INTEGRATION.fundTranferOut(payload);
+//            response = { status: { code: "0", detail: "Thành công (Giả lập)" } };
 //            response = { status: { code: "1", detail: "That bai (Giả lập)" } };
         } else {
             logger.info("ESD_HTKT_ACCOUNTING_UTILS::callApiCore: sub.type không xác định");

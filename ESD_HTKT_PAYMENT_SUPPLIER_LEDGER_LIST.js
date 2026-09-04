@@ -1115,3 +1115,45 @@ function extractAccountNumber(value) {
     var extracted = account.substring(secondSep + 1, thirdSep).trim();
     return extracted || account;
 }
+
+//===================TestZOnE==============
+function testPaging(start, count) {
+    var f = null;
+    var resultList = [];
+    try {
+        f = new SCFile("esdHTKTaccountingInformation", SCFILE_READONLY);
+        // Sửa lại cú pháp: doSelectEx("query", start, count)
+        // Dùng "true" để lấy toàn bộ bản ghi, hoặc thay bằng điều kiện cụ thể nếu cần
+        var rc = f.doSelectEx("true", start, count);
+//           var rc = f.doSelectEx("SELECT request.id FROM esdHTKTaccountingInformation WHERE true", start, count);
+        while (rc == RC_SUCCESS) {
+            var reqId = String(f["request.id"] || f["requestId"] || "").trim();
+            print("Row data: " + reqId);
+            resultList.push({
+                requestId: reqId
+            });
+            rc = f.getNext();
+        }
+    } catch (e) {
+        print("[testPaging Error]: " + e.toString());
+    } finally {
+        if (f) {
+            try {
+                f.doClose();
+            } catch (ignore) {}
+        }
+    }
+    
+    var jsonResult = JSON.stringify({
+        success: true,
+        data: resultList
+    });
+    
+    print("JSON Result: " + jsonResult);
+    return jsonResult;
+}
+
+// Gọi hàm để test lấy trang đầu tiên (start = 0) với 3 bản ghi (count = 3)
+testPaging(0, 3);
+//=======end test zone===========
+
