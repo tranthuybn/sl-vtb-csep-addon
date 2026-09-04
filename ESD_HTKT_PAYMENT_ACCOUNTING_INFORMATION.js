@@ -158,7 +158,9 @@ function generatePaymentAccountingInformation(paymentId, previewOnly) {
             glGroups[groupKey].push(glEntry);
         }
 
-        var glMaker = safeString(payment.created_by).trim();
+        var glMakerResult = resolvePaymentMaker(payment);
+        if (!glMakerResult.success) return glMakerResult;
+        var glMaker = glMakerResult.data;
         var glApprover = safeString(payment.user_approver_kttc).trim();
         var glContext = { maker: glMaker, approver: glApprover, checker: glApprover };
 
@@ -398,6 +400,23 @@ function buildAccountingInformationRow(payment, item, createdTime) {
     };
 }
 
+function resolvePaymentMaker(payment) {
+    var initialRole = safeString(payment.initial_role).trim().toLowerCase();
+
+    if (initialRole === 'kttc') {
+        return { success: true, data: safeString(payment.created_by).trim() };
+    }
+    if (initialRole === 'dmms') {
+        return { success: true, data: safeString(payment.user_checker_kttc).trim() };
+    }
+    return errorResult(
+            'INVALID_PAYMENT_INITIAL_ROLE ' +
+            'Khong map duoc initial.role="' +
+            payment.initial_role +
+            '" sang can bo KTTC tao/tiep nhan.'
+    );
+}
+
 function buildVendorContext(payment, vendorRow) {
     var vendor = selectOne(TABLE_VENDOR, 'id="' + escapeQueryValue(vendorRow.vendor_id) + '"', function (f) {
         return { number: readText(f, 'vendor.number'), name: readText(f, 'vendor.name') };
@@ -411,23 +430,9 @@ function buildVendorContext(payment, vendorRow) {
     if (!vendor || !vendor.number) return errorResult('Khong tim thay vendor.number cua NCC ' + vendorRow.vendor_id + '.');
     if (!entityResult.success) return entityResult;
 
-    var initialRole = safeString(payment.initial_role).trim().toLowerCase();
-    var maker = '';
-
-    if (initialRole === 'kttc') {
-        maker = safeString(payment.created_by).trim();
-    } else if (initialRole === 'dmms') {
-        maker = safeString(
-                payment.user_checker_kttc
-        ).trim();
-    } else {
-        return errorResult(
-                'INVALID_PAYMENT_INITIAL_ROLE ' +
-                'Khong map duoc initial.role="' +
-                payment.initial_role +
-                '" sang can bo KTTC tao/tiep nhan.'
-        );
-    }
+    var makerResult = resolvePaymentMaker(payment);
+    if (!makerResult.success) return makerResult;
+    var maker = makerResult.data;
 
     var checker = safeString(payment.user_approver_kttc).trim();
     var cashout = mapPaymentMethodToCashout(vendorRow.payment_method);

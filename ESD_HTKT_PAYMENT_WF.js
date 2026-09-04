@@ -81,7 +81,7 @@ var HTKT_WF_DSM_STATUS = {
 function checkShowApproval(record) {
     var currentUser = vars.$lo_operator["contact.name"];
     if ((record["created.by"] == currentUser && record["initial.role"] == "kttc") ||
-        record["user.checker.kttc"] == currentUser) {
+            record["user.checker.kttc"] == currentUser) {
         return "T";
     }
     return "F";
@@ -90,8 +90,8 @@ function checkShowApproval(record) {
 function checkCanSave(record) {
     var currentUser = vars.$lo_operator["contact.name"];
     if ((record["created.by"] == currentUser && record["initial.role"] == "kttc" && record["current.phase"] == "initial_kttc") ||
-        (record["created.by"] == currentUser && record["initial.role"] == "dmms" && record["current.phase"] == "initial_dmms") ||
-        (record["user.checker.kttc"] == currentUser && record["current.phase"] == "initial_kttc")
+            (record["created.by"] == currentUser && record["initial.role"] == "dmms" && record["current.phase"] == "initial_dmms") ||
+            (record["user.checker.kttc"] == currentUser && record["current.phase"] == "initial_kttc")
     ) {
         return "T";
     }
@@ -161,8 +161,8 @@ function canUpdateApprovalInfo(record, field) {
             return field == "require.check.level1" && record["created.by"] == currentUser && record["initial.role"] == "dmms";
         case "initial_kttc":
             return field == "require.check.level2" &&
-                ((record["created.by"] == currentUser && record["initial.role"] == "kttc") ||
-                    record["user.checker.kttc"] == currentUser);
+                    ((record["created.by"] == currentUser && record["initial.role"] == "kttc") ||
+                            record["user.checker.kttc"] == currentUser);
         case "check_dmms":
         case "approval_dmms":
         case "approval_kttc":
@@ -198,31 +198,23 @@ function updateNextStatus(record, previousRecord) {
             htktWfAssertDependencies(true);
 
             var paymentId = htktWfPaymentId(record);
-            print("[PAYMENT_WF.updateNextStatus] Checking presentation for paymentId=" + paymentId);
 
             var currentDocument = htktWfDocument().getCurrentPresentation({
                 paymentId: paymentId
             });
-
-            print("[PAYMENT_WF.updateNextStatus] currentDocument check result=" + JSON.stringify(currentDocument));
 
             if (currentDocument && currentDocument.success === true) {
                 documentResult = htktWfOk({
                     idempotent: true,
                     document: currentDocument.data
                 }, "Bản trình ký đã được tạo trước đó.");
-                print("[PAYMENT_WF.updateNextStatus] Presentation already existed, skip generate.");
             } else if (currentDocument && currentDocument.code && currentDocument.code !== "DOCUMENT_NOT_FOUND") {
-                print("[PAYMENT_WF.updateNextStatus] Error checking presentation: " + currentDocument.message);
                 throw new Error(currentDocument.message || "Không kiểm tra được bản trình ký hiện tại.");
             } else {
-                print("[PAYMENT_WF.updateNextStatus] Generating new presentation...");
                 documentResult = htktWfDocument().generateAndUploadPresentation({
                     paymentId: paymentId,
                     currentUser: htktWfCurrentUser()
                 });
-
-                print("[PAYMENT_WF.updateNextStatus] generateAndUploadPresentation result=" + JSON.stringify(documentResult));
 
                 if (!documentResult || documentResult.success !== true) {
                     var documentError = documentResult && documentResult.message
@@ -231,12 +223,10 @@ function updateNextStatus(record, previousRecord) {
                     if (documentResult && documentResult.detail) {
                         documentError += " " + documentResult.detail;
                     }
-                    print("[PAYMENT_WF.updateNextStatus] ERROR generating presentation: " + documentError);
                     throw new Error(documentError);
                 }
             }
         } catch (docErr) {
-            print("[PAYMENT_WF.updateNextStatus] EXCEPTION in presentation handling: " + docErr);
             throw docErr;
         }
     }
@@ -246,8 +236,6 @@ function updateNextStatus(record, previousRecord) {
     } else if (NEXT_PHASE_MAP[currentPhase]) {
         record.status = NEXT_PHASE_MAP[currentPhase];
     }
-
-    print("[PAYMENT_WF.updateNextStatus] Final record.status=" + record.status);
 
     try {
         if (currentPhase == "initial_dmms") {
@@ -269,7 +257,7 @@ function updateNextStatus(record, previousRecord) {
 function createApprovalHistory(record) {
     try {
         var currentPhase = String(
-            record.current_phase || record["current.phase"] || ""
+                record.current_phase || record["current.phase"] || ""
         ).trim();
 
         var activityType = "";
@@ -281,9 +269,9 @@ function createApprovalHistory(record) {
         } else if (currentPhase == "check_final") {
             activityType = "Rà soát 2";
         } else if (
-            currentPhase == "approval_dmms" ||
-            currentPhase == "approval_kttc" ||
-            currentPhase == "approval_final"
+                currentPhase == "approval_dmms" ||
+                currentPhase == "approval_kttc" ||
+                currentPhase == "approval_final"
         ) {
             activityType = "Phê duyệt";
         }
@@ -293,7 +281,7 @@ function createApprovalHistory(record) {
         }
 
         var currentUser = String(
-            vars.$lo_operator["contact.name"] || vars["$lo.contact.name"] || ""
+                vars.$lo_operator["contact.name"] || vars["$lo.contact.name"] || ""
         ).trim();
 
         var paymentId = String(record["id"] || record.id || "").trim();
@@ -303,15 +291,15 @@ function createApprovalHistory(record) {
         }
 
         createActivity(
-            "activityHTKTpayment",
-            activityType + ' Đề nghị Thanh Toán: Mã đề nghị: "' + paymentId + '"',
-            paymentId,
-            activityType,
-            currentUser
+                "activityHTKTpayment",
+                activityType + ' Đề nghị Thanh Toán: Mã đề nghị: "' + paymentId + '"',
+                paymentId,
+                activityType,
+                currentUser
         );
     } catch (e) {
         print(
-            "[ESD_HTKT_PAYMENT_WF.createApprovalHistory] Không thể ghi activity: " + e.toString()
+                "[ESD_HTKT_PAYMENT_WF.createApprovalHistory] Không thể ghi activity: " + e.toString()
         );
     }
 }
@@ -321,23 +309,23 @@ function cancelRequest(record) {
 
     try {
         var currentUser = String(
-            vars.$lo_operator["contact.name"] || vars["$lo.contact.name"] || ""
+                vars.$lo_operator["contact.name"] || vars["$lo.contact.name"] || ""
         ).trim();
 
         var paymentId = String(record["id"] || record.id || "").trim();
 
         if (currentUser && paymentId) {
             createActivity(
-                "activityHTKTpayment",
-                "Xóa Đề nghị Thanh toán",
-                paymentId,
-                "Xóa",
-                currentUser
+                    "activityHTKTpayment",
+                    'Xóa Đề nghị Thanh toán: Mã đề nghị: "' + paymentId + '"',
+                    paymentId,
+                    "Xóa",
+                    currentUser
             );
         }
     } catch (e) {
         print(
-            "[ESD_HTKT_PAYMENT_WF.cancelRequest] Không thể ghi activity: " + e.toString()
+                "[ESD_HTKT_PAYMENT_WF.cancelRequest] Không thể ghi activity: " + e.toString()
         );
     }
 }
@@ -347,9 +335,9 @@ function returnToUpdate(record, documentsAlreadyDeleted) {
         var deleteResult = deleteDocumentsBeforeReturn(record);
         if (!deleteResult || deleteResult.success !== true) {
             throw new Error(
-                deleteResult && deleteResult.message
-                    ? deleteResult.message
-                    : "Khong xoa duoc tai lieu ECM truoc khi yeu cau chinh sua."
+                    deleteResult && deleteResult.message
+                            ? deleteResult.message
+                            : "Khong xoa duoc tai lieu ECM truoc khi yeu cau chinh sua."
             );
         }
     }
@@ -358,7 +346,7 @@ function returnToUpdate(record, documentsAlreadyDeleted) {
 
     try {
         var currentUser = String(
-            vars.$lo_operator["contact.name"] || vars["$lo.contact.name"] || ""
+                vars.$lo_operator["contact.name"] || vars["$lo.contact.name"] || ""
         ).trim();
 
         var paymentId = String(record["id"] || record.id || "").trim();
@@ -366,20 +354,20 @@ function returnToUpdate(record, documentsAlreadyDeleted) {
 
         if (currentUser && paymentId) {
             var activityDescription =
-                "Yêu cầu chỉnh sửa Đề nghị Thanh Toán" +
-                (returnReason ? '\nLý do: "' + returnReason + '"' : "");
+                    "Yêu cầu chỉnh sửa Đề nghị Thanh Toán" +
+                    (returnReason ? '\nLý do: "' + returnReason + '"' : "");
 
             createActivity(
-                "activityHTKTpayment",
-                activityDescription,
-                paymentId,
-                "Yêu cầu chỉnh sửa",
-                currentUser
+                    "activityHTKTpayment",
+                    activityDescription,
+                    paymentId,
+                    "Yêu cầu chỉnh sửa",
+                    currentUser
             );
         }
     } catch (e) {
         print(
-            "[ESD_HTKT_PAYMENT_WF.returnToUpdate] Không thể ghi activity: " + e.toString()
+                "[ESD_HTKT_PAYMENT_WF.returnToUpdate] Không thể ghi activity: " + e.toString()
         );
     }
 }
@@ -389,7 +377,12 @@ function returnToUpdate(record, documentsAlreadyDeleted) {
  * 4. TẦNG VALIDATION NGHIỆP VỤ (BUSINESS VALIDATIONS)
  * ============================================================================= */
 
-function validateDataInPhase(record) {
+function validateDataInPhase(record, type) {
+    // Nếu không phải gọi từ Workflow (Trình duyệt / Chuyển bước) -> Bỏ qua kiểm tra chuyển phase
+    if (type !== "wf") {
+        return null;
+    }
+
     var errorMss = [];
 
     // Validate chung thông tin NCC + thanh toán
@@ -460,7 +453,7 @@ function validateFromCbDmmsToCbKttc() {
     if (record["require.check.level1"] && !record["user.checker.dmms"]) errorMss.push("Chưa chọn cán bộ Rà soát ĐMMS");
     if (!record["user.approver.dmms"]) errorMss.push("Chưa chọn cán bộ Phê duyệt ĐMMS");
     var description = String(record["description"] || "").trim();
-    
+
     if (description === "") {
         errorMss.push("Nội dung giao dịch không được để trống.");
     } else if (description.length > 255) {
@@ -479,8 +472,8 @@ function validateFromCbKttc() {
     var accountingResult = validateRequiredEsdHTKTpaymentEntry(paymentId);
     if (accountingResult.success !== true) {
         errorMss.push(
-            accountingResult.error ||
-            "Thông tin hạch toán là bắt buộc và tổng ghi nợ phải bằng tổng ghi có."
+                accountingResult.error ||
+                "Thông tin hạch toán là bắt buộc và tổng ghi nợ phải bằng tổng ghi có."
         );
     }
 
@@ -488,8 +481,8 @@ function validateFromCbKttc() {
     var requiredDeductionType = validateRequiredEsdHTKTpaymentInvoice(paymentId);
     if (requiredDeductionType.success !== true) {
         errorMss.push(
-            requiredDeductionType.error ||
-            "Hóa đơn bắt buộc chọn loại khấu trừ"
+                requiredDeductionType.error ||
+                "Hóa đơn bắt buộc chọn loại khấu trừ"
         );
     }
     //////////////////
@@ -499,6 +492,12 @@ function validateFromCbKttc() {
         errorMss.push(refundMatchResult.error);
     }
     //////////////////
+
+    // Validate phương thức thanh toán của các nhà cung cấp nếu >= 2 NCC
+    var paymentMethodResult = validateAllVendorsPaymentMethodMatch(paymentId);
+    if (paymentMethodResult.success !== true) {
+        errorMss.push(paymentMethodResult.error);
+    }
 
     // Validate thông tin phê duyệt
     if (!record["user.approver.kttc"]) {
@@ -514,7 +513,7 @@ function validateFromCbKttc() {
     }
 
     var description = String(record["description"] || "").trim();
-    
+
     if (description === "") {
         errorMss.push("Nội dung giao dịch không được để trống.");
     } else if (description.length > 255) {
@@ -671,7 +670,7 @@ function validateVendorAndPaymentDetails(record) {
     var approvedInvoiceAmount = parseAmount(vars.$approvedInvoiceAmount);
     var refundAmount = parseAmount(vars.$refundAmount);
     var remainingAmount = parseAmount(vars.$remainingAmount);
-    
+
     if (isNaN(amountField)) {
         errorMss.push("Số tiền đề nghị thanh toán là bắt buộc.");
     } else if (amountField < 0) {
@@ -679,15 +678,15 @@ function validateVendorAndPaymentDetails(record) {
     } else if (amountField > remainingAmount) {
         errorMss.push("Số tiền đề nghị thanh toán phải nhỏ hơn hoặc bằng Số tiền còn lại.");
     }
-    
+
     if (isNaN(approvedInvoiceAmount)) {
-        errorMss.push("Giá trị hóa đơn chấp nhận là bắt buộc.");
+//        errorMss.push("Giá trị hóa đơn chấp nhận là bắt buộc.");
     } else if (approvedInvoiceAmount < 0) {
-        errorMss.push("Giá trị hóa đơn chấp nhận phải lớn hơn 0.");
+//        errorMss.push("Giá trị hóa đơn chấp nhận phải lớn hơn 0.");
     } else if (approvedInvoiceAmount > remainingAmount) {
         errorMss.push("Giá trị hóa đơn chấp nhận phải nhỏ hơn hoặc bằng Số tiền còn lại.");
     }
-    
+
     if (isNaN(refundAmount)) {
         errorMss.push("Số tiền hoàn ứng lần này là bắt buộc.");
     } else if (refundAmount < 0) {
@@ -695,7 +694,7 @@ function validateVendorAndPaymentDetails(record) {
     } else if (refundAmount > remainingAmount) {
         errorMss.push("Số tiền hoàn ứng lần này phải nhỏ hơn hoặc bằng Số tiền còn lại.");
     }
-    
+
     if(refundAmount == 0 && amountField == 0 && approvedInvoiceAmount == 0) {
         errorMss.push("Vui lòng nhập số tiền.");
     }
@@ -721,7 +720,7 @@ function validateVendorAndPaymentDetails(record) {
             } else {
                 var bankValue = String(record["beneficiary.bank"]).trim();
                 checkMaxLength(bankValue, 255, "Ngân hàng thụ hưởng");
-                
+
                 // Lấy danh sách Value List từ biến $bankcode của hệ thống
                 var validBankCodes = vars.$bankcode;
                 var isBankValid = false;
@@ -729,7 +728,7 @@ function validateVendorAndPaymentDetails(record) {
                 if (validBankCodes != null) {
                     // Ép kiểu về mảng Javascript chuẩn (phòng trường hợp là SCArray của HPSM)
                     var bankCodeArray = (typeof validBankCodes.toArray === 'function') ? validBankCodes.toArray() : validBankCodes;
-                    
+
                     // Kiểm tra giá trị có nằm trong Value List không
                     for (var i = 0; i < bankCodeArray.length; i++) {
                         if (bankCodeArray[i] != null && String(bankCodeArray[i]).trim() === bankValue) {
@@ -774,16 +773,16 @@ function validateVendorAndPaymentDetails(record) {
                 }
             }
 
-         if (!record["issued.date"]) { 
-                errorMss.push("Ngày cấp giấy tờ tùy thân không được để trống."); 
+            if (!record["issued.date"]) {
+                errorMss.push("Ngày cấp giấy tờ tùy thân không được để trống.");
             } else {
                 var issuedDate = new Date(record["issued.date"]);
                 var today = new Date();
-            
+
                 issuedDate.setHours(0, 0, 0, 0);
                 today.setHours(0, 0, 0, 0);
-            
-               if (issuedDate > today) {
+
+                if (issuedDate > today) {
                     errorMss.push("Ngày cấp giấy tờ tùy thân không được vượt quá ngày hiện tại.");
                 }
             }
@@ -849,29 +848,29 @@ function validateInvoices(paymentId) {
         var invoiceId = prepInvoiceFile['invoice.id'];
 
         if (invoiceId) {
-            var invoiceFile = new SCFile('esdHTKTinvoice'); 
+            var invoiceFile = new SCFile('esdHTKTinvoice');
             var invRc = invoiceFile.doSelect('id="' + invoiceId + '"');
 
             if (invRc == RC_SUCCESS) {
                 var lastCheckDate = invoiceFile['last.check.date'];
-                
+
                 var timeStatus = lib.ESD_HTKT_PREPAYMENT_VENDOR.checkInvoiceStatus(lastCheckDate);
 
-            if (timeStatus == "Quá hạn") {
-            
-                hasInvalidInvoice = true;
-            
-                var apiResponse = lib.ESD_HTKT_SCHEDULE_OGL.callCheckInvoiceAPI(invoiceFile);
-            
-                if (apiResponse && apiResponse.success === true) {
-                    invoiceFile['last.check.date'] = new Date();
-                    invoiceFile.doUpdate();
+                if (timeStatus == "Quá hạn") {
+
+                    hasInvalidInvoice = true;
+
+                    var apiResponse = lib.ESD_HTKT_SCHEDULE_OGL.callCheckInvoiceAPI(invoiceFile);
+
+                    if (apiResponse && apiResponse.success === true) {
+                        invoiceFile['last.check.date'] = new Date();
+                        invoiceFile.doUpdate();
+                    }
                 }
             }
-            }
             try { invoiceFile.doClose(); } catch (e) {}
-        } 
-        
+        }
+
         rc = prepInvoiceFile.getNext();
     }
 
@@ -903,19 +902,19 @@ function htktWfOk(data, message) {
 
 function htktWfFail(code, message, detail, data) {
     return htktWfCommon().fail(
-        code || "WORKFLOW_ERROR",
-        message || "Có lỗi xảy ra khi xử lý workflow.",
-        detail || "",
-        data
+            code || "WORKFLOW_ERROR",
+            message || "Có lỗi xảy ra khi xử lý workflow.",
+            detail || "",
+            data
     );
 }
 
 function htktWfFailException(code, message, error, data) {
     return htktWfCommon().failFromException(
-        code || "WORKFLOW_ERROR",
-        message || "Có lỗi xảy ra khi xử lý workflow.",
-        error,
-        data
+            code || "WORKFLOW_ERROR",
+            message || "Có lỗi xảy ra khi xử lý workflow.",
+            error,
+            data
     );
 }
 
@@ -925,11 +924,11 @@ function htktWfAssertDependencies(requireDocument) {
     }
 
     if (requireDocument === true &&
-        (!lib.ESD_HTKT_PAYMENT_DOCUMENT ||
-            typeof lib.ESD_HTKT_PAYMENT_DOCUMENT.generateAndUploadPresentation !== "function" ||
-            typeof lib.ESD_HTKT_PAYMENT_DOCUMENT.getCurrentPresentation !== "function" ||
-            typeof lib.ESD_HTKT_PAYMENT_DOCUMENT.replaceCurrentVersion !== "function" ||
-            typeof lib.ESD_HTKT_PAYMENT_DOCUMENT.invalidateCurrentCycle !== "function")
+            (!lib.ESD_HTKT_PAYMENT_DOCUMENT ||
+                    typeof lib.ESD_HTKT_PAYMENT_DOCUMENT.generateAndUploadPresentation !== "function" ||
+                    typeof lib.ESD_HTKT_PAYMENT_DOCUMENT.getCurrentPresentation !== "function" ||
+                    typeof lib.ESD_HTKT_PAYMENT_DOCUMENT.replaceCurrentVersion !== "function" ||
+                    typeof lib.ESD_HTKT_PAYMENT_DOCUMENT.invalidateCurrentCycle !== "function")
     ) {
         throw new Error("Thiếu hoặc sai contract ESD_HTKT_PAYMENT_DOCUMENT.");
     }
@@ -952,8 +951,8 @@ function htktWfIsReviewPhaseValue(phase) {
 
 function htktWfIsSignaturePhaseValue(phase) {
     return phase === HTKT_WF_PHASE.APPROVAL_DMMS ||
-           phase === HTKT_WF_PHASE.APPROVAL_KTTC ||
-           phase === HTKT_WF_PHASE.APPROVAL_FINAL;
+            phase === HTKT_WF_PHASE.APPROVAL_KTTC ||
+            phase === HTKT_WF_PHASE.APPROVAL_FINAL;
 }
 
 function getCurrentActorField(record) {
@@ -1030,6 +1029,8 @@ function isSignaturePhase(record) {
     return htktWfIsSignaturePhaseValue(htktWfPhase(record));
 }
 
+
+
 // Kiểm tra quyền hiển thị Workflow Action Test ký.
 function checkCanSign(record) {
     var actorResult = validateCurrentActor(record);
@@ -1072,7 +1073,7 @@ function validateCurrentActor(record) {
 function htktWfValidateLegacy(record) {
     var errors;
     try {
-        errors = validateDataInPhase(record);
+        errors = validateDataInPhase(record, "wf");
     } catch (error) {
         return htktWfFailException("WORKFLOW_VALIDATION_EXCEPTION", "Không thực hiện được validation workflow hiện tại.", error);
     }
@@ -1125,10 +1126,10 @@ function submitForApproval(record) {
         documentResult = updateNextStatus(record);
     } catch (errorUpdate) {
         return htktWfFailException(
-            "WORKFLOW_STATUS_UPDATE_EXCEPTION",
-            "Không tạo được bản trình ký hoặc không cập nhật được workflow.",
-            errorUpdate,
-            { document: documentResult ? documentResult.data : null, retrySafe: true }
+                "WORKFLOW_STATUS_UPDATE_EXCEPTION",
+                "Không tạo được bản trình ký hoặc không cập nhật được workflow.",
+                errorUpdate,
+                { document: documentResult ? documentResult.data : null, retrySafe: true }
         );
     }
 
@@ -1140,8 +1141,8 @@ function submitForApproval(record) {
         document: documentResult ? documentResult.data : null,
         recordMustBeSaved: true
     }, phase === HTKT_WF_PHASE.INITIAL_KTTC
-        ? "Sinh bản trình ký và chuyển trạng thái thành công."
-        : "Chuyển trạng thái thành công.");
+            ? "Sinh bản trình ký và chuyển trạng thái thành công."
+            : "Chuyển trạng thái thành công.");
 }
 
 /* Rà soát chỉ xác nhận, không ký số */
@@ -1244,9 +1245,9 @@ function checkSignatureSucceeded(record) {
         var currentObjectId = String(currentResult.data.ecmObjectId || "").trim();
 
         return currentAttachmentId &&
-            currentObjectId &&
-            currentAttachmentId !== oldAttachmentId &&
-            currentObjectId !== oldObjectId
+        currentObjectId &&
+        currentAttachmentId !== oldAttachmentId &&
+        currentObjectId !== oldObjectId
                 ? "T"
                 : "F";
     } catch (ignore) {
@@ -1353,10 +1354,10 @@ function completeApprovalAfterSignature(record, signResult) {
 
     if (!replaceResult || replaceResult.success !== true) {
         return htktWfFail(
-            "SIGNED_PRESENTATION_UPDATE_FAILED",
-            (replaceResult && replaceResult.message) ? replaceResult.message : "Không cập nhật được PDF sau ký.",
-            (replaceResult && replaceResult.detail) ? replaceResult.detail : "",
-            replaceResult ? replaceResult.data : null
+                "SIGNED_PRESENTATION_UPDATE_FAILED",
+                (replaceResult && replaceResult.message) ? replaceResult.message : "Không cập nhật được PDF sau ký.",
+                (replaceResult && replaceResult.detail) ? replaceResult.detail : "",
+                replaceResult ? replaceResult.data : null
         );
     }
 
@@ -1368,10 +1369,10 @@ function completeApprovalAfterSignature(record, signResult) {
 
         if (!completeResult || completeResult.success !== true) {
             return htktWfFail(
-                "PRESENTATION_COMPLETE_FAILED",
-                (completeResult && completeResult.message) ? completeResult.message : "Không đánh dấu được bản trình ký hoàn tất.",
-                (completeResult && completeResult.detail) ? completeResult.detail : "",
-                completeResult ? completeResult.data : null
+                    "PRESENTATION_COMPLETE_FAILED",
+                    (completeResult && completeResult.message) ? completeResult.message : "Không đánh dấu được bản trình ký hoàn tất.",
+                    (completeResult && completeResult.detail) ? completeResult.detail : "",
+                    completeResult ? completeResult.data : null
             );
         }
     }
@@ -1380,10 +1381,10 @@ function completeApprovalAfterSignature(record, signResult) {
         updateNextStatus(record);
     } catch (errorUpdate) {
         return htktWfFailException(
-            "WORKFLOW_STATUS_UPDATE_EXCEPTION",
-            "Đã cập nhật PDF sau ký nhưng không cập nhật được workflow.",
-            errorUpdate,
-            { replaceResult: replaceResult.data, retrySafe: true }
+                "WORKFLOW_STATUS_UPDATE_EXCEPTION",
+                "Đã cập nhật PDF sau ký nhưng không cập nhật được workflow.",
+                errorUpdate,
+                { replaceResult: replaceResult.data, retrySafe: true }
         );
     }
 
@@ -1410,9 +1411,9 @@ function deleteDocumentsBeforeReturn(record) {
         });
     } catch (error) {
         return htktWfFailException(
-            "PRESENTATION_HARD_DELETE_EXCEPTION",
-            "Không xóa được tài liệu của vòng trình ký trên hệ thống lưu trữ.",
-            error
+                "PRESENTATION_HARD_DELETE_EXCEPTION",
+                "Không xóa được tài liệu của vòng trình ký trên hệ thống lưu trữ.",
+                error
         );
     }
 }
@@ -1429,26 +1430,26 @@ function requestCorrection(record) {
     try {
         if (checkCanReturn(record) !== "T") {
             return htktWfFail(
-                "RETURN_NOT_ALLOWED",
-                "Người dùng hiện tại không được phép yêu cầu chỉnh sửa.",
-                "currentPhase=" + phase
+                    "RETURN_NOT_ALLOWED",
+                    "Người dùng hiện tại không được phép yêu cầu chỉnh sửa.",
+                    "currentPhase=" + phase
             );
         }
     } catch (errorPermission) {
         return htktWfFailException(
-            "RETURN_PERMISSION_CHECK_EXCEPTION",
-            "Không kiểm tra được quyền yêu cầu chỉnh sửa.",
-            errorPermission
+                "RETURN_PERMISSION_CHECK_EXCEPTION",
+                "Không kiểm tra được quyền yêu cầu chỉnh sửa.",
+                errorPermission
         );
     }
 
     var deleteResult = deleteDocumentsBeforeReturn(record);
     if (!deleteResult || deleteResult.success !== true) {
         return htktWfFail(
-            "PRESENTATION_HARD_DELETE_FAILED",
-            (deleteResult && deleteResult.message) ? deleteResult.message : "Không xóa được tài liệu của vòng trình ký trên hệ thống lưu trữ.",
-            (deleteResult && deleteResult.detail) ? deleteResult.detail : "",
-            deleteResult ? deleteResult.data : null
+                "PRESENTATION_HARD_DELETE_FAILED",
+                (deleteResult && deleteResult.message) ? deleteResult.message : "Không xóa được tài liệu của vòng trình ký trên hệ thống lưu trữ.",
+                (deleteResult && deleteResult.detail) ? deleteResult.detail : "",
+                deleteResult ? deleteResult.data : null
         );
     }
 
@@ -1456,10 +1457,10 @@ function requestCorrection(record) {
         returnToUpdate(record, true);
     } catch (errorReturn) {
         return htktWfFailException(
-            "RETURN_TO_UPDATE_EXCEPTION",
-            "Đã xóa tài liệu trên hệ thống lưu trữ nhưng không cập nhật được workflow.",
-            errorReturn,
-            { documentDeletion: deleteResult.data, retrySafe: true }
+                "RETURN_TO_UPDATE_EXCEPTION",
+                "Đã xóa tài liệu trên hệ thống lưu trữ nhưng không cập nhật được workflow.",
+                errorReturn,
+                { documentDeletion: deleteResult.data, retrySafe: true }
         );
     }
 
@@ -1543,18 +1544,18 @@ function validateAllVendorsRefundMatch(paymentId) {
     var pvFile = null;
     try {
         pvFile = new SCFile("esdHTKTpaymentVendor", SCFILE_READONLY);
-        
+
         var select = "SELECT pv.vendor.id, v.vendor.number";
         var mapping = " FROM esdHTKTpaymentVendor pv JOIN esdHTKTvendor v ON (pv.vendor.id = v.id)";
         var control = ' WHERE pv.payment.id = "' + escapeSmQueryValue(paymentId) + '"';
-        
+
         var rc = pvFile.doSelect(select + mapping + control);
 
         while (rc == RC_SUCCESS) {
             var vendorId = String(pvFile["vendor.id"] || "").trim();
             // Lấy vendor.number từ bảng esdHTKTvendor đã join
             var vendorNumber = String(pvFile["v.vendor.number"] || vendorId).trim();
-            
+
             if (vendorId) {
                 var checkResult = checkRefundAmountMatch(paymentId, vendorId);
                 if (!checkResult.isMatch) {
@@ -1584,3 +1585,58 @@ function escapeSmQueryValue(value) {
             .replace(/\\/g, "\\\\")
             .replace(/"/g, '\\"');
 }
+
+// Kiểm tra phương thức thanh toán của các NCC (>=2 NCC thì phải đồng nhất: chỉ TIENMAT hoặc chỉ CHUYENKHOAN)
+function validateAllVendorsPaymentMethodMatch(paymentId) {
+    if (!paymentId) {
+        return { success: false, error: "Không tìm thấy mã đề nghị thanh toán." };
+    }
+
+    var pvFile = null;
+    try {
+        pvFile = new SCFile("esdHTKTpaymentVendor", SCFILE_READONLY);
+        var query = 'payment.id="' + escapeSmQueryValue(paymentId) + '"';
+        var rc = pvFile.doSelect(query);
+
+        var count = 0;
+        var hasCash = false;
+        var hasTransfer = false;
+        var hasOther = false;
+
+        while (rc == RC_SUCCESS) {
+            count++;
+            var method = String(pvFile["payment.method"] || "").trim().toUpperCase();
+
+            if (method === "TIENMAT") {
+                hasCash = true;
+            } else if (method === "CHUYENKHOAN") {
+                hasTransfer = true;
+            } else {
+                hasOther = true;
+            }
+
+            rc = pvFile.getNext();
+        }
+
+        if (count >= 2) {
+            if (hasOther || (hasCash && hasTransfer) || (!hasCash && !hasTransfer)) {
+                return {
+                    success: false,
+                    error: "Phương thức toán của các nhà cung cấp đang không đồng nhất."
+                };
+            }
+        }
+
+        return { success: true };
+    } catch (e) {
+        return {
+            success: false,
+            error: "Lỗi kiểm tra phương thức thanh toán của nhà cung cấp: " + e
+        };
+    } finally {
+        if (pvFile) {
+            try { pvFile.doClose(); } catch (e) {}
+        }
+    }
+}
+
