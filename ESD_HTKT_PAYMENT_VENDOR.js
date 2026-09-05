@@ -1,4 +1,5 @@
 function run() {
+
     try {
         var input = vars['$L.file'];
         if (!input) { return; }
@@ -780,14 +781,8 @@ function updateListInvoinVendor(input) {
                         successInvoiceIds.push(invoiceId);
                        
                         affectedPaymentIds[paymentId] = true;
-                    } else {
-                        console.error("Lỗi hệ thống khi cập nhật DB cho hóa đơn ID: " + invoiceId);
                     }
-                } else {
-                    console.error("Không tìm thấy bản ghi liên kết để cập nhật trong bảng esdHTKTpaymentInvoice với điều kiện: " + query);
                 }
-            } else {
-                console.error("Bỏ qua dòng số " + (i + 1) + " do thiếu thông tin id hoặc transactionId");
             }
         }
 
@@ -1151,6 +1146,79 @@ function saveVendorSite(item) {
     return vendorSite;
 }
 
+/**
+ * Số tiền còn lại = số tiền ban đầu của NCC theo hợp đồng
+ * - tổng tạm ứng đã accounted - tổng thanh toán đã accounted.
+ */
+function calculateVendorRemainingAmount(contractId, supplierId, initialRemainingAmount) {
+    var contract = String(contractId || '').trim();
+    var supplier = String(supplierId || '').trim();
+    var finalRemainingAmount = String(initialRemainingAmount || '0');
+
+    if (!contract || !supplier) return finalRemainingAmount;
+
+    var totalApprovedAmount = sumAccountedVendorAmount(
+        'esdHTKTprepaymentVendor',
+        'esdHTKTprepayment',
+        'prepayment.id',
+        contract,
+        supplier
+    );
+    var totalPaidAmount = sumAccountedVendorAmount(
+        'esdHTKTpaymentVendor',
+        'esdHTKTpayment',
+        'payment.id',
+        contract,
+        supplier
+    );
+
+    finalRemainingAmount = lib.ESD_HTKT_Utils.subtractStringsManual(finalRemainingAmount, totalApprovedAmount);
+    finalRemainingAmount = lib.ESD_HTKT_Utils.subtractStringsManual(finalRemainingAmount, totalPaidAmount);
+
+    if (
+        finalRemainingAmount &&
+        (finalRemainingAmount.charAt(0) === '-' ||
+            lib.ESD_HTKT_Utils.compareMoneyStrings(finalRemainingAmount, '0') < 0)
+    ) {
+        return '0';
+    }
+
+    return finalRemainingAmount;
+}
+
+function sumAccountedVendorAmount(vendorTable, requestTable, requestIdField, contractId, supplierId) {
+    var totalAmount = '0';
+    var file = null;
+    var query =
+        'select pv.amount as amount ' +
+        'from ' + vendorTable + ' pv ' +
+        'join ' + requestTable + ' p on (pv.' + requestIdField + ' = p.id) ' +
+        'join esdHTKTvendor v on (pv.vendor.id = v.id) ' +
+        'where p.contract.id = "' + escapePaymentVendorQueryValue(contractId) + '" ' +
+        'and v.supplier.id = "' + escapePaymentVendorQueryValue(supplierId) + '" ' +
+        'and p.status = "accounted"';
+
+    try {
+        file = new SCFile(vendorTable, SCFILE_READONLY);
+        var rc = file.doSelect(query);
+        while (rc == RC_SUCCESS) {
+            totalAmount = lib.ESD_HTKT_Utils.addStringsManual(
+                totalAmount,
+                String(file.amount || '0')
+            );
+            rc = file.getNext();
+        }
+    } finally {
+        try { if (file) file.doClose(); } catch (e) {}
+    }
+
+    return totalAmount;
+}
+
+function escapePaymentVendorQueryValue(value) {
+    return String(value || '').replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
 function loadPaymentVendorInfo(record) {
     var itemFile = new SCFile("esdHTKTpaymentVendor");
 
@@ -1162,7 +1230,8 @@ function loadPaymentVendorInfo(record) {
         ' hpv.approved.invoice.amount as approved.invoice.amount,' +
         ' hpv.refund.amount as refund.amount,' +
         ' hpv.vendor.type as vendor.type,' +
-        ' hpv.contract.amount as remaining.amount,' +
+        ' hp.contract.id as contract.id,' +
+        ' hdVendor.remaining.amount as initial.remaining.amount,' +
         ' hv.vendor.number as tax.code,' +
         ' hpv.ogl.sync.status as ogl.sync.status,' +
         ' hvs.ogl.site.code as ogl.site.code,' +
@@ -1179,7 +1248,7 @@ function loadPaymentVendorInfo(record) {
         ' LEFT JOIN esdHTKTvendor hv ON (hpv.vendor.id = hv.id)' +
         ' LEFT JOIN esdHTKTpayment hp ON (hpv.payment.id = hp.id)' +
         ' LEFT JOIN esdHTKTvendorSite hvs ON (hvs.id = hpv.vendor.site.id)' +
-        ' LEFT JOIN esdHDcontractSupplier hdVendor ON (hp.contract.id = hdVendor.contract.id)' +
+        ' LEFT JOIN esdHDcontractSupplier hdVendor ON (hp.contract.id = hdVendor.contract.id AND hdVendor.supplier.id = hv.supplier.id)' +
         ' where hpv.id = "' + record.id + '"';
 
     if (itemFile.doSelect(itemQuery) == RC_SUCCESS) {
@@ -1187,7 +1256,11 @@ function loadPaymentVendorInfo(record) {
         vars.$currency = itemFile["currency"];
         vars.$supplierId = itemFile["supplier.id"];
         vars.$L_file["payment.method"] = itemFile["payment.method"];
-        vars.$remainingAmount = itemFile["remaining.amount"];
+        vars.$remainingAmount = calculateVendorRemainingAmount(
+            itemFile['contract.id'],
+            itemFile['supplier.id'],
+            itemFile['initial.remaining.amount']
+        );
         vars.$taxCode = itemFile["tax.code"];
         vars.$supplierdisplays = [itemFile["supplier.name"]];
         vars.$suppliervalues = [itemFile["supplier.id"]];
