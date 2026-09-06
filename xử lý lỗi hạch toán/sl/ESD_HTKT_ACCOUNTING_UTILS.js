@@ -391,6 +391,15 @@ function checkAccountingInfo(requestId) {
         }
         
         if (response) {
+            // Giữ lịch sử Thử lại khi job kiểm tra OGL thay thế phản hồi mới nhất.
+            var previousResponse = null;
+            try {
+                previousResponse = rteJSONParse(String(itemAccounting.response || '{}'));
+            } catch (ePreviousResponse) {}
+            if (previousResponse && Array.isArray(previousResponse.retryHistory)) {
+                response.retryHistory = previousResponse.retryHistory;
+                response.retryCount = previousResponse.retryHistory.length;
+            }
             itemAccounting.response = rteJSONStringify(response);
             var status = "UNKNOWN";
             if (response.data) {
