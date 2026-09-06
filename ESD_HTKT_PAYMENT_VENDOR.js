@@ -193,7 +193,7 @@ function getPaymentRemainingAmount(paymentId) {
         ['hdVendor.supplier.name', 'supplier_name', 'S'],
         ['hpv.payment.method', 'payment_method', 'S'],
         ['hpv.amount', 'amount', 'N'],
-        ['hpv.contract.amount', 'remaining_amount', 'N'],
+        ['hdVendor.remaining.amount', 'remaining_amount', 'N'],
         ['hv.vendor.number', 'tax_code', 'S'],
         ['hv.ogl.sync.status', 'ogl_sync_status', 'S'],
         ['hvs.ogl.site.code', 'ogl_site_code', 'S'],
@@ -446,23 +446,25 @@ function createListInvoinVendor(input) {
             };
         }
 
+// =========================================================================
+        // 2. KIỂM TRA TỒN TẠI VÀ TỔNG GRANDTOTAL TÍCH LŨY (CŨ + MỚI) (FAIL-FAST)
         // =========================================================================
-        // 2. KIỂM TRA TỒN TẠI VÀ TỔNG GRANDTOTAL KẾT HỢP HÓA ĐƠN CŨ (FAIL-FAST)
-        // =========================================================================
-        var totalGrandTotal = 0;
+        var totalGrandTotal = "0";
         var paymentId = dataObj[0]['transactionId'] || "";
         var vendorId = dataObj[0]['vendorId'] || "";
 
-        // Tính tổng grandTotal của tất cả hóa đơn trong danh sách gửi lên lần này
-        for (var k = 0; k < dataObj.length; k++) {
-            totalGrandTotal += Number(dataObj[k]['grandTotal'] || 0);
+        if (paymentId === "" || vendorId === "") {
+            return {
+                success: false,
+                message: "Thiếu thông tin mã giao dịch (transactionId) hoặc mã nhà cung cấp (vendorId).",
+                checkStatus: []
+            };
         }
 
-        if (paymentId !== "") {
-            // Bước 2.1: Kiểm tra xem cặp payment.id và vendor.id đã có dữ liệu trong bảng esdHTKTpaymentVendor chưa
-            var checkVendorFile = new SCFile("esdHTKTpaymentVendor");
-            var checkVendorQuery = "payment.id=\"" + paymentId + "\" and vendor.id=\"" + vendorId + "\"";
-            var rcCheckVendor = checkVendorFile.doSelect(checkVendorQuery);
+        // Bước 2.1: Kiểm tra xem cặp payment.id và vendor.id đã có dữ liệu chưa trong bảng esdHTKTpaymentVendor
+        var checkVendorFile = new SCFile("esdHTKTpaymentVendor");
+        var checkVendorQuery = "payment.id=\"" + paymentId + "\" and vendor.id=\"" + vendorId + "\"";
+        var rcCheckVendor = checkVendorFile.doSelect(checkVendorQuery);
 
             if (rcCheckVendor != RC_SUCCESS) {
                 return {
@@ -472,47 +474,57 @@ function createListInvoinVendor(input) {
                 };
             }
 
-            // Bước 2.2: Lấy dữ liệu số tiền còn lại từ hàm getPaymentRemainingAmount
-            var remainingData = getPaymentRemainingAmount(paymentId);
-            var totalRemainingAmount = 0;
+        // Bước 2.2: Tính tổng grandTotal của tất cả hóa đơn MỚI được chọn từ popup
+        for (var k = 0; k < dataObj.length; k++) {
+            var gTotal = String(dataObj[k]['grandTotal'] || "0");
+            totalGrandTotal = lib.ESD_HTKT_Utils.addStringsManual(totalGrandTotal, gTotal);
+        }
 
-            if (Array.isArray(remainingData)) {
-                for (var m = 0; m < remainingData.length; m++) {
-                    totalRemainingAmount += Number(remainingData[m].remaining_amount || 0);
-                }
-            } else if (typeof remainingData === "object" && remainingData !== null) {
-                totalRemainingAmount = Number(remainingData.remaining_amount || remainingData.remainingAmount || 0);
-            } else {
-                totalRemainingAmount = Number(remainingData || 0);
-            }
+        // Bước 2.3: Lấy tổng tiền của các hóa đơn CŨ đã liên kết trước đó với paymentId và vendorId này
+        var sumExistingGrandTotal = "0";
+        var existingInvoiceFile = new SCFile("esdHTKTinvoice", SCFILE_READONLY);
+        var mappingExist = " FROM esdHTKTinvoice i JOIN esdHTKTvendor v ON (i.seller.tax.code = v.vendor.number) ";
+        var controlExist = " WHERE i.request.id = \"" + paymentId + "\" AND v.id = \"" + vendorId + "\"";
+        var queryExistingSQL = "SELECT i.id, i.grand.total " + mappingExist + controlExist;
 
-            // Bước 2.3: Kiểm tra các hóa đơn đã được gán trước đó trong bảng esdHTKTinvoice với request.id = paymentId
-            var existingInvoiceFile = new SCFile("esdHTKTinvoice");
-            var existingQuery = "request.id=\"" + paymentId + "\"";
-            var rcExisting = existingInvoiceFile.doSelect(existingQuery);
+        var rcExisting = existingInvoiceFile.doSelect(queryExistingSQL);
+        while (rcExisting === RC_SUCCESS) {
+            var existAmt = String(existingInvoiceFile["grand.total"] || existingInvoiceFile["grandTotal"] || "0");
+            sumExistingGrandTotal = lib.ESD_HTKT_Utils.addStringsManual(sumExistingGrandTotal, existAmt);
+            rcExisting = existingInvoiceFile.getNext();
+        }
 
-            var sumExistingGrandTotal = 0;
+        // Bước 2.4: Tổng tiền Tích lũy (Cũ + Mới)
+        var totalAccumulatedGrandTotal = lib.ESD_HTKT_Utils.addStringsManual(sumExistingGrandTotal, totalGrandTotal);
 
-            while (rcExisting === RC_SUCCESS) {
-                sumExistingGrandTotal += Number(existingInvoiceFile["grand.total"] || existingInvoiceFile["grandTotal"] || 0);
-                rcExisting = existingInvoiceFile.getNext();
-            }
-
-            // Bước 2.4: Tổng tiền thực tế đã dùng = Tổng các hóa đơn cũ + Tổng hóa đơn đợt này
-            var totalAccumulatedGrandTotal = sumExistingGrandTotal + totalGrandTotal;
-
-            // Nếu tổng tiền tích lũy vượt quá số tiền còn lại -> Hủy thao tác
-            if (totalAccumulatedGrandTotal > totalRemainingAmount) {
-                return {
-                    success: false,
-                    message: "Tổng tiền các hóa đơn sau khi tích lũy (" + totalAccumulatedGrandTotal + ", gồm " + sumExistingGrandTotal + " cũ + " + totalGrandTotal + " mới) vượt quá số tiền còn lại (" + totalRemainingAmount + ") của khoản thanh toán. Thao tác đã bị hủy.",
-                    checkStatus: []
-                };
-            }
-        } else {
+        // --- CHẶN 1: Tổng tích lũy (Cũ + Mới) phải lớn hơn 0 ---
+        if (lib.ESD_HTKT_Utils.compareMoneyStrings(totalAccumulatedGrandTotal, "0") <= 0) {
             return {
                 success: false,
-                message: "Thiếu thông tin mã giao dịch (transactionId) của khoản thanh toán.",
+                message: "Tổng số tiền các hoá đơn sau khi tích lũy phải lớn hơn 0 để gắn vào nhà cung cấp. Thao tác đã bị hủy.",
+                checkStatus: []
+            };
+        }
+			
+        // Bước 2.5: Kiểm tra vượt quá số tiền còn lại của khoản thanh toán (Remaining Amount)
+        var remainingData = getPaymentRemainingAmount(paymentId);
+        var totalRemainingAmount = "0";
+
+        if (Array.isArray(remainingData)) {
+            for (var m = 0; m < remainingData.length; m++) {
+                var rAmt = String(remainingData[m].remaining_amount || "0");
+                totalRemainingAmount = lib.ESD_HTKT_Utils.addStringsManual(totalRemainingAmount, rAmt);
+            }
+        } else if (typeof remainingData === "object" && remainingData !== null) {
+            totalRemainingAmount = String(remainingData.remaining_amount || remainingData.remainingAmount || "0");
+        } else {
+            totalRemainingAmount = String(remainingData || "0");
+        }
+
+        if (lib.ESD_HTKT_Utils.compareMoneyStrings(totalAccumulatedGrandTotal, totalRemainingAmount) > 0) {
+            return {
+                success: false,
+                message: "Tổng tiền các hóa đơn sau khi tích lũy vượt quá số tiền còn lại của khoản thanh toán. Thao tác đã bị hủy.",
                 checkStatus: []
             };
         }
@@ -536,7 +548,7 @@ function createListInvoinVendor(input) {
                 var invoiceId = feeData['id'] || "";
                 var invoiceNumber = feeData['invoiceNumber'] || "";
                 var currentPaymentId = feeData['transactionId'] || "";
-                var grandTotal = feeData['grandTotal'] || "";
+                var grandTotal = feeData['grandTotal'] || "0";
                 successInvoiceIds.push(invoiceId);
 
                 // --- Kiểm tra hạn mức 5 triệu ---
@@ -562,7 +574,6 @@ function createListInvoinVendor(input) {
                             var targetVendorId = feeData["vendorId"] || "";
                             var vendorNameStr = "Không xác định";
 
-                            // Query lấy tên nhà cung cấp từ bảng esdHTKTvendor dựa vào id
                             if (targetVendorId !== "") {
                                 var vendorRec = new SCFile("esdHTKTvendor");
                                 var vendorQuery = "id=\"" + targetVendorId + "\"";
@@ -573,7 +584,6 @@ function createListInvoinVendor(input) {
                                 }
                             }
 
-                            // Sửa lại thành feeData['invoiceNumber'] hoặc dùng invoiceId
                             var currentInvoiceNo = feeData['invoiceNumber'] || feeData['id'] || "";
                             itemWarningMsg = "Hóa đơn " + currentInvoiceNo + " của nhà cung cấp " + vendorNameStr + " có tổng trong ngày " + invoiceDateStr + " từ 5 triệu đồng trở lên phải có chứng từ thanh toán không dùng tiền mặt";
                         } else {
@@ -585,7 +595,7 @@ function createListInvoinVendor(input) {
                     itemCheckStatus = 'ChuaKiemTra';
                 }
 
-                // Lưu trạng thái kiểm tra hóa đơn
+                // Lưu trạng thái
                 checkStatusList.push({
                     invoiceId: invoiceId,
                     invoiceNumber: invoiceNumber,
@@ -593,8 +603,9 @@ function createListInvoinVendor(input) {
                     warningMsg: itemWarningMsg
                 });
 
-                // Ghi nhận bản ghi thuế
-                if (currentPaymentId !== "" && Number(feeData['totalTax'] || 0) > 0) {
+                // Kiểm tra totalTax > 0 bằng SL
+                var feeTax = String(feeData['totalTax'] || "0");
+                if (currentPaymentId !== "" && lib.ESD_HTKT_Utils.compareMoneyStrings(feeTax, "0") > 0) {
                     affectedTaxPaymentIds[currentPaymentId] = true;
                 }
 
@@ -608,10 +619,10 @@ function createListInvoinVendor(input) {
                         invFile["request.id"] = itemRec["payment.id"];
                         var rcUpdate = invFile.doUpdate();
                         if (rcUpdate != RC_SUCCESS) {
-                            console.error("Lỗi khi cập nhật request.id cho hóa đơn id: " + invoiceId);
+                            print("Lỗi khi cập nhật request.id cho hóa đơn id: " + invoiceId);
                         }
 
-                        // Gọi API kiểm tra hóa đơn trực tiếp bằng invFile vừa doSelect thành công
+                        // Gọi API
                         try {
                             var apiResponse = lib.ESD_HTKT_SCHEDULE_OGL.callCheckInvoiceAPI(invFile);
                             if (apiResponse !== null && apiResponse.success === true) {
@@ -619,16 +630,16 @@ function createListInvoinVendor(input) {
                                 invFile.doUpdate();
                             }
                         } catch (apiErr) {
-                            console.error("Lỗi khi gọi API check hóa đơn " + invoiceId + ": " + apiErr.toString());
+                            print("Lỗi khi gọi API check hóa đơn " + invoiceId + ": " + apiErr.toString());
                         }
 
 
                     } else {
-                        console.error("Không tìm thấy hóa đơn trong bảng esdHTKTinvoice với id: " + invoiceId);
+                        print("Không tìm thấy hóa đơn trong bảng esdHTKTinvoice với id: " + invoiceId);
                     }
                 }
             } else {
-                console.error("Không thể thêm bản ghi vào esdHTKTpaymentInvoice cho hóa đơn: " + feeData['id']);
+                print("Không thể thêm bản ghi vào esdHTKTpaymentInvoice cho hóa đơn: " + feeData['id']);
             }
         }
 
@@ -636,10 +647,11 @@ function createListInvoinVendor(input) {
         syncPaymentEntries(affectedTaxPaymentIds);
 
         // =========================================================================
-        // 3.1 CẬP NHẬT AMOUNT CHO BẢNG esdHTKTpaymentVendor KHI CÓ HÓA ĐƠN THÀNH CÔNG
+        // 3.1 CẬP NHẬT AMOUNT BẰNG STRING TỪ SL
         // =========================================================================
         if (successInvoiceIds.length > 0) {
             var processedPaymentItems = {};
+            var uniquePaymentIds = {};
 
             for (var j = 0; j < dataObj.length; j++) {
                 var pId = dataObj[j]['transactionId'] || "";
@@ -651,9 +663,11 @@ function createListInvoinVendor(input) {
                         paymentId: pId,
                         vendorId: vdId
                     };
+                    uniquePaymentIds[pId] = true; 
                 }
             }
 
+            // 3.1.1 Cập nhật cho nhà cung cấp hiện tại (esdHTKTpaymentVendor)
             for (var key in processedPaymentItems) {
                 if (processedPaymentItems.hasOwnProperty(key)) {
                     var itemInfo = processedPaymentItems[key];
@@ -664,22 +678,57 @@ function createListInvoinVendor(input) {
                     var vendorQuery = "payment.id=\"" + paymentKey + "\" and vendor.id=\"" + vendorKey + "\"";
                     var rcVendor = vendorFile.doSelect(vendorQuery);
 
-//                    if (rcVendor == RC_SUCCESS) {
-//                        vendorFile["amount"] = totalAccumulatedGrandTotal;
-//
-//                        var rcVendorUpdate = vendorFile.doUpdate();
-//                        if (rcVendorUpdate != RC_SUCCESS) {
-//                            console.error("Lỗi khi cập nhật amount cho payment.id: " + paymentKey + " và vendor.id: " + vendorKey);
-//                        }
-//                    } else {
-//                        console.error("Không tìm thấy bản ghi trong esdHTKTpaymentVendor với payment.id: " + paymentKey + " và vendor.id: " + vendorKey);
-//                    }
+                    if (rcVendor == RC_SUCCESS) {
+                        // totalAccumulatedGrandTotal đã là string chuẩn
+                        vendorFile["approved.invoice.amount"] = totalAccumulatedGrandTotal;
+
+                        var rcVendorUpdate = vendorFile.doUpdate();
+                        if (rcVendorUpdate != RC_SUCCESS) {
+                            console.error("Lỗi khi cập nhật amount cho payment.id: " + paymentKey + " và vendor.id: " + vendorKey);
+                        }
+                    } else {
+                        console.error("Không tìm thấy bản ghi trong esdHTKTpaymentVendor với payment.id: " + paymentKey + " và vendor.id: " + vendorKey);
+                    }
+                }
+            }
+            
+            // 3.1.2 Tính tổng các nhà cung cấp và cập nhật vào phiếu (esdHTKTpayment)
+            for (var prepId in uniquePaymentIds) {
+                if (uniquePaymentIds.hasOwnProperty(prepId)) {
+                    var sumPaymentAmount = "0"; // Khởi tạo chuỗi "0"
+                    
+                    var sumVendorFile = new SCFile("esdHTKTpaymentVendor");
+                    var sumVendorQuery = "payment.id=\"" + prepId + "\"";
+                    var rcSumVendor = sumVendorFile.doSelect(sumVendorQuery);
+                    
+                    while (rcSumVendor == RC_SUCCESS) {
+                        var vAmount = String(sumVendorFile["approved.invoice.amount"] || "0");
+                        // Dùng SL để cộng chuỗi
+                        sumPaymentAmount = lib.ESD_HTKT_Utils.addStringsManual(sumPaymentAmount, vAmount);
+                        rcSumVendor = sumVendorFile.getNext();
+                    }
+                    
+                    var paymentFile = new SCFile("esdHTKTpayment");
+                    var paymentQuery = "id=\"" + prepId + "\"";
+                    var rcPayment = paymentFile.doSelect(paymentQuery);
+
+                    if (rcPayment == RC_SUCCESS) {
+                        // Gán thẳng chuỗi đã tính vào DB
+                        paymentFile["approved.invoice.amount"] = sumPaymentAmount;
+
+                        var rcPaymentUpdate = paymentFile.doUpdate();
+                        if (rcPaymentUpdate != RC_SUCCESS) {
+                            console.error("Lỗi khi cập nhật tổng amount cho esdHTKTpayment với id: " + prepId);
+                        }
+                    } else {
+                        console.error("Không tìm thấy bản ghi trong esdHTKTpayment với id: " + prepId);
+                    }
                 }
             }
         }
         // =========================================================================
 
-        // 4. Trả về kết quả
+        // 5. Trả về kết quả
         if (successInvoiceIds.length === dataObj.length) {
             return {
                 success: true,
@@ -959,196 +1008,8 @@ function syncVendorOglFromPayment(record) {
 }
 
 /**
- * Đồng bộ từng NCC
- * @param paymentVendor 
- * @param branchCode 
- * @param entityCode 
- */
-function syncVendorToOgl(paymentVendor, branchCode, entityCode, username = vars.$lo_operator["contact.name"]) {
-    var itemVendor = new SCFile("esdHTKTvendor");
-    var rcItem = itemVendor.doSelect(`id="${paymentVendor['vendor.id']}"`);
-    var defaultVendorSiteInfo = lib.ESD_HTKT_ACCOUNTING_UTILS.getVendorDefaultSiteInfo();
-    var vendorExist = false;
-    if (rcItem == RC_SUCCESS) {
-        if (itemVendor['vendor.name'] && itemVendor['vendor.number']) {
-            var checkVendorReponse = lib.ESD_HTKT_INVOICE_OGL_INTEGRATION.getVendorSiteInfo({
-                "vendorNumber": itemVendor['vendor.number'],
-                //                "vendorName": itemVendor['vendor.name'],
-                "entity": branchCode,
-            });
-
-            if (checkVendorReponse && checkVendorReponse['success'] === true &&
-                checkVendorReponse['data'] &&
-                checkVendorReponse['data'].length > 0) {
-                var allSites = [];
-                checkVendorReponse['data'].forEach(item => {
-                    if (item.sites && item.sites.length > 0) {
-                        allSites = allSites.concat(item.sites);
-                    }
-                });
-
-                // Lấy ra tất cả site đang lưu theo entity - đơn vị
-                var arrVendorSiteCodeExit = [];
-                var itemVendorSite = new SCFile('esdHTKTvendorSite');
-                var vendorSiteRC = itemVendorSite.doSelect(`vendor.id = "${itemVendor.id}" and ogl.entity = "${branchCode}"`);
-                while (vendorSiteRC == RC_SUCCESS) {
-                    // trong các site trả về kiểm tra để cập nhật/set inactive cho các site đang có(set inactive cho site khác site mặc định)
-                    var findVendorSite = allSites.find(x => x.entity == itemVendorSite['ogl.entity'] &&
-                        x.vendorSiteCode == itemVendorSite['ogl.site.code']);
-                    if (findVendorSite) {
-                        if (itemVendorSite['credit.account'] != findVendorSite.debitAccount ||
-                            itemVendorSite['debit.account'] != findVendorSite.debitAccount) {
-                            itemVendorSite['credit.account'] = findVendorSite.debitAccount;
-                            itemVendorSite['debit.account'] = findVendorSite.debitAccount;
-                            itemVendorSite.doUpdate();
-                        }
-                        arrVendorSiteCodeExit.push(findVendorSite.vendorSiteCode);
-                    } else {
-                        itemVendorSite.active = false;
-                        itemVendorSite.doUpdate();
-                    }
-                    vendorSiteRC = itemVendorSite.getNext();
-                }
-                if (allSites.length > 0) {
-                    vendorExist = allSites.find(x => x.vendorSiteCode == defaultVendorSiteInfo.siteCode) != null;
-                    var newSiteArr = [];
-                    if (arrVendorSiteCodeExit.length != allSites.length) {
-                        // tìm ra và tạo các site mới
-                        if (arrVendorSiteCodeExit.length == 0) newSiteArr = allSites;
-                        else newSiteArr = allSites.filter(x => !arrVendorSiteCodeExit.includes(x.vendorSiteCode)) || [];
-                    }
-
-
-                    newSiteArr.forEach(item => {
-                        item['vendor.id'] = itemVendor.id;
-                        saveVendorSite(item);
-                    });
-                }
-            }
-            if (!vendorExist) {
-                var vendorInfo = buildVendorAndSiteInfo(itemVendor, defaultVendorSiteInfo, branchCode, entityCode, username);
-                var response = createVendor(vendorInfo, itemVendor.id);
-                //                print('createVendor 1= ', JSON.stringify(response));
-                if (response) {
-                    if (response['success'] === true) {
-                        vendorExist = true;
-                    } else {
-                        return response;
-                    }
-                }
-            }
-            if (vendorExist) {
-                if (!itemVendor['ogl.sync.status']) {
-                    itemVendor['ogl.sync.status'] = true;
-                    itemVendor.doUpdate();
-                }
-                //                if (!paymentVendor['ogl.sync.status']) {
-                //                    paymentVendor['ogl.sync.status'] = true;
-                //                    paymentVendor.doUpdate();
-                //                }
-
-                // 2. Chỉ CẬP NHẬT TRẠNG THÁI TRÊN MEMORY cho paymentVendor ($L_file)
-                // KHÔNG gọi paymentVendor.doUpdate() ở đây nữa!
-                // Vì nếu là bản ghi mới tạo, doSave/doInsert ở bước sau sẽ tự lưu trạng thái này xuống DB.
-                paymentVendor['ogl.sync.status'] = true;
-            }
-        }
-    }
-}
-
-/**
- * Tạo payload gọi Tạo NCC/site sang OGL
- * @param esdHTKTvendor 
- * @param defaultVendorSiteInfo 
- * @param branchCode 
- * @param entityCode 
- * @returns 
- */
-function buildVendorAndSiteInfo(esdHTKTvendor, defaultVendorSiteInfo, branchCode, entityCode, username) {
-    return {
-        entity: branchCode,
-        username: username,
-        vendorNumber: esdHTKTvendor['vendor.number'],
-        vendorName: esdHTKTvendor['vendor.name'],
-        vendorSiteCode: defaultVendorSiteInfo.siteCode,
-        country: "VN",
-        address: esdHTKTvendor['address'],
-        drSegment1: entityCode,
-        drSegment2: "000000",
-        drSegment3: defaultVendorSiteInfo.debitAccount,
-        drSegment4: "0000000",
-        drSegment5: "0000000",
-        drSegment6: "0000000",
-        drSegment7: "0000000",
-        crSegment1: entityCode,
-        crSegment2: "000000",
-        crSegment3: defaultVendorSiteInfo.creditAccount,
-        crSegment4: "0000000",
-        crSegment5: "0000000",
-        crSegment6: "0000000",
-        crSegment7: "0000000"
-    };
-}
-
-/**
- * Tạo NCC/site sang OGL
- * @param request 
- * @param vendor.Id 
- * @returns 
- */
-function createVendor(request, vendorId) {
-
-    var response = lib.ESD_HTKT_INVOICE_OGL_INTEGRATION.createVendorSiteInfo(request);
-    //    print('save - create = ', JSON.stringify(response));
-    if (response && response['success'] === true) {
-        saveVendorSite({
-            'vendor.id': vendorId,
-            entity: request.entity,
-            vendorSiteCode: request.vendorSiteCode,
-            creditAccount: lib.ESD_HTKT_ACCOUNTING_UTILS.buildAccountSegment(request.crSegment3, request.entity),
-            debitAccount: lib.ESD_HTKT_ACCOUNTING_UTILS.buildAccountSegment(request.drSegment3, request.entity)
-        });
-    }
-    return response;
-}
-
-/**
- * Lưu thông tin vendorSite vào esdHTKTvendorSite
- * @param item 
- * @returns 
- */
-function saveVendorSite(item) {
-
-    var vendorSite = new SCFile('esdHTKTvendorSite');
-    var rs = vendorSite.doSelect(`vendor.id = "${item['vendor.id']}" and ogl.site.code = "${item.vendorSiteCode}" and ogl.entity = "${item.entity}"`);
-    if (rs == RC_SUCCESS) {
-        vendorSite.doAction('update');
-        vendorSite['ogl.sync.status'] = true;
-        vendorSite['credit.account'] = item.creditAccount;
-        vendorSite['debit.account'] = item.debitAccount;
-        vendorSite.active = true;
-    } else {
-        var vendorId = new Datum();
-        var rcode = new Datum();
-        rcode = system.functions.rtecall("getnumber", rcode, vendorId, "esdHTKTvendorSite");
-
-        vendorSite.id = vendorId;
-        vendorSite['vendor.id'] = item['vendor.id'];
-        vendorSite['ogl.entity'] = item.entity;
-        vendorSite['ogl.sync.status'] = true;
-        vendorSite['ogl.site.code'] = item.vendorSiteCode;
-        vendorSite['credit.account'] = item.creditAccount;
-        vendorSite['debit.account'] = item.debitAccount;
-        vendorSite.active = true;
-        vendorSite.doAction('add');
-    }
-
-    return vendorSite;
-}
-
-/**
  * Số tiền còn lại = số tiền ban đầu của NCC theo hợp đồng
- * - tổng tạm ứng đã accounted - tổng thanh toán đã accounted.
+ * - tổng thanh toán đã accounted - tổng thanh toán đã accounted.
  */
 function calculateVendorRemainingAmount(contractId, supplierId, initialRemainingAmount) {
     var contract = String(contractId || '').trim();
@@ -1158,9 +1019,9 @@ function calculateVendorRemainingAmount(contractId, supplierId, initialRemaining
     if (!contract || !supplier) return finalRemainingAmount;
 
     var totalApprovedAmount = sumAccountedVendorAmount(
-        'esdHTKTprepaymentVendor',
-        'esdHTKTprepayment',
-        'prepayment.id',
+        'esdHTKTpaymentVendor',
+        'esdHTKTpayment',
+        'payment.id',
         contract,
         supplier
     );
