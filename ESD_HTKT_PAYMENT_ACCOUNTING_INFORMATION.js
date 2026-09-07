@@ -3,6 +3,8 @@
  * Mỗi bản ghi tương ứng một lần gọi API: AP invoice/payment, GL hoặc CORE.
  */
 
+
+
 function run() {
     try {
         var input = vars['$L.file'];
@@ -529,7 +531,7 @@ function mapGlPayload(requestId, accountingDate, payment, context, entries) {
             accountedDR: debit ? entries[i].amount : 0, accountedCR: debit ? 0 : entries[i].amount,
             lineDesc: entries[i].description });
     }
-    return { success: true, data: { requestId: requestId, accountingDate: accountingDate,
+    return { success: true, data: { requestId: requestId, referenceId: payment.id, accountingDate: accountingDate,
             currencyCode: entries[0].currency || 'VND', transactionDesc: payment.description || 'Hach toan GL',
             branchCode: formatBranchCode(entries[0].branch, '000'), source: 'QLTS', category: 'QLTS' || TYPE_GL,
             createdby: context.maker, approvedby: context.approver, line: lines,

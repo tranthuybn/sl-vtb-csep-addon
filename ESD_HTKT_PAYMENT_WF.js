@@ -699,11 +699,12 @@ function validateVendorAndPaymentDetails(record) {
         errorMss.push("Vui lòng nhập số tiền.");
     }
 
-    var paymentMethod = record["payment.method"];
-    if (!paymentMethod) {
-        errorMss.push("Vui lòng chọn phương thức thanh toán.");
-    } else {
-        if (paymentMethod === "CHUYENKHOAN") {
+    if (amountField > 0) {
+        var paymentMethod = record["payment.method"];
+        if (!paymentMethod) {
+            errorMss.push("Vui lòng chọn phương thức thanh toán.");
+        } else {
+            if (paymentMethod === "CHUYENKHOAN") {
             if (!record["beneficiary.account"]) {
                 errorMss.push("Số tài khoản thụ hưởng không được để trống.");
             } else {
@@ -755,7 +756,7 @@ function validateVendorAndPaymentDetails(record) {
                 checkMaxLength(record["transaction.des"], 255, "Nội dung giao dịch");
             }
 
-        } else if (paymentMethod === "TIENMAT") {
+            } else if (paymentMethod === "TIENMAT") {
             if (!record["beneficiary.name"]) {
                 errorMss.push("Họ tên người thụ hưởng tiền mặt không được để trống.");
             } else {
@@ -812,6 +813,7 @@ function validateVendorAndPaymentDetails(record) {
                 errorMss.push("Nội dung giao dịch không được để trống.");
             } else {
                 checkMaxLength(record["transaction.des"], 255, "Nội dung giao dịch");
+            }
             }
         }
     }
