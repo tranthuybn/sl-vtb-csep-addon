@@ -874,6 +874,12 @@ function htktResolvePaymentTemplate(sourceRows) {
         var source = sourceRows[i];
         var rawMethod = HTKT_COMMON.trim(source.payment_method);
 
+        // payment_method is optional. Empty values do not affect template
+        // resolution; non-empty unsupported values remain invalid.
+        if (!rawMethod) {
+            continue;
+        }
+
         if (htktIsCashPaymentMethod(rawMethod)) {
             hasCash = true;
         } else if (htktIsTransferPaymentMethod(rawMethod)) {
@@ -937,12 +943,15 @@ function htktBuildPaymentTemplateRows(sourceRows, paymentKind) {
 
     for (var i = 0; i < sourceRows.length; i++) {
         var source = sourceRows[i];
-        var isCash = htktIsCashPaymentMethod(source.payment_method);
-        var isTransfer = htktIsTransferPaymentMethod(source.payment_method);
+        var rawMethod = HTKT_COMMON.trim(source.payment_method);
+        var hasPaymentMethod = rawMethod !== "";
+        var isCash = htktIsCashPaymentMethod(rawMethod);
+        var isTransfer = htktIsTransferPaymentMethod(rawMethod);
 
         if (
-                (paymentKind === "cash" && !isCash) ||
-                (paymentKind === "transfer" && !isTransfer)
+                hasPaymentMethod &&
+                ((paymentKind === "cash" && !isCash) ||
+                    (paymentKind === "transfer" && !isTransfer))
         ) {
             continue;
         }
