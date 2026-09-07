@@ -1076,6 +1076,16 @@ function savePaymentEntryEdit(details) {
 //    );
 //    if (!transactionOfficeValidation.success) return transactionOfficeValidation;
 
+
+////    // ===============H===========================/\
+//    // Kiểm tra tổng ghi Có (theo type: Chi Phí) bằng giá trị hóa đơn của NCC từ bảng esdHTKTpaymentVendor
+    var invoiceValidation = validateCostDebitAgainstInvoice(paymentId, normalized.entries);
+    if (!invoiceValidation.success) return invoiceValidation;
+//    // === BỔ SUNG: Kiểm tra khớp chi tiết tài khoản COST với bảng esdHTKTpaymentCostDivision ===
+    var costDivisionValidation = validateCostDivisionAgainstTable(paymentId, normalized.entries);
+    if (!costDivisionValidation.success) return costDivisionValidation;
+//    // =================H=========================/\
+
     var balanceValidation = validateAccountingBalanceRows(normalized.entries);
     if (!balanceValidation.success) return balanceValidation;
 
@@ -4620,4 +4630,271 @@ function closeFile(file) {
     try {
         if (file) file.doClose();
     } catch (e) {}
+}
+
+///////////Valid khi save////////////////////
+///////////////////////////////
+// Hàm kiểm tra tổng ghi Nợ của loại tài khoản Chi phí phải bằng giá trị hóa đơn của NCC (chính xác với 6 chữ số thập phân)
+function validateCostDebitAgainstInvoice(paymentId, entries) {
+    if (!paymentId || !entries || entries.length === 0) {
+        return { success: true };
+    }
+
+    // 1. Gom nhóm entries theo vendor_id (Bỏ qua các dòng có type là GL)
+    var vendorGroups = {};
+    for (var i = 0; i < entries.length; i++) {
+        var row = entries[i];
+        var rowType = safeString(row.type).toUpperCase();
+        
+        // Nếu type là GL thì bỏ qua không đưa vào nhóm kiểm tra theo vendor
+        if (rowType === 'GL') {
+            continue;
+        }
+
+        var vendorId = row.vendor_id || row.vendorId || "";
+        
+        if (!vendorGroups[vendorId]) {
+            vendorGroups[vendorId] = [];
+        }
+        vendorGroups[vendorId].push(row);
+    }
+
+    // --- HÀM HỖ TRỢ NỘI BỘ: Làm tròn 6 chữ số và xóa sạch đuôi .000000 ---
+    function cleanAndFormatAmount(val) {
+        var num = parseFloat(val);
+        if (isNaN(num)) return "0";
+
+        var fixedStr = num.toFixed(6); 
+        fixedStr = fixedStr.replace(/\.?0+$/, "");
+
+        return fixedStr;
+    }
+
+    // --- HÀM HỖ TRỢ: Lấy tên nhà cung cấp từ bảng esdHTKTvendor ---
+    function getVendorName(vendorId) {
+        if (!vendorId) return "Không xác định";
+        
+        var fVendorInfo = new SCFile('esdHTKTvendor', SCFILE_READONLY);
+        var qVendor = 'id="' + escapeQueryValue(vendorId) + '"';
+        try {
+            var rc = fVendorInfo.doSelect(qVendor);
+            if (rc === RC_SUCCESS) {
+                var vName = readText(fVendorInfo, 'vendor.name') || readText(fVendorInfo, 'name') || vendorId;
+                closeFile(fVendorInfo);
+                return vName;
+            }
+            closeFile(fVendorInfo);
+        } catch (e) {
+            if (fVendorInfo) closeFile(fVendorInfo);
+        }
+        return vendorId; // Fallback về ID nếu không tìm thấy tên
+    }
+
+    // 2. Duyệt qua từng nhà cung cấp để kiểm tra riêng biệt
+    for (var vId in vendorGroups) {
+        if (!vendorGroups.hasOwnProperty(vId)) continue;
+        
+        var vendorEntries = vendorGroups[vId];
+
+        // Truy vấn giá trị hóa đơn đã phê duyệt của NCC này từ bảng esdHTKTpaymentVendor
+        var fVendorPayment = new SCFile('esdHTKTpaymentVendor', SCFILE_READONLY);
+                 
+        var query = 'payment.id="' + escapeQueryValue(paymentId) + '"';
+        if (vId) {
+            query += ' and vendor.id="' + escapeQueryValue(vId) + '"';
+        }
+
+        var targetInvoiceAmount = "0";
+        try {
+            var rc = fVendorPayment.doSelect(query);
+            if (rc === RC_SUCCESS) {
+                targetInvoiceAmount = String(readText(fVendorPayment, 'approved.invoice.amount') || "0");
+            }
+            closeFile(fVendorPayment);
+        } catch (e) {
+            if (fVendorPayment) closeFile(fVendorPayment);
+            var displayName = getVendorName(vId);
+            return makeError('Lỗi truy vấn thông tin hóa đơn nhà cung cấp [' + displayName + ']: ' + e.toString());
+        }
+
+        // Chuẩn hóa giá trị hóa đơn mục tiêu
+        targetInvoiceAmount = cleanAndFormatAmount(targetInvoiceAmount);
+
+        // Tính tổng cột ghi NỢ đối với các dòng có type là chi phí của NCC này
+        var totalCostDebit = "0";
+        for (var j = 0; j < vendorEntries.length; j++) {
+            var row = vendorEntries[j];
+
+            var entryTypeCode = safeString(row.entry_type).toUpperCase();
+            var accountSide = getAccountingSide(row.account_type);
+
+            var isCostType = (
+                entryTypeCode === 'COST' || entryTypeCode === 'TAX' 
+            );
+
+            // Kiểm tra chiều Ghi Nợ (debit)
+            if (isCostType && accountSide === 'debit') {
+                var rowAmount = String(row.amount || "0");
+                totalCostDebit = lib.ESD_HTKT_Utils.addStringsManual(totalCostDebit, rowAmount);
+            }
+        }
+
+        // Chuẩn hóa tổng tiền Nợ sau khi cộng dồn
+        totalCostDebit = cleanAndFormatAmount(totalCostDebit);
+
+        // So sánh tổng ghi Nợ chi phí với giá trị hóa đơn của NCC này
+        var compareResult = lib.ESD_HTKT_Utils.compareMoneyStrings(totalCostDebit, targetInvoiceAmount);
+
+        if (compareResult !== 0) {
+            var vendorName = getVendorName(vId);
+            return makeError('Tổng ghi Nợ của loại tài khoản Chi phí và Thuế của nhà cung cấp [' + vendorName + '] (' + totalCostDebit + ') phải bằng giá trị hóa đơn chấp nhận (' + targetInvoiceAmount + ').');
+        }
+    }
+
+    return { success: true };
+}
+// Hàm kiểm tra tổng chi phí theo từng tài khoản của từng nhà cung cấp 
+// phải khớp với dữ liệu trong bảng phân chia chi phí (esdHTKTpaymentCostDivision)
+function validateCostDivisionAgainstTable(paymentId, entries) {
+    if (!paymentId || !entries || entries.length === 0) {
+        return { success: true };
+    }
+
+    // --- HÀM HỖ TRỢ NỘI BỘ: Làm tròn 6 chữ số và xóa sạch đuôi .000000 hoặc các số 0 thừa ---
+    function cleanAndFormatAmount(val) {
+        var num = parseFloat(val);
+        if (isNaN(num)) return "0";
+
+        var fixedStr = num.toFixed(6); 
+        fixedStr = fixedStr.replace(/\.?0+$/, "");
+
+        return fixedStr;
+    }
+
+    // --- HÀM HỖ TRỢ: Lấy tên nhà cung cấp từ bảng esdHTKTvendor ---
+    function getVendorName(vendorId) {
+        if (!vendorId) return "Không xác định";
+        
+        var fVendorInfo = new SCFile('esdHTKTvendor', SCFILE_READONLY);
+        var qVendor = 'id="' + escapeQueryValue(vendorId) + '"';
+        try {
+            var rc = fVendorInfo.doSelect(qVendor);
+            if (rc === RC_SUCCESS) {
+                var vName = readText(fVendorInfo, 'vendor.name') || readText(fVendorInfo, 'name') || vendorId;
+                closeFile(fVendorInfo);
+                return vName;
+            }
+            closeFile(fVendorInfo);
+        } catch (e) {
+            if (fVendorInfo) closeFile(fVendorInfo);
+        }
+        return vendorId; // Fallback về ID nếu không tìm thấy tên
+    }
+
+    // 2. Truy vấn dữ liệu phân chia chi phí từ bảng esdHTKTpaymentCostDivision theo paymentId (Đưa lên trước để check xem có dữ liệu hay không)
+    var divisionTotals = {};
+    var hasCostDivisionData = false; // Biến cờ kiểm tra xem có bản ghi phân chia chi phí nào không
+    var fCostDiv = new SCFile('esdHTKTpaymentCostDivision', SCFILE_READONLY);
+    var query = 'payment.id="' + escapeQueryValue(paymentId) + '"';
+    
+    try {
+        var rc = fCostDiv.doSelect(query);
+        while (rc === RC_SUCCESS) {
+            hasCostDivisionData = true; // Đã tìm thấy ít nhất 1 bản ghi phân chia chi phí
+            
+            var divVendorId = safeString(readText(fCostDiv, 'vendor.id')).trim();
+            var divAccNum = safeString(readText(fCostDiv, 'account.number')).trim();
+            var divAmount = parseFloat(readText(fCostDiv, 'amount')) || 0;
+
+            var divKey = divVendorId + "_" + divAccNum;
+            if (!divisionTotals[divKey]) {
+                divisionTotals[divKey] = {
+                    vendorId: divVendorId,
+                    accountNumber: divAccNum,
+                    totalAmount: 0
+                };
+            }
+            divisionTotals[divKey].totalAmount += divAmount;
+
+            rc = fCostDiv.getNext();
+        }
+        closeFile(fCostDiv);
+    } catch (e) {
+        if (fCostDiv) closeFile(fCostDiv);
+        return makeError('Lỗi truy vấn bảng phân chia chi phí (esdHTKTpaymentCostDivision): ' + e.toString());
+    }
+
+    // NẾU BẢNG PHÂN CHIA CHI PHÍ KHÔNG CÓ BẢN GHI NÀO -> BỎ QUA KHÔNG KIỂM TRA NỮA
+    if (!hasCostDivisionData) {
+        return { success: true };
+    }
+
+    // 1. Tính tổng tiền từ entries, nhóm theo: vendor_id + account_number (chỉ xét loại COST và bỏ qua type GL)
+    var entryTotals = {};
+    for (var i = 0; i < entries.length; i++) {
+        var row = entries[i];
+        var rowType = safeString(row.type).toUpperCase();
+        
+        // Nếu type là GL thì bỏ qua không đưa vào nhóm kiểm tra
+        if (rowType === 'GL') {
+            continue;
+        }
+
+        var entryTypeCode = safeString(row.entry_type).toUpperCase();
+        
+        // Chỉ xét các dòng có entry_type là COST
+        if (entryTypeCode !== 'COST') {
+            continue;
+        }
+        // --- LOGIC KIỂM TRA CHIỀU NỢ (DEBIT) ---
+        var accountSide = getAccountingSide(row.account_type);
+        if (accountSide !== 'debit' && accountSide !== 'DEBIT' ) {
+            continue; // Bỏ qua nếu không phải chiều ghi Nợ
+        }
+        var vendorId = row.vendor_id || row.vendorId || "";
+        var accNum = safeString(row.account_number).trim();
+        
+        // Tạo key định danh duy nhất cho từng cặp (Nhà cung cấp + Số tài khoản)
+        var key = vendorId + "_" + accNum;
+        var amount = parseFloat(row.amount) || 0;
+
+        if (!entryTotals[key]) {
+            entryTotals[key] = {
+                vendorId: vendorId,
+                accountNumber: accNum,
+                totalAmount: 0
+            };
+        }
+        entryTotals[key].totalAmount += amount;
+    }
+
+    // 3. Đối chiếu giữa entries và bảng phân chia chi phí
+    for (var key in entryTotals) {
+        if (!entryTotals.hasOwnProperty(key)) continue;
+        
+        var entryItem = entryTotals[key];
+        var divItem = divisionTotals[key];
+        
+        var divAmount = divItem ? divItem.totalAmount : 0;
+        
+        var cleanEntryAmt = cleanAndFormatAmount(entryItem.totalAmount);
+        var cleanDivAmt = cleanAndFormatAmount(divAmount);
+
+        if (lib.ESD_HTKT_Utils.compareMoneyStrings(cleanEntryAmt, cleanDivAmt) !== 0) {
+            var vendorName = getVendorName(entryItem.vendorId);
+            return makeError('Tổng tiền của tài khoản [' + entryItem.accountNumber + '] (Nhà cung cấp: ' + vendorName + ') trong hạch toán (' + cleanEntryAmt + ') không khớp với dữ liệu phân chia chi phí (' + cleanDivAmt + ').');
+        }
+    }
+
+    // Kiểm tra xem có tài khoản phân chia nào bị thiếu ở entries không
+    for (var divKey in divisionTotals) {
+        if (!divisionTotals.hasOwnProperty(divKey)) continue;
+        if (!entryTotals[divKey]) {
+            var missingDiv = divisionTotals[divKey];
+            var missingVendorName = getVendorName(missingDiv.vendorId);
+            return makeError('Thiếu hạch toán cho tài khoản [' + missingDiv.accountNumber + '] của nhà cung cấp [' + missingVendorName + '] theo bảng phân chia chi phí.');
+        }
+    }
+
+    return { success: true };
 }

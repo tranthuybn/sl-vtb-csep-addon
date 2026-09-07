@@ -505,7 +505,7 @@ function createListInvoinVendor(input) {
                 checkStatus: []
             };
         }
-			
+            
         // Bước 2.5: Kiểm tra vượt quá số tiền còn lại của khoản thanh toán (Remaining Amount)
         var remainingData = getPaymentRemainingAmount(paymentId);
         var totalRemainingAmount = "0";
@@ -681,13 +681,14 @@ function createListInvoinVendor(input) {
                     if (rcVendor == RC_SUCCESS) {
                         // totalAccumulatedGrandTotal đã là string chuẩn
                         vendorFile["approved.invoice.amount"] = totalAccumulatedGrandTotal;
+                        vendorFile["amount"] = totalAccumulatedGrandTotal;
 
                         var rcVendorUpdate = vendorFile.doUpdate();
                         if (rcVendorUpdate != RC_SUCCESS) {
-                            console.error("Lỗi khi cập nhật amount cho payment.id: " + paymentKey + " và vendor.id: " + vendorKey);
+                            print("Lỗi khi cập nhật amount cho payment.id: " + paymentKey + " và vendor.id: " + vendorKey);
                         }
                     } else {
-                        console.error("Không tìm thấy bản ghi trong esdHTKTpaymentVendor với payment.id: " + paymentKey + " và vendor.id: " + vendorKey);
+                        print("Không tìm thấy bản ghi trong esdHTKTpaymentVendor với payment.id: " + paymentKey + " và vendor.id: " + vendorKey);
                     }
                 }
             }
@@ -718,10 +719,10 @@ function createListInvoinVendor(input) {
 
                         var rcPaymentUpdate = paymentFile.doUpdate();
                         if (rcPaymentUpdate != RC_SUCCESS) {
-                            console.error("Lỗi khi cập nhật tổng amount cho esdHTKTpayment với id: " + prepId);
+                            print("Lỗi khi cập nhật tổng amount cho esdHTKTpayment với id: " + prepId);
                         }
                     } else {
-                        console.error("Không tìm thấy bản ghi trong esdHTKTpayment với id: " + prepId);
+                        print("Không tìm thấy bản ghi trong esdHTKTpayment với id: " + prepId);
                     }
                 }
             }
@@ -1022,79 +1023,6 @@ function calculateVendorRemainingAmount(contractId, supplierId, initialRemaining
         'esdHTKTpaymentVendor',
         'esdHTKTpayment',
         'payment.id',
-        contract,
-        supplier
-    );
-    var totalPaidAmount = sumAccountedVendorAmount(
-        'esdHTKTpaymentVendor',
-        'esdHTKTpayment',
-        'payment.id',
-        contract,
-        supplier
-    );
-
-    finalRemainingAmount = lib.ESD_HTKT_Utils.subtractStringsManual(finalRemainingAmount, totalApprovedAmount);
-    finalRemainingAmount = lib.ESD_HTKT_Utils.subtractStringsManual(finalRemainingAmount, totalPaidAmount);
-
-    if (
-        finalRemainingAmount &&
-        (finalRemainingAmount.charAt(0) === '-' ||
-            lib.ESD_HTKT_Utils.compareMoneyStrings(finalRemainingAmount, '0') < 0)
-    ) {
-        return '0';
-    }
-
-    return finalRemainingAmount;
-}
-
-function sumAccountedVendorAmount(vendorTable, requestTable, requestIdField, contractId, supplierId) {
-    var totalAmount = '0';
-    var file = null;
-    var query =
-        'select pv.amount as amount ' +
-        'from ' + vendorTable + ' pv ' +
-        'join ' + requestTable + ' p on (pv.' + requestIdField + ' = p.id) ' +
-        'join esdHTKTvendor v on (pv.vendor.id = v.id) ' +
-        'where p.contract.id = "' + escapePaymentVendorQueryValue(contractId) + '" ' +
-        'and v.supplier.id = "' + escapePaymentVendorQueryValue(supplierId) + '" ' +
-        'and p.status = "accounted"';
-
-    try {
-        file = new SCFile(vendorTable, SCFILE_READONLY);
-        var rc = file.doSelect(query);
-        while (rc == RC_SUCCESS) {
-            totalAmount = lib.ESD_HTKT_Utils.addStringsManual(
-                totalAmount,
-                String(file.amount || '0')
-            );
-            rc = file.getNext();
-        }
-    } finally {
-        try { if (file) file.doClose(); } catch (e) {}
-    }
-
-    return totalAmount;
-}
-
-function escapePaymentVendorQueryValue(value) {
-    return String(value || '').replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-}
-
-/**
- * Số tiền còn lại = số tiền ban đầu của NCC theo hợp đồng
- * - tổng tạm ứng đã accounted - tổng thanh toán đã accounted.
- */
-function calculateVendorRemainingAmount(contractId, supplierId, initialRemainingAmount) {
-    var contract = String(contractId || '').trim();
-    var supplier = String(supplierId || '').trim();
-    var finalRemainingAmount = String(initialRemainingAmount || '0');
-
-    if (!contract || !supplier) return finalRemainingAmount;
-
-    var totalApprovedAmount = sumAccountedVendorAmount(
-        'esdHTKTprepaymentVendor',
-        'esdHTKTprepayment',
-        'prepayment.id',
         contract,
         supplier
     );
