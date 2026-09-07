@@ -1343,6 +1343,7 @@ function mapGlApiPayloadForEntries(
 
     var payload = {
         requestId: requestId,
+        referenceId: prepayment.id,
         accountingDate: accountingDate,
         currencyCode: firstEntry.currency,
         transactionDesc: transactionDescription,
