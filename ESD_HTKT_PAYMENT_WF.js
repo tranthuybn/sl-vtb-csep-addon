@@ -680,9 +680,9 @@ function validateVendorAndPaymentDetails(record) {
     }
 
     if (isNaN(approvedInvoiceAmount)) {
-//        errorMss.push("Giá trị hóa đơn chấp nhận là bắt buộc.");
+        errorMss.push("Giá trị hóa đơn chấp nhận là bắt buộc.");
     } else if (approvedInvoiceAmount < 0) {
-//        errorMss.push("Giá trị hóa đơn chấp nhận phải lớn hơn 0.");
+        errorMss.push("Giá trị hóa đơn chấp nhận phải lớn hơn 0.");
     } else if (approvedInvoiceAmount > remainingAmount) {
         errorMss.push("Giá trị hóa đơn chấp nhận phải nhỏ hơn hoặc bằng Số tiền còn lại.");
     }
@@ -1201,7 +1201,9 @@ function prepareApprovalForSignature(record) {
     }
 
     var doc = documentResult.data;
-    if (doc.status !== "CURRENT" || !doc.ecmObjectId) {
+    var docStatus = String(doc.status || "").trim().toUpperCase();
+    var isSignableStatus = docStatus === "CURRENT" || docStatus === "CHO KY SO" || docStatus === "DANG THUC HIEN KY SO" || !docStatus;
+    if (!isSignableStatus || !doc.ecmObjectId) {
         return htktWfFail("CURRENT_PRESENTATION_NOT_SIGNABLE", "Bản trình ký hiện hành không ở trạng thái cho phép ký.", "status=" + String(doc.status || ""), doc);
     }
 
