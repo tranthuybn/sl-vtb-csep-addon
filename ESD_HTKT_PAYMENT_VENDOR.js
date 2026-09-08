@@ -1361,7 +1361,7 @@ function executeDeletePaymentInvoice(invoiceId, paymentId) {
     }
 
     try {
-        var vendorId = null; // Khởi tạo biến lưu vendorId
+        var affectedVendorIds = {};
 
         // Bước 1: Xóa bản ghi quan hệ trong bảng esdHTKTpaymentInvoice
         var paymentInvFile = new SCFile("esdHTKTpaymentInvoice");
@@ -1370,6 +1370,10 @@ function executeDeletePaymentInvoice(invoiceId, paymentId) {
 
         var deletedCount = 0;
         while (rcSelect === RC_SUCCESS) {
+            var vendorId = String(paymentInvFile["vendor.id"] || "").trim();
+            if (vendorId) {
+                affectedVendorIds[vendorId] = true;
+            }
 
             var rcDelete = paymentInvFile.doDelete();
             if (rcDelete === RC_SUCCESS) {
@@ -1393,6 +1397,10 @@ function executeDeletePaymentInvoice(invoiceId, paymentId) {
         }
         try { if (invFile) invFile.doClose(); } catch (e) {}
 
+        if (deletedCount > 0) {
+            refreshPaymentAmountsAfterInvoiceDelete(paymentId, affectedVendorIds);
+        }
+
         return {
             success: true,
             message: "Đã xóa liên kết hóa đơn thành công",
@@ -1406,6 +1414,81 @@ function executeDeletePaymentInvoice(invoiceId, paymentId) {
             message: "Lỗi khi xử lý xóa: " + error.toString()
         };
     }
+}
+
+function refreshPaymentAmountsAfterInvoiceDelete(paymentId, vendorIds) {
+    for (var vendorId in vendorIds) {
+        if (!vendorIds.hasOwnProperty(vendorId)) continue;
+
+        var vendorInvoiceAmount = "0";
+        var remainingInvoiceFile = new SCFile("esdHTKTpaymentInvoice", SCFILE_READONLY);
+        var remainingInvoiceQuery =
+            "SELECT i.grand.total " +
+            "FROM esdHTKTpaymentInvoice pi " +
+            "JOIN esdHTKTinvoice i ON (pi.invoice.id = i.id) " +
+            "WHERE pi.payment.id=\"" + paymentId + "\" " +
+            "AND pi.vendor.id=\"" + vendorId + "\"";
+        var rcRemainingInvoice = remainingInvoiceFile.doSelect(remainingInvoiceQuery);
+
+        while (rcRemainingInvoice === RC_SUCCESS) {
+            var grandTotal = String(
+                remainingInvoiceFile["i.grand.total"] ||
+                remainingInvoiceFile["grand.total"] ||
+                "0"
+            );
+            vendorInvoiceAmount = lib.ESD_HTKT_Utils.addStringsManual(
+                vendorInvoiceAmount,
+                grandTotal
+            );
+            rcRemainingInvoice = remainingInvoiceFile.getNext();
+        }
+        try { remainingInvoiceFile.doClose(); } catch (remainingCloseError) {}
+
+        var vendorFile = new SCFile("esdHTKTpaymentVendor");
+        var vendorQuery =
+            "payment.id=\"" + paymentId + "\" and vendor.id=\"" + vendorId + "\"";
+        var rcVendor = vendorFile.doSelect(vendorQuery);
+
+        if (rcVendor === RC_SUCCESS) {
+            vendorFile["approved.invoice.amount"] = vendorInvoiceAmount;
+            vendorFile["amount"] = vendorInvoiceAmount;
+            var rcVendorUpdate = vendorFile.doUpdate();
+            if (rcVendorUpdate !== RC_SUCCESS) {
+                print(
+                    "[PAYMENT_INVOICE_DELETE] Khong the cap nhat amount cho payment.id=" +
+                    paymentId + ", vendor.id=" + vendorId
+                );
+            }
+        }
+        try { vendorFile.doClose(); } catch (vendorCloseError) {}
+    }
+
+    var totalPaymentAmount = "0";
+    var sumVendorFile = new SCFile("esdHTKTpaymentVendor", SCFILE_READONLY);
+    var rcSumVendor = sumVendorFile.doSelect('payment.id="' + paymentId + '"');
+
+    while (rcSumVendor === RC_SUCCESS) {
+        totalPaymentAmount = lib.ESD_HTKT_Utils.addStringsManual(
+            totalPaymentAmount,
+            String(sumVendorFile["approved.invoice.amount"] || "0")
+        );
+        rcSumVendor = sumVendorFile.getNext();
+    }
+    try { sumVendorFile.doClose(); } catch (sumCloseError) {}
+
+    var paymentFile = new SCFile("esdHTKTpayment");
+    var rcPayment = paymentFile.doSelect('id="' + paymentId + '"');
+    if (rcPayment === RC_SUCCESS) {
+        paymentFile["approved.invoice.amount"] = totalPaymentAmount;
+        var rcPaymentUpdate = paymentFile.doUpdate();
+        if (rcPaymentUpdate !== RC_SUCCESS) {
+            print(
+                "[PAYMENT_INVOICE_DELETE] Khong the cap nhat approved.invoice.amount cho payment.id=" +
+                paymentId
+            );
+        }
+    }
+    try { paymentFile.doClose(); } catch (paymentCloseError) {}
 }
 
 
