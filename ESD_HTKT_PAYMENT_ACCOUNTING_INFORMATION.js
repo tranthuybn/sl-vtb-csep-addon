@@ -712,7 +712,8 @@ function mapDiscountType(deductionType) {
 function mapPaymentMethodToCashout(value) {
     var normalized = normalizeIdentity(value);
     if (normalized === 'tienmat') return CASH_YES;
-    if (normalized === 'chuyenkhoan') return CASH_NO;
+    // payment.method is optional; when omitted, use the non-cash flow.
+    if (!normalized || normalized === 'chuyenkhoan') return CASH_NO;
     return '';
 }
 
@@ -849,7 +850,10 @@ function readNumber(record, field) { return toNumber(readField(record, field)); 
 function readField(record, field) { try { return record[field]; } catch (e) { return ''; } }
 function isDebit(value) { var v = normalizeIdentity(value); return v === 'no' || v === 'debit'; }
 function isCredit(value) { var v = normalizeIdentity(value); return v === 'co' || v === 'credit' || v === 'asset' || v === 'taisan'; }
-function isBankTransfer(value) { return normalizeIdentity(value) === 'chuyenkhoan'; }
+function isBankTransfer(value) {
+    var normalized = normalizeIdentity(value);
+    return !normalized || normalized === 'chuyenkhoan';
+}
 function sumEntryAmounts(rows) { var n = 0; for (var i = 0; i < rows.length; i++) n += toNumber(rows[i].amount); return n; }
 function sumInvoiceLineAmounts(rows) { var n = 0; for (var i = 0; i < rows.length; i++) n += toNumber(rows[i].amount); return n; }
 function entryIds(rows) { var r = []; for (var i = 0; i < rows.length; i++) r.push(rows[i].id); return r; }

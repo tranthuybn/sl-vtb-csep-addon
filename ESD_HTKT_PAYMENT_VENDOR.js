@@ -643,8 +643,8 @@ function createListInvoinVendor(input) {
             }
         }
 
-        // Đồng bộ dữ liệu
-        syncPaymentEntries(affectedTaxPaymentIds);
+        // Đồng bộ dữ liệu (da co trigger xu ly)
+//        syncPaymentEntries(affectedTaxPaymentIds);
 
         // =========================================================================
         // 3.1 CẬP NHẬT AMOUNT BẰNG STRING TỪ SL
