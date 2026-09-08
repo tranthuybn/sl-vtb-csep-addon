@@ -123,6 +123,7 @@ try {
     vars.$isDmms = false;
 }
 
+vars.$totalContractAmount = "0";
 vars.$totalPrepayment = "0";            // (1) Tổng giá trị đã tạm ứng
 vars.$totalPayment = "0";              // (2) Tổng giá trị đã thanh toán
 vars.$remainingContractValue = "0";   // (3) Tổng giá trị HĐ/KMS còn lại
@@ -175,8 +176,8 @@ if (contractId) {
         paymentFile.doClose();
 
         // 3. Tính "Tổng giá trị HĐ/KMS còn lại" 
-        var currentContractAmount = String(record["total.contract.amount"] || 0);
-
+        var currentContractAmount = String(record["total.contract.amount"] || "0");
+        
         var remainingContractValue =
             lib.ESD_HTKT_Utils.subtractStringsManual(
                 currentContractAmount,
@@ -189,7 +190,16 @@ if (contractId) {
                 totalPayment
             );
 
-
+        // =====================================================
+        // KIỂM TRA NẾU KẾT QUẢ LÀ SỐ ÂM THÌ ĐẶT VỀ "0"
+        // =====================================================
+        if (
+            remainingContractValue && 
+            (remainingContractValue.charAt(0) === "-" || 
+             lib.ESD_HTKT_Utils.compareMoneyStrings(remainingContractValue, "0") < 0)
+        ) {
+            remainingContractValue = "0";
+        }
         // =====================================================
         // 4. GÁN KẾT QUẢ
         // =====================================================
