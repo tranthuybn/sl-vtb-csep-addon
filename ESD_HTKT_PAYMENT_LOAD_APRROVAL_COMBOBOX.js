@@ -152,10 +152,7 @@ function loadPaymentApprovalComboBoxes() {
 
             excludeRights: [
                 RIGHT_CHECK_1,
-                RIGHT_APPROVE_1,
-                RIGHT_APPROVE_2,
-                RIGHT_CHECK_2,
-                RIGHT_APPROVE_3
+               
             ],
             seedRights: [
                 RIGHT_ACCOUNTING_INPUT
@@ -646,8 +643,6 @@ function loadPaymentApprovalComboBoxes() {
         result.message =
             "User chỉ có scope cá nhân, không được load combobox theo lv1.";
 
-        print("[MESSAGE] " + result.message);
-
         return result;
     }
 
@@ -656,8 +651,6 @@ function loadPaymentApprovalComboBoxes() {
         result.canAccessTargetLv1 = false;
         result.message =
             "User có scope đơn vị nhưng không có unit phân quyền dữ liệu.";
-
-        print("[MESSAGE] " + result.message);
 
         return result;
     }
