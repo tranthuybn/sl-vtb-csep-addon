@@ -273,6 +273,13 @@ function loadPaymentApprovalComboBoxes() {
         configs: []
     };
 
+    /* Cache trong một lần load form để không truy vấn lặp cùng user/role. */
+    var userRightsCache = {};
+    var userScopeCache = {};
+    var contactPoolCache = {};
+    var contactDataCache = {};
+    var orgUnitCache = {};
+
     var file = vars["$L.file"];
 
     var targetInfo = getPaymentTargetLv1(file);
@@ -487,14 +494,21 @@ function loadPaymentApprovalComboBoxes() {
             return [];
         }
 
+        var cacheKey = rightIds.slice(0).sort().join("|");
+        if (contactPoolCache.hasOwnProperty(cacheKey)) {
+            return contactPoolCache[cacheKey].slice(0);
+        }
+
         try {
             if (
                 lib.ESD_PERMS_RIGHTS &&
                 lib.ESD_PERMS_RIGHTS.listContactsByRights
             ) {
-                return normalizeArray(
+                var contactsByRights = normalizeArray(
                     lib.ESD_PERMS_RIGHTS.listContactsByRights(rightIds) || []
                 );
+                contactPoolCache[cacheKey] = contactsByRights;
+                return contactsByRights.slice(0);
             }
         } catch (e1) {}
 
@@ -508,27 +522,39 @@ function loadPaymentApprovalComboBoxes() {
                 lib.ESD_PERMS_RIGHTS &&
                 lib.ESD_PERMS_RIGHTS.listContactsByRightsAndFilter
             ) {
-                return normalizeArray(
+                var contactsByFilter = normalizeArray(
                     lib.ESD_PERMS_RIGHTS.listContactsByRightsAndFilter(
                         rightIds, {}
                     ) || []
                 );
+                contactPoolCache[cacheKey] = contactsByFilter;
+                return contactsByFilter.slice(0);
             }
         } catch (e2) {}
 
+        contactPoolCache[cacheKey] = [];
         return [];
     }
 
-    function contactHasRightRule(contactId, includeRights, excludeRights) {
-        var userRights = [];
+    function getCachedUserRights(contactId) {
+        contactId = normalizeValue(contactId);
+        if (!contactId) return [];
 
-        try {
-            userRights = normalizeArray(
-                lib.ESD_PERMS_RIGHTS.permsRight(contactId) || []
-            );
-        } catch (e) {
-            return false;
+        if (!userRightsCache.hasOwnProperty(contactId)) {
+            try {
+                userRightsCache[contactId] = normalizeArray(
+                    lib.ESD_PERMS_RIGHTS.permsRight(contactId) || []
+                );
+            } catch (e) {
+                userRightsCache[contactId] = [];
+            }
         }
+
+        return userRightsCache[contactId];
+    }
+
+    function contactHasRightRule(contactId, includeRights, excludeRights) {
+        var userRights = getCachedUserRights(contactId);
 
         var map = {};
 
@@ -561,6 +587,21 @@ function loadPaymentApprovalComboBoxes() {
      * ========================================================= */
 
     function getUserScopeContext(contactId, targetLv1) {
+        var normalizedContactId = normalizeValue(contactId);
+        var normalizedTargetLv1 = normalizeUnitCode(targetLv1);
+        var cacheKey = normalizedContactId + "|" + normalizedTargetLv1;
+
+        if (!userScopeCache.hasOwnProperty(cacheKey)) {
+            userScopeCache[cacheKey] = buildUserScopeContext(
+                normalizedContactId,
+                normalizedTargetLv1
+            );
+        }
+
+        return userScopeCache[cacheKey];
+    }
+
+    function buildUserScopeContext(contactId, targetLv1) {
 
     targetLv1 = normalizeUnitCode(targetLv1);
 
@@ -843,6 +884,10 @@ function loadPaymentApprovalComboBoxes() {
             return result;
         }
 
+        if (orgUnitCache.hasOwnProperty(unitCode)) {
+            return orgUnitCache[unitCode];
+        }
+
         var f = null;
 
         try {
@@ -880,6 +925,7 @@ function loadPaymentApprovalComboBoxes() {
             } catch (eClose) {}
         }
 
+        orgUnitCache[unitCode] = result;
         return result;
     }
 
@@ -898,6 +944,7 @@ function loadPaymentApprovalComboBoxes() {
 
     function readContactData(contactIds) {
         var ids = normalizeArray(contactIds);
+        var cacheKey = ids.slice(0).sort().join("|");
 
         var data = {
             ids: [],
@@ -905,6 +952,13 @@ function loadPaymentApprovalComboBoxes() {
         };
         if (ids.length === 0) {
             return data;
+        }
+
+        if (contactDataCache.hasOwnProperty(cacheKey)) {
+            return {
+                ids: contactDataCache[cacheKey].ids.slice(0),
+                names: contactDataCache[cacheKey].names.slice(0)
+            };
         }
 
         var conditions = [];
@@ -1002,6 +1056,11 @@ function loadPaymentApprovalComboBoxes() {
             data.ids.push(rows[j].id);
             data.names.push(rows[j].display);
         }
+
+        contactDataCache[cacheKey] = {
+            ids: data.ids.slice(0),
+            names: data.names.slice(0)
+        };
 
         return data;
     }
