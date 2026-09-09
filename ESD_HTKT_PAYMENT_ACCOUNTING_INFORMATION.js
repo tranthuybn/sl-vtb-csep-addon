@@ -540,7 +540,7 @@ function mapGlPayload(requestId, accountingDate, payment, context, entries) {
 
 function mapCorePayload(requestId, entry, context) {
     var branchCode = String(entry.branch).slice(2);
-    if (branchCode === '007') branchCode = '107';
+    if (branchCode.indexOf('007') === 0) branchCode = '107' + branchCode.slice(3);
     var bankParts = safeString(context.beneficiaryBank).split('|');
     var internal = safeString(bankParts[2]).trim() === VIETINBANK_NAPAS;
     var amount = safeString(toNumber(entry.amount));
