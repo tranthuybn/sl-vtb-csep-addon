@@ -493,6 +493,117 @@ function checkCompleteAccounting(prepaymentId) {
     }
 }
 
+/**
+ * Đồng bộ trạng thái hạch toán từ phiếu Tạm Ứng sang các hóa đơn đã gắn đề nghị.
+ */
+function updateInvoiceAccountingStatusByRequestId(requestId) {
+    var safeRequestId = String(requestId == null ? "" : requestId).trim();
+    if (!safeRequestId) {
+        return;
+    }
+
+    var escapedRequestId = safeRequestId
+        .split("\\").join("\\\\")
+        .split('"').join('\\"');
+
+    var invoiceFile = null;
+    var invoiceIds = [];
+    var updatedCount = 0;
+
+    try {
+        /*
+         * Bước 1: lấy danh sách ID hóa đơn theo request.id.
+         */
+        invoiceFile = new SCFile("esdHTKTinvoice");
+
+        var selectRc = invoiceFile.doSelect(
+            `request.id = "${escapedRequestId}"`
+        );
+
+        while (selectRc == RC_SUCCESS) {
+            var invoiceId = String(invoiceFile["id"] || "").trim();
+
+            if (invoiceId) {
+                invoiceIds.push(invoiceId);
+            }
+
+            selectRc = invoiceFile.getNext();
+        }
+    } catch (eSelect) {
+        logger.info(
+            "ESD_HTKT_ACCOUNTING_UTILS::updateInvoiceAccountingStatusByRequestId SELECT ERROR" +
+            " requestId=" + safeRequestId +
+            " error=" + eSelect
+        );
+        return;
+    } finally {
+        try {
+            if (invoiceFile) {
+                invoiceFile.doClose();
+            }
+        } catch (eCloseSelect) {}
+    }
+
+    /*
+     * Bước 2: update từng hóa đơn theo ID.
+         */
+    for (var i = 0; i < invoiceIds.length; i++) {
+        var invoiceItem = null;
+        var invoiceIdToUpdate = invoiceIds[i];
+
+        try {
+            invoiceItem = new SCFile("esdHTKTinvoice");
+
+            var invoiceRc = invoiceItem.doSelect(
+                `id = "${invoiceIdToUpdate}"`
+            );
+
+            if (invoiceRc == RC_SUCCESS) {
+                var currentAccountingStatus = String(
+                    invoiceItem["accounting.status"] || ""
+                ).trim();
+
+                if (currentAccountingStatus !== "1") {
+                    invoiceItem["accounting.status"] = "1";
+
+                    var updateInvoiceRc = invoiceItem.doUpdate();
+
+                    if (updateInvoiceRc == RC_SUCCESS) {
+                        updatedCount++;
+                    } else {
+                        logger.info(
+                            "ESD_HTKT_ACCOUNTING_UTILS::updateInvoiceAccountingStatusByRequestId UPDATE FAILED" +
+                            " requestId=" + safeRequestId +
+                            " invoiceId=" + invoiceIdToUpdate +
+                            " rc=" + updateInvoiceRc
+                        );
+                    }
+                }
+            }
+        } catch (eUpdate) {
+            logger.info(
+                "ESD_HTKT_ACCOUNTING_UTILS::updateInvoiceAccountingStatusByRequestId UPDATE ERROR" +
+                " requestId=" + safeRequestId +
+                " invoiceId=" + invoiceIdToUpdate +
+                " error=" + eUpdate
+            );
+        } finally {
+            try {
+                if (invoiceItem) {
+                    invoiceItem.doClose();
+                }
+            } catch (eCloseUpdate) {}
+        }
+    }
+
+    logger.info(
+        "ESD_HTKT_ACCOUNTING_UTILS::updateInvoiceAccountingStatusByRequestId DONE" +
+        " requestId=" + safeRequestId +
+        " matched=" + invoiceIds.length +
+        " updated=" + updatedCount
+    );
+}
+
 function updatePaymentAccountingCompletedStatus(prepaymentId, isPayment) {
     var tableName = isPayment ?
         "esdHTKTpayment" :
@@ -504,7 +615,19 @@ function updatePaymentAccountingCompletedStatus(prepaymentId, isPayment) {
     if (prResult == RC_SUCCESS) {
         itemPrepayment.status = 'accounted';
         itemPrepayment["completed.date"] = system.functions.tod();
-        itemPrepayment.doUpdate();
+
+        var updatePrepaymentRc = itemPrepayment.doUpdate();
+
+        /*
+         * Logic mới chỉ áp dụng cho bảng Tạm Ứng:
+         * esdHTKTprepayment.id = esdHTKTinvoice.request.id.
+         *
+         * Không áp dụng khi isPayment = true vì quan hệ trên chỉ được chốt cho Tạm Ứng.
+         * Toàn bộ logic cũ của esdHTKTpayment được giữ nguyên.
+         */
+        if (updatePrepaymentRc == RC_SUCCESS && !isPayment) {
+            updateInvoiceAccountingStatusByRequestId(prepaymentId);
+        }
     }
     try { if (itemPrepayment) itemPrepayment.doClose(); } catch (e) {}
 }
