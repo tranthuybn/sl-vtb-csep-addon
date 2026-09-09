@@ -1241,7 +1241,7 @@ function mapCoreTransferPayloadForEntry(requestId, entry, context) {
                 depAcctIdTo: {
                     acctId: accountNumber,
                     acctCur: currency,
-                    toBranchId: String(entry.branch).slice(2)
+                    toBranchId: entry.branch
                 },
                 amount: amountText,
                 curCode: currency,
@@ -1258,7 +1258,6 @@ function mapCoreTransferPayloadForEntry(requestId, entry, context) {
             reftype: CORE_EXTERNAL_REFERENCE_TYPE,
             spname: CORE_EXTERNAL_SP_NAME,
             data: {
-                serviceBranch: '',
                 pmtType: 'Outgoing IBPS_Bilateral',
                 pmtMethod: 'GL Account',
                 trnType: 'Transaction Internet Banking',
@@ -1267,7 +1266,7 @@ function mapCoreTransferPayloadForEntry(requestId, entry, context) {
                 toBankId: bank.citadCode,
                 toBranchId: bank.citadBranchCode,
                 toAcctName: externalAccountName,
-                serviceBranch: String(entry.branch).slice(2),
+                serviceBranch: entry.branch,
                 amount: [
                     {
                         amount: amountText,

@@ -158,6 +158,7 @@ function loadPrepaymentApprovalComboBoxes() {
 
     // Cache trong một lần load form để tránh truy vấn lặp cùng user/role/unit.
     var userRightsCache = {};
+    var userRightMapCache = {};
     var userScopeCache = {};
     var contactPoolCache = {};
     var contactDataCache = {};
@@ -195,6 +196,8 @@ function loadPrepaymentApprovalComboBoxes() {
         output.message = "User đăng nhập không có phân quyền dữ liệu " + HTKT_SUB_MODULE + " trong lv1 của hồ sơ: " + output.targetLv1;
         return output;
     }
+
+    preloadRoleRights();
 
     for (var i = 0; i < configs.length; i++) {
         var config = configs[i];
@@ -336,6 +339,60 @@ function loadPrepaymentApprovalComboBoxes() {
         return [];
     }
 
+    /*
+     * Dùng API chung để lấy danh sách user theo từng quyền liên quan.
+     * Đảo danh sách thành quyền theo user, tránh permsRight cho từng ứng viên.
+     * Không dùng query riêng và không cache quyền giữa các lần load form.
+     * Chỉ công bố cache khi mọi lời gọi thành công; lỗi dùng lại đường cũ.
+     */
+    function preloadRoleRights() {
+        var started = new Date().getTime();
+        output.rightsLoad = { mode: "fallback", elapsedMs: 0 };
+        try {
+            var needed = RIGHTS_FULL.slice(0);
+            for (var i = 0; i < configs.length; i++) {
+                needed = needed.concat(configs[i].includeRights,
+                    configs[i].excludeRights, configs[i].seedRights);
+            }
+            needed = normalizeArray(needed);
+            var rightsByContact = {};
+            var contactsByRight = {};
+            for (var j = 0; j < needed.length; j++) {
+                // Gọi trực tiếp để lỗi không bị chuyển thành danh sách rỗng:
+                // thiếu dữ liệu excludeRights có thể cho phép nhầm user.
+                var contacts = normalizeArray(
+                    lib.ESD_PERMS_RIGHTS.listContactsByRights([needed[j]]) || []
+                );
+                contactsByRight["$" + needed[j]] = contacts;
+                for (var k = 0; k < contacts.length; k++) {
+                    var key = "$" + contacts[k];
+                    if (!rightsByContact[key]) rightsByContact[key] = [];
+                    rightsByContact[key].push(needed[j]);
+                }
+            }
+            for (var key in rightsByContact) {
+                if (rightsByContact.hasOwnProperty(key)) {
+                    userRightsCache[key.substring(1)] = rightsByContact[key];
+                }
+            }
+            for (var c = 0; c < configs.length; c++) {
+                var seeds = normalizeArray(configs[c].seedRights);
+                if (!seeds.length) seeds = normalizeArray(configs[c].includeRights);
+                var pool = [];
+                for (var n = 0; n < seeds.length; n++) {
+                    pool = pool.concat(contactsByRight["$" + seeds[n]] || []);
+                }
+                contactPoolCache[seeds.slice(0).sort().join("|")] = normalizeArray(pool);
+            }
+            output.rightsLoad.mode = "shared-rights";
+            output.rightsLoad.rightCount = needed.length;
+        } catch (e) {
+            output.rightsLoad.message = String(e.message || e);
+        } finally {
+            output.rightsLoad.elapsedMs = new Date().getTime() - started;
+        }
+    }
+
     function getCachedUserRights(contactId) {
         contactId = normalizeValue(contactId);
         if (!contactId) return [];
@@ -354,11 +411,15 @@ function loadPrepaymentApprovalComboBoxes() {
     }
 
     function contactHasRightRule(contactId, includeRights, excludeRights) {
-        var userRights = getCachedUserRights(contactId);
-
-        var map = {};
-        for (var i = 0; i < userRights.length; i++) {
-            map[userRights[i]] = true;
+        var cacheKey = "$" + contactId;
+        var map = userRightMapCache[cacheKey];
+        if (!map) {
+            var userRights = getCachedUserRights(contactId);
+            map = {};
+            for (var i = 0; i < userRights.length; i++) {
+                map[userRights[i]] = true;
+            }
+            userRightMapCache[cacheKey] = map;
         }
 
         var isFullRights = true;

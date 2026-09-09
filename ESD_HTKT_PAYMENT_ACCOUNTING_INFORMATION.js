@@ -554,7 +554,7 @@ function mapCorePayload(requestId, entry, context) {
     return { subType: SUB_CITAD, data: {
             requestId: requestId, clientDt: clientDate, channel: 'A101_IBR', reftype: 'IB',
             spname: 'com.fnf.xes.PRF', data: {
-                serviceBranch: '', pmtType: 'Outgoing IBPS_Bilateral', pmtMethod: 'Account',
+                pmtType: 'Outgoing IBPS_Bilateral', pmtMethod: 'Account',
                 trnType: 'Transaction Internet Banking', fromAcctId: '101870783864',
                 toAcctId: entry.account_number, toBankId: safeString(bankParts[1]).trim(),
                 toBranchId: safeString(bankParts[0]).trim(), toAcctName: truncate(entry.account_name, 150), serviceBranch: String(entry.branch).slice(2),
