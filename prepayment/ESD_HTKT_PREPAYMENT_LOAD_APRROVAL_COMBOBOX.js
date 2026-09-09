@@ -63,13 +63,33 @@ function loadPrepaymentApprovalComboBoxes() {
     var RIGHTS_VIEW_CREATE = [RIGHT_VIEW_INVOICE_CREATE, RIGHT_VIEW_PREPAYMENT_CREATE];
     var RIGHTS_VIEW_APPROVAL = [RIGHT_VIEW_INVOICE_APPROVAL, RIGHT_VIEW_PREPAYMENT_APPROVAL];
 
+    var RIGHTS_FULL = [
+        RIGHT_VIEW_INVOICE_CREATE,
+        RIGHT_VIEW_INVOICE_APPROVAL,
+        RIGHT_VIEW_PREPAYMENT_CREATE,
+        RIGHT_VIEW_PREPAYMENT_APPROVAL,
+        RIGHT_CREATE_PREPAYMENT,
+        RIGHT_ACCOUNTING_INPUT,
+        RIGHT_CHECK_1,
+        RIGHT_APPROVE_1,
+        RIGHT_APPROVE_2,
+        RIGHT_CHECK_2,
+        RIGHT_APPROVE_3
+    ];
+
     var configs = [
         {
             key: "kttc",
             label: "KTTC tiếp nhận",
             saveField: "user.checker.kttc",
             includeRights: RIGHTS_VIEW_CREATE.concat([RIGHT_CREATE_PREPAYMENT, RIGHT_ACCOUNTING_INPUT]),
-            excludeRights: [RIGHT_CHECK_1, RIGHT_APPROVE_1, RIGHT_APPROVE_2, RIGHT_CHECK_2, RIGHT_APPROVE_3],
+            excludeRights: [
+            RIGHT_CHECK_1, 
+            RIGHT_APPROVE_1, 
+//            RIGHT_APPROVE_2, 
+//            RIGHT_CHECK_2, 
+//            RIGHT_APPROVE_3
+            ],
             seedRights: [RIGHT_ACCOUNTING_INPUT],
             valueList: "$L.kttc.ids",
             displayList: "$L.kttc.names"
@@ -135,8 +155,13 @@ function loadPrepaymentApprovalComboBoxes() {
         targetLv1Source: "",
         configs: []
     };
-    var contactPermissionGroupCache = {};
-    var permissionGroupRightsCache = {};
+
+    // Cache trong một lần load form để tránh truy vấn lặp cùng user/role/unit.
+    var userRightsCache = {};
+    var userScopeCache = {};
+    var contactPoolCache = {};
+    var contactDataCache = {};
+    var orgUnitCache = {};
 
     var file = vars["$L.file"];
     var targetInfo = getPrepaymentTargetLv1(file);
@@ -263,7 +288,7 @@ function loadPrepaymentApprovalComboBoxes() {
                 continue;
             }
 
-            if (!contactHasAssignedRoleRule(contactId, seedRights, includeRights, excludeRights)) {
+            if (!contactHasRightRule(contactId, includeRights, excludeRights)) {
                 output.rejectedCount++;
                 continue;
             }
@@ -282,163 +307,78 @@ function loadPrepaymentApprovalComboBoxes() {
         rightIds = normalizeArray(rightIds);
         if (rightIds.length === 0) return [];
 
+        var cacheKey = rightIds.slice(0).sort().join("|");
+        if (contactPoolCache.hasOwnProperty(cacheKey)) {
+            return contactPoolCache[cacheKey].slice(0);
+        }
+
         try {
             if (lib.ESD_PERMS_RIGHTS && lib.ESD_PERMS_RIGHTS.listContactsByRights) {
-                return normalizeArray(lib.ESD_PERMS_RIGHTS.listContactsByRights(rightIds) || []);
+                var contactsByRights = normalizeArray(
+                    lib.ESD_PERMS_RIGHTS.listContactsByRights(rightIds) || []
+                );
+                contactPoolCache[cacheKey] = contactsByRights;
+                return contactsByRights.slice(0);
             }
         } catch (e1) {}
 
         try {
             if (lib.ESD_PERMS_RIGHTS && lib.ESD_PERMS_RIGHTS.listContactsByRightsAndFilter) {
-                return normalizeArray(lib.ESD_PERMS_RIGHTS.listContactsByRightsAndFilter(rightIds, {}) || []);
+                var contactsByFilter = normalizeArray(
+                    lib.ESD_PERMS_RIGHTS.listContactsByRightsAndFilter(rightIds, {}) || []
+                );
+                contactPoolCache[cacheKey] = contactsByFilter;
+                return contactsByFilter.slice(0);
             }
         } catch (e2) {}
 
+        contactPoolCache[cacheKey] = [];
         return [];
     }
 
-    function contactHasAssignedRoleRule(contactId, seedRights, includeRights, excludeRights) {
-        var userRights = [];
-        try {
-            userRights = normalizeArray(lib.ESD_PERMS_RIGHTS.permsRight(contactId) || []);
-        } catch (e) {
-            return false;
+    function getCachedUserRights(contactId) {
+        contactId = normalizeValue(contactId);
+        if (!contactId) return [];
+
+        if (!userRightsCache.hasOwnProperty(contactId)) {
+            try {
+                userRightsCache[contactId] = normalizeArray(
+                    lib.ESD_PERMS_RIGHTS.permsRight(contactId) || []
+                );
+            } catch (e) {
+                userRightsCache[contactId] = [];
+            }
         }
+
+        return userRightsCache[contactId];
+    }
+
+    function contactHasRightRule(contactId, includeRights, excludeRights) {
+        var userRights = getCachedUserRights(contactId);
 
         var map = {};
         for (var i = 0; i < userRights.length; i++) {
             map[userRights[i]] = true;
         }
 
-        // Quyền bắt buộc có thể được cấp từ nhiều permission group khác nhau.
+        var isFullRights = true;
+        for (var f = 0; f < RIGHTS_FULL.length; f++) {
+            if (!map[RIGHTS_FULL[f]]) {
+                isFullRights = false;
+                break;
+            }
+        }
+        if (isFullRights) return true;
+
         for (var j = 0; j < includeRights.length; j++) {
             if (!map[includeRights[j]]) return false;
         }
 
-        // Role phải được nhận diện từ ít nhất một permission group được gán trực tiếp.
-        // Không dùng tổng quyền hiệu lực để tránh quyền của role cao loại nhầm một role khác.
-        var groupIds = getActivePermissionGroupIds(contactId);
-        for (var g = 0; g < groupIds.length; g++) {
-            var groupRights = getRightsByPermissionGroup(groupIds[g]);
-            var groupRightMap = {};
-
-            for (var r = 0; r < groupRights.length; r++) {
-                groupRightMap[groupRights[r]] = true;
-            }
-
-            var hasAllSeedRights = true;
-            for (var s = 0; s < seedRights.length; s++) {
-                if (!groupRightMap[seedRights[s]]) {
-                    hasAllSeedRights = false;
-                    break;
-                }
-            }
-            if (!hasAllSeedRights) continue;
-
-            var hasExcludedRight = false;
-            for (var e = 0; e < excludeRights.length; e++) {
-                if (groupRightMap[excludeRights[e]]) {
-                    hasExcludedRight = true;
-                    break;
-                }
-            }
-
-            if (!hasExcludedRight) return true;
+        for (var k = 0; k < excludeRights.length; k++) {
+            if (map[excludeRights[k]]) return false;
         }
 
-        return false;
-    }
-
-    function getActivePermissionGroupIds(contactId) {
-        if (contactPermissionGroupCache[contactId]) {
-            return contactPermissionGroupCache[contactId].slice();
-        }
-
-        var result = [];
-        var assignments = [];
-        var joinFile = null;
-        var groupFile = null;
-
-        try {
-            joinFile = new SCFile("esdjoinContactsPermissionGroup", SCFILE_READONLY);
-            joinFile.setFields(["permission.group.id", "start.date", "end.date"]);
-
-            var rc = joinFile.doSelect('contact.id="' + escapeQueryValue(contactId) + '"');
-            while (rc === RC_SUCCESS) {
-                var groupId = normalizeValue(joinFile["permission.group.id"]);
-                var assignmentActive = isCurrentInRange(joinFile["start.date"], joinFile["end.date"]);
-
-                if (groupId && assignmentActive) {
-                    assignments.push(groupId);
-                }
-                rc = joinFile.getNext();
-            }
-
-            assignments = normalizeArray(assignments);
-            if (assignments.length === 0) return result;
-
-            var conditions = [];
-            for (var i = 0; i < assignments.length; i++) {
-                conditions.push('id="' + escapeQueryValue(assignments[i]) + '"');
-            }
-
-            groupFile = new SCFile("esdQTpermissionGroup", SCFILE_READONLY);
-            groupFile.setFields(["id", "status", "start.date", "end.date"]);
-
-            var groupRc = groupFile.doSelect("(" + conditions.join(" or ") + ")");
-            while (groupRc === RC_SUCCESS) {
-                var activeGroupId = normalizeValue(groupFile["id"]);
-                var groupActive = normalizeValue(groupFile["status"]) === "Dang hoat dong" &&
-                                  isCurrentInRange(groupFile["start.date"], groupFile["end.date"]);
-
-                if (activeGroupId && groupActive) {
-                    result.push(activeGroupId);
-                }
-                groupRc = groupFile.getNext();
-            }
-        } finally {
-            try { if (joinFile) joinFile.doClose(); } catch (eJoinClose) {}
-            try { if (groupFile) groupFile.doClose(); } catch (eGroupClose) {}
-        }
-
-        result = normalizeArray(result);
-        contactPermissionGroupCache[contactId] = result;
-        return result.slice();
-    }
-
-    function getRightsByPermissionGroup(groupId) {
-        if (permissionGroupRightsCache[groupId]) {
-            return permissionGroupRightsCache[groupId].slice();
-        }
-
-        var result = [];
-        var rightFile = null;
-
-        try {
-            rightFile = new SCFile("esdjoinRightsPermission", SCFILE_READONLY);
-            rightFile.setFields(["permission.group.id", "rights.id"]);
-
-            var rc = rightFile.doSelect('permission.group.id="' + escapeQueryValue(groupId) + '"');
-            while (rc === RC_SUCCESS) {
-                var rightId = normalizeValue(rightFile["rights.id"]);
-                if (rightId) result.push(rightId);
-                rc = rightFile.getNext();
-            }
-        } finally {
-            try { if (rightFile) rightFile.doClose(); } catch (eRightClose) {}
-        }
-
-        result = normalizeArray(result);
-        permissionGroupRightsCache[groupId] = result;
-        return result.slice();
-    }
-
-    function isCurrentInRange(startDate, endDate) {
-        try {
-            return lib.ESD_DateTime_Utils.isCurrentInRange(startDate, endDate) === true;
-        } catch (e) {
-            return false;
-        }
+        return true;
     }
 
     function contactDataPermissionInLv1(contactId, targetLv1) {
@@ -447,6 +387,21 @@ function loadPrepaymentApprovalComboBoxes() {
     }
 
     function getUserScopeContext(contactId, targetLv1) {
+        var normalizedContactId = normalizeValue(contactId);
+        var normalizedTargetLv1 = normalizeUnitCode(targetLv1);
+        var cacheKey = normalizedContactId + "|" + normalizedTargetLv1;
+
+        if (!userScopeCache.hasOwnProperty(cacheKey)) {
+            userScopeCache[cacheKey] = buildUserScopeContext(
+                normalizedContactId,
+                normalizedTargetLv1
+            );
+        }
+
+        return userScopeCache[cacheKey];
+    }
+
+    function buildUserScopeContext(contactId, targetLv1) {
         targetLv1 = normalizeUnitCode(targetLv1);
         var result = {
             contactId: contactId,
@@ -584,6 +539,11 @@ function loadPrepaymentApprovalComboBoxes() {
 
     function lookupOrgUnit(unitCode) {
         unitCode = normalizeUnitCode(unitCode);
+
+        if (orgUnitCache.hasOwnProperty(unitCode)) {
+            return orgUnitCache[unitCode];
+        }
+
         var result = {
             found: false,
             recordId: "",
@@ -621,6 +581,8 @@ function loadPrepaymentApprovalComboBoxes() {
                 if (f) f.doClose();
             } catch (eClose) {}
         }
+
+        orgUnitCache[unitCode] = result;
         return result;
     }
 
@@ -631,8 +593,17 @@ function loadPrepaymentApprovalComboBoxes() {
 
     function readContactData(contactIds) {
         var ids = normalizeArray(contactIds);
+        var cacheKey = ids.slice(0).sort().join("|");
         var data = { ids: [], names: [] };
+
         if (ids.length === 0) return data;
+
+        if (contactDataCache.hasOwnProperty(cacheKey)) {
+            return {
+                ids: contactDataCache[cacheKey].ids.slice(0),
+                names: contactDataCache[cacheKey].names.slice(0)
+            };
+        }
 
         var conditions = [];
         for (var i = 0; i < ids.length; i++) {
@@ -688,6 +659,12 @@ function loadPrepaymentApprovalComboBoxes() {
             data.ids.push(rows[j].id);
             data.names.push(rows[j].display);
         }
+
+        contactDataCache[cacheKey] = {
+            ids: data.ids.slice(0),
+            names: data.names.slice(0)
+        };
+
         return data;
     }
 
