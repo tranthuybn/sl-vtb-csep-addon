@@ -1247,6 +1247,8 @@ function mapCoreTransferPayloadForEntry(requestId, entry, context) {
                 curCode: currency,
                 reversedInd: 'N',
                 trnRefNum: requestId,
+                maker: context.accountingCreator,
+                checker: context.accountingApprover,
                 notes: description
             }
         };
@@ -1274,6 +1276,8 @@ function mapCoreTransferPayloadForEntry(requestId, entry, context) {
                         amountType: 'TRAN_AMOUNT'
                     }
                 ],
+                maker: context.accountingCreator,
+                checker: context.accountingApprover,
                 trnDesc: description,
                 chanRefNum: requestId
             }
