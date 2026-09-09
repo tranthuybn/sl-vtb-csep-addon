@@ -1241,7 +1241,7 @@ function mapCoreTransferPayloadForEntry(requestId, entry, context) {
                 depAcctIdTo: {
                     acctId: accountNumber,
                     acctCur: currency,
-                    toBranchId: entry.branch
+                    toBranchId: entry.branch + '98'
                 },
                 amount: amountText,
                 curCode: currency,
@@ -1266,7 +1266,7 @@ function mapCoreTransferPayloadForEntry(requestId, entry, context) {
                 toBankId: bank.citadCode,
                 toBranchId: bank.citadBranchCode,
                 toAcctName: externalAccountName,
-                serviceBranch: entry.branch,
+                serviceBranch: entry.branch  + '98',
                 amount: [
                     {
                         amount: amountText,
