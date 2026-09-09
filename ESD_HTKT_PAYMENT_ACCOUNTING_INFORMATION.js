@@ -539,6 +539,8 @@ function mapGlPayload(requestId, accountingDate, payment, context, entries) {
 }
 
 function mapCorePayload(requestId, entry, context) {
+    var branchCode = String(entry.branch).slice(2);
+    if (branchCode === '007') branchCode = '107';
     var bankParts = safeString(context.beneficiaryBank).split('|');
     var internal = safeString(bankParts[2]).trim() === VIETINBANK_NAPAS;
     var amount = safeString(toNumber(entry.amount));
@@ -548,7 +550,7 @@ function mapCorePayload(requestId, entry, context) {
             requestId: requestId, clientDt: clientDate, channel: 'A101_IBR',
             spname: 'com.xesapi.xferadd20.FunsTransferAdd', data: {
                 depAcctIdFrom: { acctId: '1111', acctCur: entry.currency },
-                depAcctIdTo: { acctId: entry.account_number, acctCur: entry.currency, toBranchId: String(entry.branch).slice(2) },
+                depAcctIdTo: { acctId: entry.account_number, acctCur: entry.currency, toBranchId: branchCode },
                 amount: amount, curCode: entry.currency, reversedInd: 'N',
                 trnRefNum: requestId, notes: description } } };
     return { subType: SUB_CITAD, data: {
@@ -557,7 +559,7 @@ function mapCorePayload(requestId, entry, context) {
                 pmtType: 'Outgoing IBPS_Bilateral', pmtMethod: 'Account',
                 trnType: 'Transaction Internet Banking', fromAcctId: '101870783864',
                 toAcctId: entry.account_number, toBankId: safeString(bankParts[1]).trim(),
-                toBranchId: safeString(bankParts[0]).trim(), toAcctName: truncate(entry.account_name, 150), serviceBranch: String(entry.branch).slice(2),
+                toBranchId: safeString(bankParts[0]).trim(), toAcctName: truncate(entry.account_name, 150), serviceBranch: branchCode,
                 amount: [{ amount: amount, crcd: entry.currency, amountType: 'TRAN_AMOUNT' }],
                 trnDesc: truncate(description, 269), chanRefNum: requestId } } };
 }
