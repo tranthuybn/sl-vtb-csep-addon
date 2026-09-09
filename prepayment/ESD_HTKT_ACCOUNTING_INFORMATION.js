@@ -1203,6 +1203,8 @@ function truncateCoreText(value, maxLength) {
  * map dòng ghi Có TU-BT-03 thành payload CORE trong hoặc ngoài hệ thống.
  */
 function mapCoreTransferPayloadForEntry(requestId, entry, context) {
+    var branchCode = String(entry.branch);
+    if (branchCode === '007') branchCode = '107';
     var bank = mapCoreBeneficiaryBank(context.beneficiaryBank);
     var isInternal = bank.napasCode === CORE_VIETINBANK_NAPAS_CODE;
     var accountNumber = safeString(entry.account_number).trim();
@@ -1241,7 +1243,7 @@ function mapCoreTransferPayloadForEntry(requestId, entry, context) {
                 depAcctIdTo: {
                     acctId: accountNumber,
                     acctCur: currency,
-                    toBranchId: entry.branch + '98'
+                    toBranchId: branchCode + '98'
                 },
                 amount: amountText,
                 curCode: currency,
@@ -1268,7 +1270,7 @@ function mapCoreTransferPayloadForEntry(requestId, entry, context) {
                 toBankId: bank.citadCode,
                 toBranchId: bank.citadBranchCode,
                 toAcctName: externalAccountName,
-                serviceBranch: entry.branch  + '98',
+                serviceBranch: branchCode + '98',
                 amount: [
                     {
                         amount: amountText,

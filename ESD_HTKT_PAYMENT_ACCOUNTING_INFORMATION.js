@@ -552,7 +552,7 @@ function mapCorePayload(requestId, entry, context) {
                 depAcctIdFrom: { acctId: '1111', acctCur: entry.currency },
                 depAcctIdTo: { acctId: entry.account_number, acctCur: entry.currency, toBranchId: branchCode },
                 amount: amount, curCode: entry.currency, reversedInd: 'N',
-                trnRefNum: requestId, notes: description } } };
+                trnRefNum: requestId, maker: context.maker, checker: context.checker, notes: description } } };
     return { subType: SUB_CITAD, data: {
             requestId: requestId, clientDt: clientDate, channel: 'A101_IBR', reftype: 'IB',
             spname: 'com.fnf.xes.PRF', data: {
@@ -561,7 +561,7 @@ function mapCorePayload(requestId, entry, context) {
                 toAcctId: entry.account_number, toBankId: safeString(bankParts[1]).trim(),
                 toBranchId: safeString(bankParts[0]).trim(), toAcctName: truncate(entry.account_name, 150), serviceBranch: branchCode,
                 amount: [{ amount: amount, crcd: entry.currency, amountType: 'TRAN_AMOUNT' }],
-                trnDesc: truncate(description, 269), chanRefNum: requestId } } };
+                maker: context.maker, checker: context.checker, trnDesc: truncate(description, 269), chanRefNum: requestId } } };
 }
 
 function validateInvoicePayload(p) {
