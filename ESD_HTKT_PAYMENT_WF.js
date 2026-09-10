@@ -688,6 +688,41 @@ function validateVendorAndPaymentDetails(record) {
         errorMss.push("Số tiền hoàn ứng lần này phải nhỏ hơn hoặc bằng Số tiền còn lại.");
     }
 
+    if (refundAmount > 0) {
+        var paymentFile = null;
+        try {
+            var paymentId = String(record["payment.id"] || record.payment_id || "").trim();
+            var vendorId = String(record["vendor.id"] || record.vendor_id || "").trim();
+            var contractId = String(record["contract.id"] || record.contract_id || "").trim();
+
+            if (!contractId && paymentId) {
+                paymentFile = new SCFile("esdHTKTpayment", SCFILE_READONLY);
+                if (paymentFile.doSelect('id="' + escapeSmQueryValue(paymentId) + '"') == RC_SUCCESS) {
+                    contractId = String(paymentFile["contract.id"] || "").trim();
+                }
+            }
+
+            if (!paymentId || !vendorId || !contractId) {
+                throw new Error("Thiếu thông tin phiếu thanh toán, nhà cung cấp hoặc hợp đồng.");
+            }
+
+            var debtSummary = lib.ESD_HTKT_PAYMENT_SUPPLIER_LEDGER_LIST.getSupplierDebtSummary({
+                details: JSON.stringify({ paymentId: paymentId, vendorId: vendorId, contractId: contractId })
+            });
+            var tongCoTheHoanUng = parseAmount(debtSummary && debtSummary.tongCoTheHoanUng);
+            if (isNaN(tongCoTheHoanUng) || tongCoTheHoanUng < 0) {
+                throw new Error("Tổng có thể hoàn ứng không hợp lệ.");
+            }
+            if (refundAmount > tongCoTheHoanUng) {
+                errorMss.push("Số tiền hoàn ứng lần này phải nhỏ hơn hoặc bằng Tổng có thể hoàn ứng (" + tongCoTheHoanUng + ").");
+            }
+        } catch (eRefund) {
+            errorMss.push("Không thể kiểm tra Tổng có thể hoàn ứng. " + String(eRefund.message || eRefund));
+        } finally {
+            try { if (paymentFile) paymentFile.doClose(); } catch (eClosePayment) {}
+        }
+    }
+
     if(refundAmount == 0 && amountField == 0 && approvedInvoiceAmount == 0) {
         errorMss.push("Vui lòng nhập số tiền.");
     }

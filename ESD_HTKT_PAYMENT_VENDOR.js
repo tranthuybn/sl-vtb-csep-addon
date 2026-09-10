@@ -1,3 +1,16 @@
+/**
+ * ScriptLibrary : ESD_HTKT_PAYMENT_VENDOR
+ * -----------------------------------------------------------------------------
+ * Module       : HTKT - Đề nghị thanh toán
+ * Version      : 1.0.0
+ * Chức năng:
+ * - Quản lý danh sách nhà cung cấp thụ hưởng trong đề nghị thanh toán (esdHTKTpaymentVendor).
+ * - Thêm mới, cập nhật, xóa thông tin thanh toán (số tài khoản, ngân hàng, số tiền, hình thức thanh toán).
+ * - Kiểm tra và xác thực tính hợp lệ của thông tin nhà cung cấp với dữ liệu Vendor/Site tập trung.
+ * - Tự động đồng bộ và tính toán lại tổng tiền đề nghị thanh toán và bút toán hạch toán.
+ * -----------------------------------------------------------------------------
+ */
+
 function run() {
 
     try {
@@ -12,7 +25,7 @@ function run() {
 
         var result;
         switch (name) {
-            //Danh sách Đề nghị theo nhà cung cấp
+                //Danh sách Đề nghị theo nhà cung cấp
             case 'getListPaymentVendor':
                 var data = getListPaymentVendor(input);
                 result = { success: true, data: data };
@@ -140,9 +153,9 @@ function getListPaymentVendor(input) {
     var sqlFields = fieldMappings.map(function(item) { return item[0]; });
     var select = " SELECT " + sqlFields.join(", ");
     var mapping = ' FROM esdHTKTpaymentVendor pv ' +
-        ' JOIN esdHTKTpayment p ON (pv.payment.id = p.id) ' +
-        ' JOIN esdHTKTvendor v ON (pv.vendor.id = v.id) ' +
-        ' LEFT JOIN esdHTKTvendorSite vs ON (pv.vendor.site.id = vs.id) ';
+            ' JOIN esdHTKTpayment p ON (pv.payment.id = p.id) ' +
+            ' JOIN esdHTKTvendor v ON (pv.vendor.id = v.id) ' +
+            ' LEFT JOIN esdHTKTvendorSite vs ON (pv.vendor.site.id = vs.id) ';
     var control = ' WHERE p.id = "' + paymentId + '"';
 
     var f = new SCFile('esdHTKTpaymentVendor', SCFILE_READONLY);
@@ -211,10 +224,10 @@ function getPaymentRemainingAmount(paymentId) {
     var sqlSelect = "SELECT " + fieldMappings.map(function(item) { return item[0]; }).join(", ");
 
     var sqlFrom = ' FROM esdHTKTpaymentVendor hpv' +
-        ' LEFT JOIN esdHTKTvendor hv ON (hpv.vendor.id = hv.id)' +
-        ' LEFT JOIN esdHTKTpayment hp ON (hpv.payment.id = hp.id)' +
-        ' LEFT JOIN esdHTKTvendorSite hvs ON (hvs.id = hpv.vendor.site.id)' +
-        ' LEFT JOIN esdHDcontractSupplier hdVendor ON (hp.contract.id = hdVendor.contract.id)';
+            ' LEFT JOIN esdHTKTvendor hv ON (hpv.vendor.id = hv.id)' +
+            ' LEFT JOIN esdHTKTpayment hp ON (hpv.payment.id = hp.id)' +
+            ' LEFT JOIN esdHTKTvendorSite hvs ON (hvs.id = hpv.vendor.site.id)' +
+            ' LEFT JOIN esdHDcontractSupplier hdVendor ON (hp.contract.id = hdVendor.contract.id)';
 
     var sqlWhere = ' WHERE hp.id = "' + paymentId + '"';
 
@@ -232,7 +245,7 @@ function getPaymentRemainingAmount(paymentId) {
             rc = f.getNext();
         }
     } catch (e) {
-        print("[ERROR getPaymentVendorListByPaymentId] Lỗi doSelect: " + e);
+        // print("[ERROR getPaymentVendorListByPaymentId] Lỗi doSelect: " + e);
     } finally {
         try { if (f) f.doClose(); } catch (e) {}
     }
@@ -260,7 +273,7 @@ function getListInvoinVendor(input) {
         vendorId = tempObj.vendorId || "";
 
     } catch (ex) {
-        print("[DEBUG run] Error parsing JSON: " + ex);
+        // print("[DEBUG run] Error parsing JSON: " + ex);
         return invoiceList;
     }
 
@@ -291,7 +304,7 @@ function getListInvoinVendor(input) {
 
     var select = " SELECT " + sqlFields.join(", ");
     var mapping = ' FROM esdHTKTinvoice i ' +
-        'JOIN esdHTKTvendor v ON (i.seller.tax.code = v.vendor.number) ';
+            'JOIN esdHTKTvendor v ON (i.seller.tax.code = v.vendor.number) ';
 
     var control = ' WHERE v.id = "' + vendorId + '"';
     var querySQL = select + mapping + control;
@@ -342,7 +355,7 @@ function getInvoicesBySupplier(input) {
         vendorId = tempObj.vendorId || "";
 
     } catch (ex) {
-        print("[DEBUG run] Error parsing JSON: " + ex);
+        // print("[DEBUG run] Error parsing JSON: " + ex);
         return invoiceList;
     }
 
@@ -370,7 +383,7 @@ function getInvoicesBySupplier(input) {
 
     var select = " SELECT " + sqlFields.join(", ");
     var mapping = ' FROM esdHTKTinvoice i ' +
-        'JOIN esdHTKTvendor v ON (i.seller.tax.code = v.vendor.number) ';
+            'JOIN esdHTKTvendor v ON (i.seller.tax.code = v.vendor.number) ';
 
     var control = ' WHERE i.request.id = "' + paymentId + '" AND v.id = "' + vendorId + '"';
     var querySQL = select + mapping + control;
@@ -466,13 +479,13 @@ function createListInvoinVendor(input) {
         var checkVendorQuery = "payment.id=\"" + paymentId + "\" and vendor.id=\"" + vendorId + "\"";
         var rcCheckVendor = checkVendorFile.doSelect(checkVendorQuery);
 
-            if (rcCheckVendor != RC_SUCCESS) {
-                return {
-                    success: false,
-                    message: "Không tìm thấy thông tin khoản thanh toán của nhà cung cấp (Payment ID: " + paymentId + ", Vendor ID: " + vendorId + ") trong hệ thống. Thao tác đã bị hủy.",
-                    checkStatus: []
-                };
-            }
+        if (rcCheckVendor != RC_SUCCESS) {
+            return {
+                success: false,
+                message: "Không tìm thấy thông tin khoản thanh toán của nhà cung cấp (Payment ID: " + paymentId + ", Vendor ID: " + vendorId + ") trong hệ thống. Thao tác đã bị hủy.",
+                checkStatus: []
+            };
+        }
 
         // Bước 2.2: Tính tổng grandTotal của tất cả hóa đơn MỚI được chọn từ popup
         for (var k = 0; k < dataObj.length; k++) {
@@ -505,7 +518,7 @@ function createListInvoinVendor(input) {
                 checkStatus: []
             };
         }
-            
+
         // Bước 2.5: Kiểm tra vượt quá số tiền còn lại của khoản thanh toán (Remaining Amount)
         var remainingData = getPaymentRemainingAmount(paymentId);
         var totalRemainingAmount = "0";
@@ -591,7 +604,7 @@ function createListInvoinVendor(input) {
                         }
                     }
                 } catch (limitErr) {
-                    print("Lỗi kiểm tra hạn mức (đã bỏ qua): " + limitErr.toString());
+                    // print("Lỗi kiểm tra hạn mức (đã bỏ qua): " + limitErr.toString());
                     itemCheckStatus = 'ChuaKiemTra';
                 }
 
@@ -619,7 +632,7 @@ function createListInvoinVendor(input) {
                         invFile["request.id"] = itemRec["payment.id"];
                         var rcUpdate = invFile.doUpdate();
                         if (rcUpdate != RC_SUCCESS) {
-                            print("Lỗi khi cập nhật request.id cho hóa đơn id: " + invoiceId);
+                            // print("Lỗi khi cập nhật request.id cho hóa đơn id: " + invoiceId);
                         }
 
                         // Gọi API
@@ -630,16 +643,16 @@ function createListInvoinVendor(input) {
                                 invFile.doUpdate();
                             }
                         } catch (apiErr) {
-                            print("Lỗi khi gọi API check hóa đơn " + invoiceId + ": " + apiErr.toString());
+                            // print("Lỗi khi gọi API check hóa đơn " + invoiceId + ": " + apiErr.toString());
                         }
 
 
                     } else {
-                        print("Không tìm thấy hóa đơn trong bảng esdHTKTinvoice với id: " + invoiceId);
+                        // print("Không tìm thấy hóa đơn trong bảng esdHTKTinvoice với id: " + invoiceId);
                     }
                 }
             } else {
-                print("Không thể thêm bản ghi vào esdHTKTpaymentInvoice cho hóa đơn: " + feeData['id']);
+                // print("Không thể thêm bản ghi vào esdHTKTpaymentInvoice cho hóa đơn: " + feeData['id']);
             }
         }
 
@@ -663,7 +676,7 @@ function createListInvoinVendor(input) {
                         paymentId: pId,
                         vendorId: vdId
                     };
-                    uniquePaymentIds[pId] = true; 
+                    uniquePaymentIds[pId] = true;
                 }
             }
 
@@ -685,30 +698,30 @@ function createListInvoinVendor(input) {
 
                         var rcVendorUpdate = vendorFile.doUpdate();
                         if (rcVendorUpdate != RC_SUCCESS) {
-                            print("Lỗi khi cập nhật amount cho payment.id: " + paymentKey + " và vendor.id: " + vendorKey);
+                            // print("Lỗi khi cập nhật amount cho payment.id: " + paymentKey + " và vendor.id: " + vendorKey);
                         }
                     } else {
-                        print("Không tìm thấy bản ghi trong esdHTKTpaymentVendor với payment.id: " + paymentKey + " và vendor.id: " + vendorKey);
+                        // print("Không tìm thấy bản ghi trong esdHTKTpaymentVendor với payment.id: " + paymentKey + " và vendor.id: " + vendorKey);
                     }
                 }
             }
-            
+
             // 3.1.2 Tính tổng các nhà cung cấp và cập nhật vào phiếu (esdHTKTpayment)
             for (var prepId in uniquePaymentIds) {
                 if (uniquePaymentIds.hasOwnProperty(prepId)) {
                     var sumPaymentAmount = "0"; // Khởi tạo chuỗi "0"
-                    
+
                     var sumVendorFile = new SCFile("esdHTKTpaymentVendor");
                     var sumVendorQuery = "payment.id=\"" + prepId + "\"";
                     var rcSumVendor = sumVendorFile.doSelect(sumVendorQuery);
-                    
+
                     while (rcSumVendor == RC_SUCCESS) {
                         var vAmount = String(sumVendorFile["approved.invoice.amount"] || "0");
                         // Dùng SL để cộng chuỗi
                         sumPaymentAmount = lib.ESD_HTKT_Utils.addStringsManual(sumPaymentAmount, vAmount);
                         rcSumVendor = sumVendorFile.getNext();
                     }
-                    
+
                     var paymentFile = new SCFile("esdHTKTpayment");
                     var paymentQuery = "id=\"" + prepId + "\"";
                     var rcPayment = paymentFile.doSelect(paymentQuery);
@@ -719,10 +732,10 @@ function createListInvoinVendor(input) {
 
                         var rcPaymentUpdate = paymentFile.doUpdate();
                         if (rcPaymentUpdate != RC_SUCCESS) {
-                            print("Lỗi khi cập nhật tổng amount cho esdHTKTpayment với id: " + prepId);
+                            // print("Lỗi khi cập nhật tổng amount cho esdHTKTpayment với id: " + prepId);
                         }
                     } else {
-                        print("Không tìm thấy bản ghi trong esdHTKTpayment với id: " + prepId);
+                        // print("Không tìm thấy bản ghi trong esdHTKTpayment với id: " + prepId);
                     }
                 }
             }
@@ -829,14 +842,14 @@ function updateListInvoinVendor(input) {
 
                     if (rcUpdate == RC_SUCCESS) {
                         successInvoiceIds.push(invoiceId);
-                       
+
                         affectedPaymentIds[paymentId] = true;
                     }
                 }
             }
         }
 
-     
+
         // syncPaymentEntries(affectedPaymentIds);
 
         if (successInvoiceIds.length === dataObj.length) {
@@ -942,10 +955,10 @@ function syncPaymentEntries(paymentIds) {
 
         try {
             lib.ESD_HTKT_PAYMENT_ENTRY.syncPaymentEntryBySourceChange(
-                "esdHTKTpaymentInvoice", { "payment.id": paymentId }
+                    "esdHTKTpaymentInvoice", { "payment.id": paymentId }
             );
         } catch (syncError) {
-            console.error("Khong the sinh lai but toan cho " + paymentId + ": " + syncError.toString());
+            // console.error("Khong the sinh lai but toan cho " + paymentId + ": " + syncError.toString());
         }
     }
 }
@@ -963,10 +976,10 @@ function checkInvoiceStatus(lastCheckDate) {
         // Tính khoảng cách ngày
         var diffTime = currentDate.getTime() - checkDate.getTime();
         var diffDays = diffTime / (1000 * 60 * 60 * 24);
-        
+
         var maxAllowedDays = lib.ESD_HTKT_Utils.getItemNameFromConfig({
-        categoryId: "htkt_thoi_gia",
-        defaultValue: "2" 
+            categoryId: "htkt_thoi_gia",
+            defaultValue: "2"
         });
 
         return (diffDays > maxAllowedDays) ? "Quá hạn" : "Còn hạn";
@@ -979,24 +992,24 @@ function checkInvoiceStatus(lastCheckDate) {
 
 /**
  * Đồng bộ OGL tất cả thông tin NCC/site theo đề nghị thanh toán
- * @param record 
+ * @param record
  */
 function syncVendorOglFromPayment(record) {
     var entityInfo = lib.ESD_HTKT_ACCOUNTING_UTILS.mapPsToEntity(record['unit.lv1']);
     if (entityInfo && entityInfo.entity && entityInfo.oglBranchCode) {
         var entityCode = entityInfo.entity;
         var branchCode = entityInfo.oglBranchCode.length == 4 ?
-            entityInfo.oglBranchCode.substr(1, 4) :
-            entityInfo.oglBranchCode;
+                entityInfo.oglBranchCode.substr(1, 4) :
+                entityInfo.oglBranchCode;
 
         var itemPaymentVendor = new SCFile("esdHTKTpaymentVendor");
         var paymentVendorRc = itemPaymentVendor.doSelect(`payment.id = "${record.id}"`);
         while (paymentVendorRc == RC_SUCCESS) {
             if (!itemPaymentVendor['ogl.sync.status']) {
                 var result = lib.ESD_HTKT_PREPAYMENT_VENDOR.syncVendorToOgl(itemPaymentVendor,
-                    branchCode,
-                    entityCode,
-                    record['user.checker.kttc'] || vars.$lo_operator["contact.name"]);
+                        branchCode,
+                        entityCode,
+                        record['user.checker.kttc'] || vars.$lo_operator["contact.name"]);
                 if (result && result.success == true) {
                     itemPaymentVendor['ogl.sync.status'] = true;
                     itemPaymentVendor.doUpdate();
@@ -1020,27 +1033,27 @@ function calculateVendorRemainingAmount(contractId, supplierId, initialRemaining
     if (!contract || !supplier) return finalRemainingAmount;
 
     var totalApprovedAmount = sumAccountedVendorAmount(
-        'esdHTKTpaymentVendor',
-        'esdHTKTpayment',
-        'payment.id',
-        contract,
-        supplier
+            'esdHTKTpaymentVendor',
+            'esdHTKTpayment',
+            'payment.id',
+            contract,
+            supplier
     );
     var totalPaidAmount = sumAccountedVendorAmount(
-        'esdHTKTpaymentVendor',
-        'esdHTKTpayment',
-        'payment.id',
-        contract,
-        supplier
+            'esdHTKTpaymentVendor',
+            'esdHTKTpayment',
+            'payment.id',
+            contract,
+            supplier
     );
 
     finalRemainingAmount = lib.ESD_HTKT_Utils.subtractStringsManual(finalRemainingAmount, totalApprovedAmount);
     finalRemainingAmount = lib.ESD_HTKT_Utils.subtractStringsManual(finalRemainingAmount, totalPaidAmount);
 
     if (
-        finalRemainingAmount &&
-        (finalRemainingAmount.charAt(0) === '-' ||
-            lib.ESD_HTKT_Utils.compareMoneyStrings(finalRemainingAmount, '0') < 0)
+            finalRemainingAmount &&
+            (finalRemainingAmount.charAt(0) === '-' ||
+                    lib.ESD_HTKT_Utils.compareMoneyStrings(finalRemainingAmount, '0') < 0)
     ) {
         return '0';
     }
@@ -1052,21 +1065,21 @@ function sumAccountedVendorAmount(vendorTable, requestTable, requestIdField, con
     var totalAmount = '0';
     var file = null;
     var query =
-        'select pv.amount as amount ' +
-        'from ' + vendorTable + ' pv ' +
-        'join ' + requestTable + ' p on (pv.' + requestIdField + ' = p.id) ' +
-        'join esdHTKTvendor v on (pv.vendor.id = v.id) ' +
-        'where p.contract.id = "' + escapePaymentVendorQueryValue(contractId) + '" ' +
-        'and v.supplier.id = "' + escapePaymentVendorQueryValue(supplierId) + '" ' +
-        'and p.status = "accounted"';
+            'select pv.amount as amount ' +
+            'from ' + vendorTable + ' pv ' +
+            'join ' + requestTable + ' p on (pv.' + requestIdField + ' = p.id) ' +
+            'join esdHTKTvendor v on (pv.vendor.id = v.id) ' +
+            'where p.contract.id = "' + escapePaymentVendorQueryValue(contractId) + '" ' +
+            'and v.supplier.id = "' + escapePaymentVendorQueryValue(supplierId) + '" ' +
+            'and p.status = "accounted"';
 
     try {
         file = new SCFile(vendorTable, SCFILE_READONLY);
         var rc = file.doSelect(query);
         while (rc == RC_SUCCESS) {
             totalAmount = lib.ESD_HTKT_Utils.addStringsManual(
-                totalAmount,
-                String(file.amount || '0')
+                    totalAmount,
+                    String(file.amount || '0')
             );
             rc = file.getNext();
         }
@@ -1085,33 +1098,33 @@ function loadPaymentVendorInfo(record) {
     var itemFile = new SCFile("esdHTKTpaymentVendor");
 
     var itemQuery =
-        'select hv.supplier.id as supplier.id,' +
-        ' hv.vendor.name as supplier.name,' +
-        ' hpv.payment.method as payment.method,' +
-        ' hpv.amount as amount,' +
-        ' hpv.approved.invoice.amount as approved.invoice.amount,' +
-        ' hpv.refund.amount as refund.amount,' +
-        ' hpv.vendor.type as vendor.type,' +
-        ' hp.contract.id as contract.id,' +
-        ' hdVendor.remaining.amount as initial.remaining.amount,' +
-        ' hv.vendor.number as tax.code,' +
-        ' hpv.ogl.sync.status as ogl.sync.status,' +
-        ' hvs.ogl.site.code as ogl.site.code,' +
-        ' hvs.ogl.sync.status as hvs.ogl.sync.status,' +
-        ' hpv.vendor.site.id as vendor.site.id,' +
-        ' hpv.currency as currency,' +
-        ' hp.unit.lv1 as unit.lv1,' +
-        ' hp.unit.lv2 as unit.lv2,' +
-        ' hp.current.phase as current.phase,' +
-        ' hp.created.by as created.by,' +
-        ' hp.initial.role as initial.role,' +
-        ' hp.user.checker.kttc as user.checker.kttc' +
-        ' from esdHTKTpaymentVendor hpv' +
-        ' LEFT JOIN esdHTKTvendor hv ON (hpv.vendor.id = hv.id)' +
-        ' LEFT JOIN esdHTKTpayment hp ON (hpv.payment.id = hp.id)' +
-        ' LEFT JOIN esdHTKTvendorSite hvs ON (hvs.id = hpv.vendor.site.id)' +
-        ' LEFT JOIN esdHDcontractSupplier hdVendor ON (hp.contract.id = hdVendor.contract.id AND hdVendor.supplier.id = hv.supplier.id)' +
-        ' where hpv.id = "' + record.id + '"';
+            'select hv.supplier.id as supplier.id,' +
+            ' hv.vendor.name as supplier.name,' +
+            ' hpv.payment.method as payment.method,' +
+            ' hpv.amount as amount,' +
+            ' hpv.approved.invoice.amount as approved.invoice.amount,' +
+            ' hpv.refund.amount as refund.amount,' +
+            ' hpv.vendor.type as vendor.type,' +
+            ' hp.contract.id as contract.id,' +
+            ' hdVendor.remaining.amount as initial.remaining.amount,' +
+            ' hv.vendor.number as tax.code,' +
+            ' hpv.ogl.sync.status as ogl.sync.status,' +
+            ' hvs.ogl.site.code as ogl.site.code,' +
+            ' hvs.ogl.sync.status as hvs.ogl.sync.status,' +
+            ' hpv.vendor.site.id as vendor.site.id,' +
+            ' hpv.currency as currency,' +
+            ' hp.unit.lv1 as unit.lv1,' +
+            ' hp.unit.lv2 as unit.lv2,' +
+            ' hp.current.phase as current.phase,' +
+            ' hp.created.by as created.by,' +
+            ' hp.initial.role as initial.role,' +
+            ' hp.user.checker.kttc as user.checker.kttc' +
+            ' from esdHTKTpaymentVendor hpv' +
+            ' LEFT JOIN esdHTKTvendor hv ON (hpv.vendor.id = hv.id)' +
+            ' LEFT JOIN esdHTKTpayment hp ON (hpv.payment.id = hp.id)' +
+            ' LEFT JOIN esdHTKTvendorSite hvs ON (hvs.id = hpv.vendor.site.id)' +
+            ' LEFT JOIN esdHDcontractSupplier hdVendor ON (hp.contract.id = hdVendor.contract.id AND hdVendor.supplier.id = hv.supplier.id)' +
+            ' where hpv.id = "' + record.id + '"';
 
     if (itemFile.doSelect(itemQuery) == RC_SUCCESS) {
 
@@ -1119,9 +1132,9 @@ function loadPaymentVendorInfo(record) {
         vars.$supplierId = itemFile["supplier.id"];
         vars.$L_file["payment.method"] = itemFile["payment.method"];
         vars.$remainingAmount = calculateVendorRemainingAmount(
-            itemFile['contract.id'],
-            itemFile['supplier.id'],
-            itemFile['initial.remaining.amount']
+                itemFile['contract.id'],
+                itemFile['supplier.id'],
+                itemFile['initial.remaining.amount']
         );
         vars.$taxCode = itemFile["tax.code"];
         vars.$supplierdisplays = [itemFile["supplier.name"]];
@@ -1132,37 +1145,37 @@ function loadPaymentVendorInfo(record) {
         vars.$refundAmount = itemFile["refund.amount"];
         vars.$unitLv1 = itemFile["unit.lv1"];
         vars.$unitLv2 = itemFile["unit.lv2"];
-        
+
         vars.$isCNvendorType = itemFile['vendor.type'] === "CN" ? true : false;
 
         vars.$showSyncVendorOgl =
-            itemFile["current.phase"] == "initial_kttc" &&
-            (
-                itemFile["user.checker.kttc"] == vars.$lo_operator["contact.name"] ||
+                itemFile["current.phase"] == "initial_kttc" &&
                 (
-                    itemFile["created.by"] == vars.$lo_operator["contact.name"] &&
-                    itemFile["initial.role"] == "kttc"
-                )
-            );
+                        itemFile["user.checker.kttc"] == vars.$lo_operator["contact.name"] ||
+                        (
+                                itemFile["created.by"] == vars.$lo_operator["contact.name"] &&
+                                itemFile["initial.role"] == "kttc"
+                        )
+                );
 
         vars.$canEditSite = vars.$showSyncVendorOgl && itemFile["ogl.sync.status"] == true
 
         vars.$canEditObj =
-            (
-                itemFile["current.phase"] == "initial_dmms" &&
-                itemFile["created.by"] == vars.$lo_operator["contact.name"] &&
-                itemFile["initial.role"] == "dmms"
-            ) ||
-            (
-                itemFile["current.phase"] == "initial_kttc" &&
                 (
-                    itemFile["user.checker.kttc"] == vars.$lo_operator["contact.name"] ||
-                    (
+                        itemFile["current.phase"] == "initial_dmms" &&
                         itemFile["created.by"] == vars.$lo_operator["contact.name"] &&
-                        itemFile["initial.role"] == "kttc"
-                    )
-                )
-            );
+                        itemFile["initial.role"] == "dmms"
+                ) ||
+                (
+                        itemFile["current.phase"] == "initial_kttc" &&
+                        (
+                                itemFile["user.checker.kttc"] == vars.$lo_operator["contact.name"] ||
+                                (
+                                        itemFile["created.by"] == vars.$lo_operator["contact.name"] &&
+                                        itemFile["initial.role"] == "kttc"
+                                )
+                        )
+                );
     }
 
     try {
@@ -1186,7 +1199,7 @@ function formatDateToDDMMYYYY(rawDate) {
             return day + "/" + month + "/" + year;
         }
     } catch (e) {
-        print("Lỗi định dạng ngày: " + e.toString());
+        // print("Lỗi định dạng ngày: " + e.toString());
     }
 
     return rawDate;
@@ -1214,7 +1227,7 @@ function queryVendorData(record) {
             vars.$isAmountReadonly = true;
         } else {
             // Xử lý khi không tìm thấy dữ liệu phù hợp
-            print("Không tìm thấy bản ghi phù hợp với điều kiện: " + sqlVendor);
+            // print("Không tìm thấy bản ghi phù hợp với điều kiện: " + sqlVendor);
         }
     }
 }
@@ -1222,7 +1235,7 @@ function queryVendorData(record) {
 
 
 /**
- * Hàm cập nhật lại số tiền còn lại (contract.amount) cho TẤT CẢ các phiếu đề nghị thanh toán 
+ * Hàm cập nhật lại số tiền còn lại (contract.amount) cho TẤT CẢ các phiếu đề nghị thanh toán
  * đang chờ duyệt (cùng Hợp đồng, cùng NCC) ngay khi một phiếu được phê duyệt cuối.
  */
 function updateRemainingAmountForPendingTickets(record) {
@@ -1262,12 +1275,12 @@ function updateRemainingAmountForPendingTickets(record) {
         var totalOtherApprovedAmount = 0;
         var checkFile = new SCFile("esdHTKTpaymentVendor", SCFILE_READONLY);
         var checkQuery = 'select pv.amount as amount from esdHTKTpaymentVendor pv ' +
-            'join esdHTKTpayment p on (pv.payment.id = p.id) ' +
-            'join esdHTKTvendor v on (pv.vendor.id = v.id) ' +
-            'where p.contract.id = "' + currentContractId + '" ' +
-            'and v.supplier.id = "' + currentSupplierId + '" ' +
-            'and (p.status = "approved" or p.status = "accounted") ' +
-            'and p.id ~= "' + paymentId + '"'; // Bỏ qua phiếu đang thao tác
+                'join esdHTKTpayment p on (pv.payment.id = p.id) ' +
+                'join esdHTKTvendor v on (pv.vendor.id = v.id) ' +
+                'where p.contract.id = "' + currentContractId + '" ' +
+                'and v.supplier.id = "' + currentSupplierId + '" ' +
+                'and (p.status = "approved" or p.status = "accounted") ' +
+                'and p.id ~= "' + paymentId + '"'; // Bỏ qua phiếu đang thao tác
 
         var rcCheck = checkFile.doSelect(checkQuery);
         while (rcCheck == RC_SUCCESS) {
@@ -1282,12 +1295,12 @@ function updateRemainingAmountForPendingTickets(record) {
         // 3. Cập nhật lại số dư mới này cho TẤT CẢ các phiếu đang chờ duyệt
         var pendingFile = new SCFile("esdHTKTpaymentVendor");
         var pendingQuery = 'select pv.id as id from esdHTKTpaymentVendor pv ' +
-            'join esdHTKTpayment p on (pv.payment.id = p.id) ' +
-            'join esdHTKTvendor v on (pv.vendor.id = v.id) ' +
-            'where p.contract.id = "' + currentContractId + '" ' +
-            'and v.supplier.id = "' + currentSupplierId + '" ' +
-            'and p.id ~= "' + paymentId + '" ' +
-            'and p.status ~= "approved" and p.status ~= "accounted" and p.status ~= "cancelled"';
+                'join esdHTKTpayment p on (pv.payment.id = p.id) ' +
+                'join esdHTKTvendor v on (pv.vendor.id = v.id) ' +
+                'where p.contract.id = "' + currentContractId + '" ' +
+                'and v.supplier.id = "' + currentSupplierId + '" ' +
+                'and p.id ~= "' + paymentId + '" ' +
+                'and p.status ~= "approved" and p.status ~= "accounted" and p.status ~= "cancelled"';
 
         var rcPending = pendingFile.doSelect(pendingQuery);
         while (rcPending == RC_SUCCESS) {
@@ -1343,7 +1356,7 @@ function deletePaymentInvoice(input) {
         return executeDeletePaymentInvoice(invoiceId, paymentId);
 
     } catch (error) {
-        print("[PAYMENT_INVOICE_DELETE] error=" + error.toString());
+        // print("[PAYMENT_INVOICE_DELETE] error=" + error.toString());
         return {
             success: false,
             message: "Lỗi khi xử lý xóa: " + error.toString()
@@ -1383,7 +1396,7 @@ function executeDeletePaymentInvoice(invoiceId, paymentId) {
         }
         try { if (paymentInvFile) paymentInvFile.doClose(); } catch (e) {}
 
-        print("[PAYMENT_INVOICE_DELETE] deleted mapping rows count=" + deletedCount);
+        // print("[PAYMENT_INVOICE_DELETE] deleted mapping rows count=" + deletedCount);
 
         // Bước 2: Cập nhật lại esdHTKTinvoice (set request.id = null)
         var invFile = new SCFile("esdHTKTinvoice");
@@ -1393,7 +1406,7 @@ function executeDeletePaymentInvoice(invoiceId, paymentId) {
         if (rcInv === RC_SUCCESS) {
             invFile["request.id"] = null;
             var rcUpdate = invFile.doUpdate();
-            print("[PAYMENT_INVOICE_DELETE] update invoice request.id to null rc=" + rcUpdate);
+            // print("[PAYMENT_INVOICE_DELETE] update invoice request.id to null rc=" + rcUpdate);
         }
         try { if (invFile) invFile.doClose(); } catch (e) {}
 
@@ -1408,7 +1421,7 @@ function executeDeletePaymentInvoice(invoiceId, paymentId) {
         };
 
     } catch (error) {
-        print("[PAYMENT_INVOICE_DELETE] error=" + error.toString());
+        // print("[PAYMENT_INVOICE_DELETE] error=" + error.toString());
         return {
             success: false,
             message: "Lỗi khi xử lý xóa: " + error.toString()
@@ -1423,22 +1436,22 @@ function refreshPaymentAmountsAfterInvoiceDelete(paymentId, vendorIds) {
         var vendorInvoiceAmount = "0";
         var remainingInvoiceFile = new SCFile("esdHTKTpaymentInvoice", SCFILE_READONLY);
         var remainingInvoiceQuery =
-            "SELECT i.grand.total " +
-            "FROM esdHTKTpaymentInvoice pi " +
-            "JOIN esdHTKTinvoice i ON (pi.invoice.id = i.id) " +
-            "WHERE pi.payment.id=\"" + paymentId + "\" " +
-            "AND pi.vendor.id=\"" + vendorId + "\"";
+                "SELECT i.grand.total " +
+                "FROM esdHTKTpaymentInvoice pi " +
+                "JOIN esdHTKTinvoice i ON (pi.invoice.id = i.id) " +
+                "WHERE pi.payment.id=\"" + paymentId + "\" " +
+                "AND pi.vendor.id=\"" + vendorId + "\"";
         var rcRemainingInvoice = remainingInvoiceFile.doSelect(remainingInvoiceQuery);
 
         while (rcRemainingInvoice === RC_SUCCESS) {
             var grandTotal = String(
-                remainingInvoiceFile["i.grand.total"] ||
-                remainingInvoiceFile["grand.total"] ||
-                "0"
+                    remainingInvoiceFile["i.grand.total"] ||
+                    remainingInvoiceFile["grand.total"] ||
+                    "0"
             );
             vendorInvoiceAmount = lib.ESD_HTKT_Utils.addStringsManual(
-                vendorInvoiceAmount,
-                grandTotal
+                    vendorInvoiceAmount,
+                    grandTotal
             );
             rcRemainingInvoice = remainingInvoiceFile.getNext();
         }
@@ -1446,7 +1459,7 @@ function refreshPaymentAmountsAfterInvoiceDelete(paymentId, vendorIds) {
 
         var vendorFile = new SCFile("esdHTKTpaymentVendor");
         var vendorQuery =
-            "payment.id=\"" + paymentId + "\" and vendor.id=\"" + vendorId + "\"";
+                "payment.id=\"" + paymentId + "\" and vendor.id=\"" + vendorId + "\"";
         var rcVendor = vendorFile.doSelect(vendorQuery);
 
         if (rcVendor === RC_SUCCESS) {
@@ -1454,10 +1467,10 @@ function refreshPaymentAmountsAfterInvoiceDelete(paymentId, vendorIds) {
             vendorFile["amount"] = vendorInvoiceAmount;
             var rcVendorUpdate = vendorFile.doUpdate();
             if (rcVendorUpdate !== RC_SUCCESS) {
-                print(
-                    "[PAYMENT_INVOICE_DELETE] Khong the cap nhat amount cho payment.id=" +
-                    paymentId + ", vendor.id=" + vendorId
-                );
+                /* print(
+                        "[PAYMENT_INVOICE_DELETE] Khong the cap nhat amount cho payment.id=" +
+                        paymentId + ", vendor.id=" + vendorId
+                ); */
             }
         }
         try { vendorFile.doClose(); } catch (vendorCloseError) {}
@@ -1469,8 +1482,8 @@ function refreshPaymentAmountsAfterInvoiceDelete(paymentId, vendorIds) {
 
     while (rcSumVendor === RC_SUCCESS) {
         totalPaymentAmount = lib.ESD_HTKT_Utils.addStringsManual(
-            totalPaymentAmount,
-            String(sumVendorFile["approved.invoice.amount"] || "0")
+                totalPaymentAmount,
+                String(sumVendorFile["approved.invoice.amount"] || "0")
         );
         rcSumVendor = sumVendorFile.getNext();
     }
@@ -1482,10 +1495,10 @@ function refreshPaymentAmountsAfterInvoiceDelete(paymentId, vendorIds) {
         paymentFile["approved.invoice.amount"] = totalPaymentAmount;
         var rcPaymentUpdate = paymentFile.doUpdate();
         if (rcPaymentUpdate !== RC_SUCCESS) {
-            print(
-                "[PAYMENT_INVOICE_DELETE] Khong the cap nhat approved.invoice.amount cho payment.id=" +
-                paymentId
-            );
+            /* print(
+                    "[PAYMENT_INVOICE_DELETE] Khong the cap nhat approved.invoice.amount cho payment.id=" +
+                    paymentId
+            ); */
         }
     }
     try { paymentFile.doClose(); } catch (paymentCloseError) {}
@@ -1507,21 +1520,21 @@ function getAllVendorsByPaymentId(paymentId) {
     }
 
     var f = new SCFile(
-        "esdHTKTpaymentVendor",
-        SCFILE_READONLY
+            "esdHTKTpaymentVendor",
+            SCFILE_READONLY
     );
 
     try {
         var sql =
-            'SELECT pv.id, ' +
-            'pv.vendor.id, ' +
-            'pv.amount, ' +
-            'pv.refund.amount, ' +
-            'pv.approved.invoice.amount ' +
-            'FROM esdHTKTpaymentVendor pv ' +
-            'WHERE pv.payment.id = "' +
-            paymentId +
-            '"';
+                'SELECT pv.id, ' +
+                'pv.vendor.id, ' +
+                'pv.amount, ' +
+                'pv.refund.amount, ' +
+                'pv.approved.invoice.amount ' +
+                'FROM esdHTKTpaymentVendor pv ' +
+                'WHERE pv.payment.id = "' +
+                paymentId +
+                '"';
 
         var rc = f.doSelect(sql);
 
@@ -1533,17 +1546,17 @@ function getAllVendorsByPaymentId(paymentId) {
                 amount: Number(f["pv.amount"] || f["amount"]) || 0,
                 refundAmount: Number(f["pv.refund.amount"] || f["refund.amount"]) || 0,
                 approvedInvoiceAmount: Number(
-                    f["pv.approved.invoice.amount"] ||
-                    f["approved.invoice.amount"]
+                        f["pv.approved.invoice.amount"] ||
+                        f["approved.invoice.amount"]
                 ) || 0
             });
             rc = f.getNext();
         }
     } catch (e) {
-        print(
-            "[getAllVendorsByPaymentId] Lỗi: " +
-            e.toString()
-        );
+        /* print(
+                "[getAllVendorsByPaymentId] Lỗi: " +
+                e.toString()
+        ); */
     } finally {
         try {
             f.doClose();
@@ -1602,7 +1615,7 @@ function getPaymentVendorList(paymentId) {
  */
 function handleVendorChangeUpdate(record) {
     if (!record || !record["payment.id"]) {
-        print("[handleVendorChangeUpdate] Thiếu record hoặc paymentId.");
+        // print("[handleVendorChangeUpdate] Thiếu record hoặc paymentId.");
         return;
     }
 
@@ -1625,12 +1638,12 @@ function handleVendorChangeUpdate(record) {
         var rc = f.doSelect('id="' + paymentId + '"');
 
         if (rc != RC_SUCCESS) {
-            print(
-                "[handleVendorChangeUpdate] Không tìm thấy paymentId=" +
-                paymentId +
-                ". rc=" +
-                rc
-            );
+            /* print(
+                    "[handleVendorChangeUpdate] Không tìm thấy paymentId=" +
+                    paymentId +
+                    ". rc=" +
+                    rc
+            ); */
             return;
         }
 
@@ -1642,21 +1655,21 @@ function handleVendorChangeUpdate(record) {
         var updateRc = f.doUpdate();
 
         if (updateRc != RC_SUCCESS) {
-            print(
-                "[handleVendorChangeUpdate] Update thất bại: " +
-                system.functions.valmessage(updateRc)
-            );
+            /* print(
+                    "[handleVendorChangeUpdate] Update thất bại: " +
+                    system.functions.valmessage(updateRc)
+            ); */
             return;
         }
 
 
     } catch (e) {
-        print(
-            "[handleVendorChangeUpdate] Error paymentId=" +
-            paymentId +
-            ": " +
-            String(e.message || e)
-        );
+        /* print(
+                "[handleVendorChangeUpdate] Error paymentId=" +
+                paymentId +
+                ": " +
+                String(e.message || e)
+        ); */
     } finally {
         if (f) {
             f.doClose();
