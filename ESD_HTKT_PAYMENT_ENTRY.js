@@ -1,4 +1,16 @@
-/** Tự động sinh và đồng bộ bút toán thanh toán trong esdHTKTpaymentEntry. */
+/**
+ * ScriptLibrary : ESD_HTKT_PAYMENT_ENTRY
+ * -----------------------------------------------------------------------------
+ * Module       : HTKT - Đề nghị thanh toán
+ * Version      : 1.0.0
+ * Chức năng:
+ * - Tự động tính toán và sinh các dòng bút toán định khoản Nợ/Có (esdHTKTpaymentEntry).
+ * - Đồng bộ bút toán tự động khi có thay đổi từ hóa đơn, nhà cung cấp hoặc phân bổ chi phí.
+ * - Áp dụng các quy tắc hạch toán kế toán theo loại đề nghị, tài khoản thuế, tạm ứng và thanh toán.
+ * - Kiểm tra tính cân bằng Nợ/Có (Balance check) trước khi chuyển trạng thái hồ sơ.
+ * -----------------------------------------------------------------------------
+ */
+
 var logger = typeof getLog === 'function' ? getLog("ESD_HTKT_PAYMENT_ENTRY") : { info: function(m) {}, error: function(m) {} };
 
 /*
@@ -646,7 +658,7 @@ function getPaymentById(paymentId) {
             };
         }
     } catch (e) {
-        logger.info("getPaymentById failed for paymentId: " + paymentId + " | Exception: " + e);
+        // logger.info("getPaymentById failed for paymentId: " + paymentId + " | Exception: " + e);
     } finally {
         if (file) {
             try {
@@ -672,7 +684,7 @@ function handlePaymentCostDivisionAndAccountingSync(rec) {
     }
 
     var payment = getPaymentById(paymentId);
-    logger.info("handlePaymentCostDivisionAndAccountingSync | paymentId: " + paymentId + " | payment: " + (payment ? JSON.stringify(payment) : payment));
+    // logger.info("handlePaymentCostDivisionAndAccountingSync | paymentId: " + paymentId + " | payment: " + (payment ? JSON.stringify(payment) : payment));
 
     if (!payment || payment["current.phase"] !== "initial_kttc") {
         return;
@@ -684,7 +696,7 @@ function handlePaymentCostDivisionAndAccountingSync(rec) {
                 rec
         );
     } catch (ex) {
-        logger.info("handlePaymentCostDivisionAndAccountingSync failed for ID: " + (rec["id"] || "") + " | Exception: " + ex);
+        // logger.info("handlePaymentCostDivisionAndAccountingSync failed for ID: " + (rec["id"] || "") + " | Exception: " + ex);
     }
 }
 
@@ -703,7 +715,7 @@ function handleSyncPaymentEntryByInvoice(rec) {
     }
 
     var payment = getPaymentById(paymentId);
-    logger.info("handleSyncPaymentEntryByInvoice | paymentId: " + paymentId + " | payment: " + (payment ? JSON.stringify(payment) : payment));
+    // logger.info("handleSyncPaymentEntryByInvoice | paymentId: " + paymentId + " | payment: " + (payment ? JSON.stringify(payment) : payment));
 
     if (!payment || payment["current.phase"] !== "initial_kttc") {
         return;
@@ -715,7 +727,7 @@ function handleSyncPaymentEntryByInvoice(rec) {
                 rec
         );
     } catch (ex) {
-        logger.info("handleSyncPaymentEntryByInvoice failed for ID: " + (rec["id"] || "") + " | Exception: " + ex);
+        // logger.info("handleSyncPaymentEntryByInvoice failed for ID: " + (rec["id"] || "") + " | Exception: " + ex);
     }
 }
 
@@ -735,7 +747,7 @@ function handleSyncPaymentEntryByVendor(rec) {
     }
 
     var payment = getPaymentById(paymentId);
-    logger.info("handleSyncPaymentEntryByVendor | paymentId: " + paymentId + " | payment: " + (payment ? JSON.stringify(payment) : payment));
+    // logger.info("handleSyncPaymentEntryByVendor | paymentId: " + paymentId + " | payment: " + (payment ? JSON.stringify(payment) : payment));
 
     if (!payment || payment["current.phase"] !== "initial_kttc") {
         return;
@@ -747,7 +759,7 @@ function handleSyncPaymentEntryByVendor(rec) {
                 rec
         );
     } catch (ex) {
-        logger.info("handleSyncPaymentEntryByVendor failed for ID: " + (rec["id"] || "") + " | Exception: " + ex);
+        // logger.info("handleSyncPaymentEntryByVendor failed for ID: " + (rec["id"] || "") + " | Exception: " + ex);
     }
 }
 
@@ -770,7 +782,7 @@ function handleUpdatePaymentVendorAndAccountingSync(rec, oldRec) {
     }
 
     var payment = getPaymentById(paymentId);
-    logger.info("handleUpdatePaymentVendorAndAccountingSync | paymentId: " + paymentId + " | payment: " + (payment ? JSON.stringify(payment) : payment));
+    // logger.info("handleUpdatePaymentVendorAndAccountingSync | paymentId: " + paymentId + " | payment: " + (payment ? JSON.stringify(payment) : payment));
 
     if (!payment || payment["current.phase"] !== "initial_kttc") {
         return;
@@ -782,7 +794,7 @@ function handleUpdatePaymentVendorAndAccountingSync(rec, oldRec) {
                 rec
         );
     } catch (ex) {
-        logger.info("handleUpdatePaymentVendorAndAccountingSync failed for ID: " + (rec["id"] || "") + " | Exception: " + ex);
+        // logger.info("handleUpdatePaymentVendorAndAccountingSync failed for ID: " + (rec["id"] || "") + " | Exception: " + ex);
     }
 }
 
@@ -4645,14 +4657,14 @@ function validateCostDebitAgainstInvoice(paymentId, entries) {
     for (var i = 0; i < entries.length; i++) {
         var row = entries[i];
         var rowType = safeString(row.type).toUpperCase();
-        
+
         // Nếu type là GL thì bỏ qua không đưa vào nhóm kiểm tra theo vendor
         if (rowType === 'GL') {
             continue;
         }
 
         var vendorId = row.vendor_id || row.vendorId || "";
-        
+
         if (!vendorGroups[vendorId]) {
             vendorGroups[vendorId] = [];
         }
@@ -4664,7 +4676,7 @@ function validateCostDebitAgainstInvoice(paymentId, entries) {
         var num = parseFloat(val);
         if (isNaN(num)) return "0";
 
-        var fixedStr = num.toFixed(6); 
+        var fixedStr = num.toFixed(6);
         fixedStr = fixedStr.replace(/\.?0+$/, "");
 
         return fixedStr;
@@ -4673,7 +4685,7 @@ function validateCostDebitAgainstInvoice(paymentId, entries) {
     // --- HÀM HỖ TRỢ: Lấy tên nhà cung cấp từ bảng esdHTKTvendor ---
     function getVendorName(vendorId) {
         if (!vendorId) return "Không xác định";
-        
+
         var fVendorInfo = new SCFile('esdHTKTvendor', SCFILE_READONLY);
         var qVendor = 'id="' + escapeQueryValue(vendorId) + '"';
         try {
@@ -4693,12 +4705,12 @@ function validateCostDebitAgainstInvoice(paymentId, entries) {
     // 2. Duyệt qua từng nhà cung cấp để kiểm tra riêng biệt
     for (var vId in vendorGroups) {
         if (!vendorGroups.hasOwnProperty(vId)) continue;
-        
+
         var vendorEntries = vendorGroups[vId];
 
         // Truy vấn giá trị hóa đơn đã phê duyệt của NCC này từ bảng esdHTKTpaymentVendor
         var fVendorPayment = new SCFile('esdHTKTpaymentVendor', SCFILE_READONLY);
-                 
+
         var query = 'payment.id="' + escapeQueryValue(paymentId) + '"';
         if (vId) {
             query += ' and vendor.id="' + escapeQueryValue(vId) + '"';
@@ -4729,7 +4741,7 @@ function validateCostDebitAgainstInvoice(paymentId, entries) {
             var accountSide = getAccountingSide(row.account_type);
 
             var isCostType = (
-                entryTypeCode === 'COST' || entryTypeCode === 'TAX' 
+                    entryTypeCode === 'COST' || entryTypeCode === 'TAX'
             );
 
             // Kiểm tra chiều Ghi Nợ (debit)
@@ -4765,7 +4777,7 @@ function validateCostDivisionAgainstTable(paymentId, entries) {
         var num = parseFloat(val);
         if (isNaN(num)) return "0";
 
-        var fixedStr = num.toFixed(6); 
+        var fixedStr = num.toFixed(6);
         fixedStr = fixedStr.replace(/\.?0+$/, "");
 
         return fixedStr;
@@ -4774,7 +4786,7 @@ function validateCostDivisionAgainstTable(paymentId, entries) {
     // --- HÀM HỖ TRỢ: Lấy tên nhà cung cấp từ bảng esdHTKTvendor ---
     function getVendorName(vendorId) {
         if (!vendorId) return "Không xác định";
-        
+
         var fVendorInfo = new SCFile('esdHTKTvendor', SCFILE_READONLY);
         var qVendor = 'id="' + escapeQueryValue(vendorId) + '"';
         try {
@@ -4796,12 +4808,12 @@ function validateCostDivisionAgainstTable(paymentId, entries) {
     var hasCostDivisionData = false; // Biến cờ kiểm tra xem có bản ghi phân chia chi phí nào không
     var fCostDiv = new SCFile('esdHTKTpaymentCostDivision', SCFILE_READONLY);
     var query = 'payment.id="' + escapeQueryValue(paymentId) + '"';
-    
+
     try {
         var rc = fCostDiv.doSelect(query);
         while (rc === RC_SUCCESS) {
             hasCostDivisionData = true; // Đã tìm thấy ít nhất 1 bản ghi phân chia chi phí
-            
+
             var divVendorId = safeString(readText(fCostDiv, 'vendor.id')).trim();
             var divAccNum = safeString(readText(fCostDiv, 'account.number')).trim();
             var divAmount = parseFloat(readText(fCostDiv, 'amount')) || 0;
@@ -4834,14 +4846,14 @@ function validateCostDivisionAgainstTable(paymentId, entries) {
     for (var i = 0; i < entries.length; i++) {
         var row = entries[i];
         var rowType = safeString(row.type).toUpperCase();
-        
+
         // Nếu type là GL thì bỏ qua không đưa vào nhóm kiểm tra
         if (rowType === 'GL') {
             continue;
         }
 
         var entryTypeCode = safeString(row.entry_type).toUpperCase();
-        
+
         // Chỉ xét các dòng có entry_type là COST
         if (entryTypeCode !== 'COST') {
             continue;
@@ -4853,7 +4865,7 @@ function validateCostDivisionAgainstTable(paymentId, entries) {
         }
         var vendorId = row.vendor_id || row.vendorId || "";
         var accNum = safeString(row.account_number).trim();
-        
+
         // Tạo key định danh duy nhất cho từng cặp (Nhà cung cấp + Số tài khoản)
         var key = vendorId + "_" + accNum;
         var amount = parseFloat(row.amount) || 0;
@@ -4871,12 +4883,12 @@ function validateCostDivisionAgainstTable(paymentId, entries) {
     // 3. Đối chiếu giữa entries và bảng phân chia chi phí
     for (var key in entryTotals) {
         if (!entryTotals.hasOwnProperty(key)) continue;
-        
+
         var entryItem = entryTotals[key];
         var divItem = divisionTotals[key];
-        
+
         var divAmount = divItem ? divItem.totalAmount : 0;
-        
+
         var cleanEntryAmt = cleanAndFormatAmount(entryItem.totalAmount);
         var cleanDivAmt = cleanAndFormatAmount(divAmount);
 

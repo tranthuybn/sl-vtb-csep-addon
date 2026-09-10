@@ -83,6 +83,7 @@ function getListSupplierLedger(input) {
 
             "pe.amount AS payment_entry_amount, " +
             "pe.payment.id AS entry_payment_id, " +
+            "p.status AS entry_payment_status, " +
 
             "pe.description AS pe_description, " +
 
@@ -94,6 +95,8 @@ function getListSupplierLedger(input) {
             "ON (ai.prepayment.id = pe.ref.id  " +
             'AND pe.entry.type = "PREPAYMENT" ' +
             'AND pe.vendor.id = "' + escapeSmQueryValue(vendorId) + '") ' +
+
+            "LEFT JOIN esdHTKTpayment p ON (pe.payment.id = p.id) " +
 
             "LEFT JOIN esdHTKTaccountingInformation aip " +
             "ON (pe.accounting.request.id = aip.request.id ) " +
@@ -121,6 +124,7 @@ function getListSupplierLedger(input) {
             var paymentEntryAmount = getNumberField(file, ["payment_entry_amount", "pe.amount"]);
 
             var entryPaymentId = String(file["pe.payment.id"] || "").trim();
+            var entryPaymentStatus = String(file["entry_payment_status"] || file["p.status"] || "").trim().toLowerCase();
             var oglStatus = String(file["aip.status"] || "").trim().toLowerCase();
             var peDescription = String(file["pe.description"] || "").trim(); // Lấy description từ payment entry
 
@@ -184,7 +188,7 @@ function getListSupplierLedger(input) {
                 }
                 // 3. Nếu CHƯA Completed mà thuộc Phiếu khác (và không bị Hủy/Từ chối) -> "Chờ duyệt ở ĐNTT khác"
                 else if (oglStatus !== "rejected" && oglStatus !== "cancelled" && oglStatus !== "failed" && oglStatus !== "completed") {// đã complete thì tính vào refunded_amount nên không cộng vào đây nữa tránh bị tính 2 lần
-                    if (entryPaymentId) {
+                    if (entryPaymentId && entryPaymentStatus !== "cancelled") {
                         item.other_pending_amount += paymentEntryAmount;
                     }
                 }
@@ -429,12 +433,14 @@ function getTotalPayableAmount(prepaymentId, currentPaymentId, vendorId) {
     if (!prepaymentId) return totalAmount;
 
     var query =
-            "SELECT amount FROM esdHTKTpaymentEntry " +
-            'WHERE entry.type = "PAYABLE" ' +
-            'AND account.type = "DEBIT" ' +
-            'AND ref.id = "' + escapeSmQueryValue(prepaymentId) + '" ' +
-            'AND payment.id ~= "' + escapeSmQueryValue(currentPaymentId) + '"' +
-            (vendorId ? ' AND vendor.id = "' + escapeSmQueryValue(vendorId) + '"' : '');
+            "SELECT pe.amount AS amount FROM esdHTKTpaymentEntry pe " +
+            "JOIN esdHTKTpayment p ON (pe.payment.id = p.id) " +
+            'WHERE pe.entry.type = "PAYABLE" ' +
+            'AND pe.account.type = "DEBIT" ' +
+            'AND p.status ~= "cancelled" ' +
+            'AND pe.ref.id = "' + escapeSmQueryValue(prepaymentId) + '" ' +
+            'AND pe.payment.id ~= "' + escapeSmQueryValue(currentPaymentId) + '"' +
+            (vendorId ? ' AND pe.vendor.id = "' + escapeSmQueryValue(vendorId) + '"' : '');
 
 
     try {
