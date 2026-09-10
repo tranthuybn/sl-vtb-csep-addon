@@ -2358,8 +2358,8 @@ function getStandardExpenseAllocations(c) {
     if (result.length === 0) {
         // debugPaymentEntry('COST-FALLBACK', 'NCC ' + (c.vendor.vendor_id || '?') + ': không có PCCP, dùng debit.account=' + safeString(c.vendor.debit_account));
         result.push({
-            account_number: c.vendor.debit_account,
-            account_name: getGlAccountName(c.vendor.debit_account),
+            account_number: '',
+            account_name: '',
             department: '',
             branch: '',
             amount: Math.max(0, c.approvedAmount - (c.hasTax ? c.taxInfo.totalDeductibleTax : 0))
