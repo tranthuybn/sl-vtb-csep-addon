@@ -91,6 +91,9 @@ function getListSupplierLedger(input) {
 
             "FROM esdHTKTaccountingInformation ai " +
 
+            "JOIN esdHTKTprepayment prep " +
+            'ON (ai.prepayment.id = prep.id AND prep.status = "accounted") ' +
+
             "LEFT JOIN esdHTKTpaymentEntry pe " +
             "ON (ai.prepayment.id = pe.ref.id  " +
             'AND pe.entry.type = "PREPAYMENT" ' +
@@ -265,6 +268,8 @@ function getListAccountsPayable(input) {
             "pe.amount " +
 
             "FROM esdHTKTaccountingInformation ai " +
+            "JOIN esdHTKTpayment payment " +
+            'ON (ai.prepayment.id = payment.id AND payment.status = "accounted") ' +
             "JOIN esdHTKTpaymentEntry pe " +
             "ON (ai.prepayment.id = pe.payment.id " +
             'AND pe.entry.type = "PAYABLE" ' +
