@@ -2645,7 +2645,7 @@ function getAutoEntryRowErrors(row) {
 
     if (!row.account_number) {
         if (entryCode === AUTO_ENTRY_CODE.COST) {
-            costDivisionFields.push('account.number');
+            // Cho phép sinh dòng chi phí chưa chọn tài khoản để KT nhập sau.
         } else if (entryCode === AUTO_ENTRY_CODE.TAX) {
             categoryItemFields.push('item.name (' + CATEGORY_TAX_ACCOUNT_NUMBER + ')');
         } else if (entryCode === AUTO_ENTRY_CODE.LIABILITY ||
