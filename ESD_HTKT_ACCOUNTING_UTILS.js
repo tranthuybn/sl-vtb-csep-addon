@@ -254,6 +254,7 @@ function callApiAp(esdHTKTacountingInfo) {
             esdHTKTacountingInfo['sub.type'] == ACCOUNTING_SUB_TYPE.TAM_UNG ||
             esdHTKTacountingInfo['sub.type'] == ACCOUNTING_SUB_TYPE.THUE) {
             response = lib.ESD_HTKT_INVOICE_OGL_INTEGRATION.createApInvoice(payload);
+//            response = { success : false }
         } else if (esdHTKTacountingInfo['sub.type'] == ACCOUNTING_SUB_TYPE.TAT_TOAN) {
             response = lib.ESD_HTKT_INVOICE_OGL_INTEGRATION.createApPayment(payload);
         } else {
