@@ -320,6 +320,8 @@ function callApiGl(esdHTKTacountingInfo) {
 
 // Goi API chuyen tien
 function callApiCore(esdHTKTacountingInfo) {
+    // Đặt false để tắt giả lập và gọi lại CORE thật.
+    var USE_FAKE_CORE_RESPONSE = true;
     var success = false;
     if (!esdHTKTacountingInfo || !esdHTKTacountingInfo['request.id'] || !esdHTKTacountingInfo.data) {
         logger.info('ESD_HTKT_ACCOUNTING_UTILS::callApiCore: invalid payload');
@@ -335,16 +337,22 @@ function callApiCore(esdHTKTacountingInfo) {
         var response = null;
         var status = "UNKNOWN";
         var statusDetail = null;
-        if (esdHTKTacountingInfo['sub.type'] == ACCOUNTING_SUB_TYPE.INHOUSE) {
-            // Tạm thời không gọi sang CORE.
+        if (USE_FAKE_CORE_RESPONSE &&
+            (esdHTKTacountingInfo['sub.type'] == ACCOUNTING_SUB_TYPE.INHOUSE ||
+             esdHTKTacountingInfo['sub.type'] == ACCOUNTING_SUB_TYPE.CITAD)) {
+            var fakeStatuses = [
+                { code: "1", detail: "Thất bại" },
+                { code: "1001", detail: "Lỗi server" },
+                { code: "98", detail: "Time out call sang XES" },
+                { code: "202", detail: "Lỗi kết nối database" },
+                { code: "100", detail: "Lỗi dữ liệu. Mã lỗi hệ thống chung" }
+            ];
+            var fakeStatus = fakeStatuses[Math.floor(Math.random() * fakeStatuses.length)];
+            response = { status: { code: fakeStatus.code, detail: fakeStatus.detail + " (Giả lập)" } };
+        } else if (esdHTKTacountingInfo['sub.type'] == ACCOUNTING_SUB_TYPE.INHOUSE) {
             response = lib.ESD_HTKT_FUND_TRANSFER_INTEGRATION.fundTranfer(payload);
-//            response = { status: { code: "0", detail: "Thành công (Giả lập)" } };
-//            response = { status: { code: "1", detail: "That bai (Giả lập)" } };
         } else if (esdHTKTacountingInfo['sub.type'] == ACCOUNTING_SUB_TYPE.CITAD) {
-            // Tạm thời không gọi sang CORE.
             response = lib.ESD_HTKT_FUND_TRANSFER_INTEGRATION.fundTranferOut(payload);
-//            response = { status: { code: "0", detail: "Thành công (Giả lập)" } };
-//            response = { status: { code: "1", detail: "That bai (Giả lập)" } };
         } else {
             logger.info("ESD_HTKT_ACCOUNTING_UTILS::callApiCore: sub.type không xác định");
         }
