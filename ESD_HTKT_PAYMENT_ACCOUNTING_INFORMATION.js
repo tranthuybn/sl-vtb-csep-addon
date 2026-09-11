@@ -320,7 +320,7 @@ function buildVendorPayloads(payment, vendorRow, entries, context, accountingDat
             payablePayments.push(entry);
             continue;
         }
-        if (debit && (entryType === 'COST' || entryType === 'TAX')) {
+        if (debit && (entryType === 'COST' || entryType === 'TAX' || entryType === 'OTHER')) {
             apLines.push(mapInvoiceLine(entry, context.segment1, apLines.length + 1));
             apEntryIds.push(entry.id);
         }
