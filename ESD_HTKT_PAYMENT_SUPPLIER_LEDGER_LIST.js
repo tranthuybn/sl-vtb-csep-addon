@@ -674,6 +674,66 @@ function saveListPaymentEntryRefund(input) {
 
 
 // Xu ly them moi THANH TOAN o tab cong no
+function validatePaymentEntryPayableAmounts(details) {
+    var groups = {};
+    for (var i = 0; i < details.length; i++) {
+        var row = details[i];
+        var paymentId = row.paymentId || "";
+        var vendorId = row.vendorId || "";
+        var amount = Number(row.currentPayment || 0);
+        if (!paymentId || !vendorId || !isFinite(amount)) {
+            return "Dòng " + (i + 1) + ": thiếu paymentId, vendorId hoặc số tiền không hợp lệ";
+        }
+        var key = JSON.stringify([paymentId, vendorId]);
+        if (!groups[key]) groups[key] = { paymentId: paymentId, vendorId: vendorId, amounts: {} };
+        var refKey = JSON.stringify(String(row.prepaymentId || row.refId || ""));
+        if (Object.prototype.hasOwnProperty.call(groups[key].amounts, refKey)) {
+            return "Danh sách có khoản phải trả trùng tham chiếu của nhà cung cấp " + vendorId;
+        }
+        groups[key].amounts[refKey] = Math.max(0, amount);
+    }
+
+    for (var groupKey in groups) {
+        if (!Object.prototype.hasOwnProperty.call(groups, groupKey)) continue;
+        var group = groups[groupKey];
+        var query = 'payment.id="' + escapeSmQueryValue(group.paymentId) + '" AND vendor.id="' + escapeSmQueryValue(group.vendorId) + '"';
+        var vendorFile = new SCFile("esdHTKTpaymentVendor");
+        var entryFile = null;
+        try {
+            if (vendorFile.doSelect(query) != RC_SUCCESS) {
+                return "Không đọc được thông tin nhà cung cấp " + group.vendorId;
+            }
+            var limit = Number(vendorFile["payable.amount"] || 0);
+            if (!(limit > 0)) continue;
+            if (!isFinite(limit)) return "Số tiền cấn trừ phải trả NCC không hợp lệ";
+            var total = 0;
+            entryFile = new SCFile("esdHTKTpaymentEntry");
+            var rc = entryFile.doSelect(query + ' AND type="AP" AND entry.type="PAYABLE" AND account.type="DEBIT"');
+            while (rc == RC_SUCCESS) {
+                var existingRefKey = JSON.stringify(String(entryFile["ref.id"] || ""));
+                // Dòng đang sửa được thay bằng số tiền mới, không cộng lại số tiền cũ.
+                if (!Object.prototype.hasOwnProperty.call(group.amounts, existingRefKey)) {
+                    var existingAmount = Number(entryFile["amount"] || 0);
+                    if (!isFinite(existingAmount)) return "Số tiền bút toán phải trả không hợp lệ";
+                    total += existingAmount;
+                }
+                rc = entryFile.getNext();
+            }
+            if (rc != RC_NO_MORE) return "Không đọc được tổng bút toán phải trả của nhà cung cấp " + group.vendorId;
+            for (var ref in group.amounts) {
+                if (Object.prototype.hasOwnProperty.call(group.amounts, ref)) total += group.amounts[ref];
+            }
+            if (total > limit) {
+                return "Tổng số tiền thanh toán các khoản phải trả (" + total + ") không được vượt Số tiền cấn trừ phải trả NCC (" + limit + ").";
+            }
+        } finally {
+            closeSCFile(entryFile);
+            closeSCFile(vendorFile);
+        }
+    }
+    return "";
+}
+
 function saveListPaymentEntryPayable(input) {
     var rawDetails = "";
     if (input.details) {
@@ -716,6 +776,10 @@ function saveListPaymentEntryPayable(input) {
         var deletedIds = [];
         var failedIds = [];
         var affectedPaymentIds = {};
+
+        // Kiểm tra toàn bộ danh sách trước khi thêm, sửa hoặc xóa bất kỳ dòng nào.
+        var validationError = validatePaymentEntryPayableAmounts(dataObj);
+        if (validationError) return { success: false, message: validationError };
 
         for (var i = 0; i < dataObj.length; i++) {
             var feeData = dataObj[i];

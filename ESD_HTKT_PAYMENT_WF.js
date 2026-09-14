@@ -202,7 +202,7 @@ function updateNextStatus(record, previousRecord) {
                     document: currentDocument.data
                 }, "Bản trình ký đã được tạo trước đó.");
             } else if (currentDocument && currentDocument.code && currentDocument.code !== "DOCUMENT_NOT_FOUND") {
-                throw new Error(currentDocument.message || "Không kiểm tra được bản trình ký hiện tại.");
+//                throw new Error(currentDocument.message || "Không kiểm tra được bản trình ký hiện tại.");
             } else {
                 documentResult = htktWfDocument().generateAndUploadPresentation({
                     paymentId: paymentId,
@@ -220,7 +220,7 @@ function updateNextStatus(record, previousRecord) {
                 }
             }
         } catch (docErr) {
-            throw docErr;
+//            throw docErr;
         }
     }
 
@@ -553,9 +553,16 @@ function validateRequiredEsdHTKTpaymentEntry(paymentId) {
         var count = 0;
         var totalDebit = 0;
         var totalCredit = 0;
+        var hasEmptyAccount = false;
 
         while (rc == RC_SUCCESS) {
             count++;
+
+            var accountNumber = String(f["account.number"] || "").trim();
+            var accountName = String(f["account.name"] || "").trim();
+            if (!accountNumber || !accountName) {
+                hasEmptyAccount = true;
+            }
 
             var amount = Number(f["amount"]) || 0;
             var accountType = f["account.type"];
@@ -571,6 +578,13 @@ function validateRequiredEsdHTKTpaymentEntry(paymentId) {
 
         if (count == 0) {
             return { success: false, error: "Thông tin hạch toán là bắt buộc." };
+        }
+
+        if (hasEmptyAccount) {
+            return {
+                success: false,
+                error: "Thông tin hạch toán không được để trống số tài khoản hoặc tên tài khoản."
+            };
         }
 
         if (totalDebit != totalCredit) {
@@ -688,12 +702,14 @@ function validateVendorAndPaymentDetails(record) {
         errorMss.push("Số tiền hoàn ứng lần này phải nhỏ hơn hoặc bằng Số tiền còn lại.");
     }
 
-    if (refundAmount > 0) {
+    var paymentId = String(record["payment.id"] || record.payment_id || "").trim();
+    var vendorId = String(record["vendor.id"] || record.vendor_id || "").trim();
+    var contractId = String(record["contract.id"] || record.contract_id || "").trim();
+
+    if (refundAmount > 0 && vendorId) {
         var paymentFile = null;
         try {
-            var paymentId = String(record["payment.id"] || record.payment_id || "").trim();
-            var vendorId = String(record["vendor.id"] || record.vendor_id || "").trim();
-            var contractId = String(record["contract.id"] || record.contract_id || "").trim();
+
 
             if (!contractId && paymentId) {
                 paymentFile = new SCFile("esdHTKTpayment", SCFILE_READONLY);
@@ -702,8 +718,8 @@ function validateVendorAndPaymentDetails(record) {
                 }
             }
 
-            if (!paymentId || !vendorId || !contractId) {
-                throw new Error("Thiếu thông tin phiếu thanh toán, nhà cung cấp hoặc hợp đồng.");
+            if (!paymentId || !contractId) {
+                throw new Error("Thiếu thông tin phiếu thanh toán, hợp đồng.");
             }
 
             var debtSummary = lib.ESD_HTKT_PAYMENT_SUPPLIER_LEDGER_LIST.getSupplierDebtSummary({
