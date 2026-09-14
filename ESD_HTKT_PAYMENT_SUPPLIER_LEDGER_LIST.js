@@ -723,8 +723,8 @@ function validatePaymentEntryPayableAmounts(details) {
             for (var ref in group.amounts) {
                 if (Object.prototype.hasOwnProperty.call(group.amounts, ref)) total += group.amounts[ref];
             }
-            if (total > limit) {
-                return "Tổng số tiền thanh toán các khoản phải trả (" + total + ") không được vượt Số tiền cấn trừ phải trả NCC (" + limit + ").";
+            if (total != limit) {
+                return "Tổng số tiền thanh toán các khoản phải trả (" + total + ") phải bằng Số tiền cấn trừ phải trả NCC (" + limit + ").";
             }
         } finally {
             closeSCFile(entryFile);
