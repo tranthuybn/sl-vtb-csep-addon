@@ -946,12 +946,14 @@ function getSupplierDebtSummary(input) {
             "ai.amount AS advance_amount, " +
             "pe.amount AS payment_entry_amount, " +
             "pe.payment.id AS entry_payment_id, " +
+            "p.status AS entry_payment_status, " +
             "aip.status AS ogl_status " +
             "FROM esdHTKTaccountingInformation ai " +
             "JOIN esdHTKTprepayment prep " +
             'ON (ai.prepayment.id = prep.id AND prep.status = "accounted") ' +
             "LEFT JOIN esdHTKTpaymentEntry pe " +
             "ON (ai.prepayment.id = pe.ref.id AND pe.entry.type = \"PREPAYMENT\" AND pe.vendor.id = \"" + escapeSmQueryValue(vendorId) + "\") " +
+            "LEFT JOIN esdHTKTpayment p ON (pe.payment.id = p.id) " +
             "LEFT JOIN esdHTKTaccountingInformation aip " +
             "ON (pe.accounting.request.id = aip.request.id) " +
             'WHERE ai.sub.type = "TAM_UNG" ' +
@@ -974,6 +976,7 @@ function getSupplierDebtSummary(input) {
             var tuAmount = getNumberField(fileTamUng, ["advance_amount", "ai.amount", "amount"]);
             var tuPeAmount = getNumberField(fileTamUng, ["payment_entry_amount", "pe.amount"]);
             var tuEntryPaymentId = String(fileTamUng["pe.payment.id"] || "").trim();
+            var paymentStatus = String(fileTamUng["entry_payment_status"] || fileTamUng["p.status"] || "").trim().toLowerCase();
             var tuOglStatus = String(fileTamUng["aip.status"] || "").trim().toLowerCase();
 
             if (!tamUngMap[tuKey]) {
@@ -990,7 +993,7 @@ function getSupplierDebtSummary(input) {
                 if (tuOglStatus === "completed") {
                     tuItem.refunded_amount += tuPeAmount;
                 } else if (tuOglStatus !== "rejected" && tuOglStatus !== "cancelled" && tuOglStatus !== "failed") {
-                    if (tuEntryPaymentId && tuEntryPaymentId !== currentPaymentId) {
+                    if (tuEntryPaymentId && tuEntryPaymentId !== currentPaymentId && paymentStatus !== "cancelled") {
                         tuItem.other_pending_amount += tuPeAmount;
                     }
                 }
