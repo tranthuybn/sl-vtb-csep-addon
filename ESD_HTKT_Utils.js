@@ -946,18 +946,26 @@ function getCurrentUserScope() {
     return String(permissions.scope || "").trim();
 }
 
-// Trả bản ghi SCFile để đọc các trường contacts; null nếu không tìm thấy.
-// Bên gọi đóng bản ghi bằng doClose() sau khi sử dụng xong.
+// Chỉ trả thông tin đơn vị, mã liên hệ và email; null nếu không tìm thấy.
 function getCurrentUserContact() {
     var contactId = String(vars["$lo.contact.name"] || "").trim();
     if (!contactId) return null;
 
     var contactFile = new SCFile("contacts", SCFILE_READONLY);
     var queryValue = contactId.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-    if (contactFile.doSelect('contact.name="' + queryValue + '"') == RC_SUCCESS) {
-        return contactFile;
+    try {
+        contactFile.setFields(["lv1.id", "lv2.id", "contact.name", "email"]);
+        if (contactFile.doSelect('contact.name="' + queryValue + '"') == RC_SUCCESS) {
+            return {
+                "lv1.id": String(contactFile["lv1.id"] || ""),
+                "lv2.id": String(contactFile["lv2.id"] || ""),
+                "contact.name": String(contactFile["contact.name"] || ""),
+                "email": String(contactFile["email"] || "")
+            };
+        }
+        return null;
+    } finally {
+        contactFile.doClose();
     }
-    contactFile.doClose();
-    return null;
 }
 
