@@ -674,43 +674,6 @@ function saveListPaymentEntryRefund(input) {
 
 
 // Xu ly them moi THANH TOAN o tab cong no
-// Tính lại từ dữ liệu đã lưu, gồm tất cả khoản treo cũ của cùng phiếu/NCC.
-function updatePaymentVendorPayableAmount(paymentId, vendorId) {
-    paymentId = String(paymentId || "").trim();
-    vendorId = String(vendorId || "").trim();
-    if (!paymentId || !vendorId) return { success: false, message: "Thiếu paymentId hoặc vendorId khi cập nhật payable.amount." };
-
-    var entryFile = null;
-    var vendorFile = null;
-    try {
-        var filter = 'payment.id="' + escapeSmQueryValue(paymentId) + '" AND vendor.id="' + escapeSmQueryValue(vendorId) + '"';
-        entryFile = new SCFile("esdHTKTpaymentEntry", SCFILE_READONLY);
-        entryFile.setFields(["amount"]);
-        var rc = entryFile.doSelect(filter + ' AND ref.id ~= NULL AND ref.id ~= "" AND type="AP" AND entry.type="PAYABLE" AND account.type="DEBIT"');
-        var totalAmount = "0";
-        while (rc === RC_SUCCESS) {
-            var amount = String(entryFile["amount"] == null ? "0" : entryFile["amount"]).trim() || "0";
-            if (!isFinite(Number(amount))) throw new Error("Số tiền bút toán không hợp lệ.");
-            totalAmount = lib.ESD_HTKT_Utils.addStringsManual(totalAmount, amount);
-            rc = entryFile.getNext();
-        }
-        if (rc !== RC_NO_MORE) throw new Error("Không đọc đủ bút toán, rc=" + rc);
-
-        vendorFile = new SCFile("esdHTKTpaymentVendor");
-        var vendorRc = vendorFile.doSelect(filter);
-        if (vendorRc !== RC_SUCCESS) throw new Error("Không tìm được bản ghi nhà cung cấp, rc=" + vendorRc);
-        vendorFile["payable.amount"] = totalAmount;
-        var updateRc = vendorFile.doUpdate();
-        if (updateRc !== RC_SUCCESS && updateRc !== true) throw new Error("Lỗi cập nhật, rc=" + updateRc);
-        return { success: true, amount: totalAmount };
-    } catch (e) {
-        return { success: false, message: "Không cập nhật được payable.amount cho " + paymentId + "/" + vendorId + ": " + String(e.message || e) };
-    } finally {
-        closeSCFile(entryFile);
-        closeSCFile(vendorFile);
-    }
-}
-
 function saveListPaymentEntryPayable(input) {
     var rawDetails = "";
     if (input.details) {
@@ -753,8 +716,6 @@ function saveListPaymentEntryPayable(input) {
         var deletedIds = [];
         var failedIds = [];
         var affectedPaymentIds = {};
-        var payableTargets = {};
-        var payableSyncErrors = [];
 
         for (var i = 0; i < dataObj.length; i++) {
             var feeData = dataObj[i];
@@ -774,8 +735,6 @@ function saveListPaymentEntryPayable(input) {
                 failedIds.push(paymentId || ("dòng " + (i + 1)));
                 continue;
             }
-
-            payableTargets[JSON.stringify([paymentId, vendorId])] = { paymentId: paymentId, vendorId: vendorId };
 
             var entryFile = new SCFile("esdHTKTpaymentEntry");
             var query = "payment.id=\"" + paymentId + "\" AND vendor.id=\"" + vendorId + "\" AND ref.id=\"" + refId + "\"";
@@ -880,23 +839,14 @@ function saveListPaymentEntryPayable(input) {
             }
         }
 
-        for (var targetKey in payableTargets) {
-            if (!payableTargets.hasOwnProperty(targetKey)) continue;
-            var target = payableTargets[targetKey];
-            var syncResult = updatePaymentVendorPayableAmount(target.paymentId, target.vendorId);
-            if (!syncResult.success) payableSyncErrors.push(syncResult.message);
-        }
-
         var msgParts = [];
         if (updatedIds.length > 0) msgParts.push("Đã cập nhật: " + updatedIds.join(", "));
         if (addedIds.length > 0) msgParts.push("Đã thêm mới: " + addedIds.join(", "));
         if (deletedIds.length > 0) msgParts.push("Đã xóa: " + deletedIds.join(", "));
         if (failedIds.length > 0) msgParts.push("Thất bại: " + failedIds.join(", "));
 
-        if (payableSyncErrors.length > 0) msgParts.push(payableSyncErrors.join(" | "));
-
         return {
-            success: payableSyncErrors.length === 0 && ((updatedIds.length + addedIds.length + deletedIds.length) > 0 || (failedIds.length === 0)),
+            success: (updatedIds.length + addedIds.length + deletedIds.length) > 0 || (failedIds.length === 0),
             message: msgParts.length > 0 ? msgParts.join(" | ") : "Không có thay đổi"
         };
 
