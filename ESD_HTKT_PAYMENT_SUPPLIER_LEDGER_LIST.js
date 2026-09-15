@@ -819,36 +819,20 @@ function saveListPaymentEntryPayable(input) {
                     }
                 }
             } else {
-                // Tìm tài khoản phải trả của NCC từ vendorSite
+                // Lấy tài khoản từ bút toán phải trả của phiếu tham chiếu.
                 var accountNumber = "";
                 var accountName = "";
-                var vendorSiteId = "";
-
-                // Tìm vendorSiteId từ paymentVendor để lấy site chính xác
-                var pvFile = new SCFile("esdHTKTpaymentVendor");
-                var rcPv = pvFile.doSelect('payment.id="' + paymentId + '" AND vendor.id="' + vendorId + '"');
-                if (rcPv == RC_SUCCESS) {
-                    vendorSiteId = pvFile['vendor.site.id'] || "";
-                }
-
-                var vendorSiteFile = new SCFile("esdHTKTvendorSite");
-                var rcSite = RC_NO_MORE;
-                if (vendorSiteId) {
-                    rcSite = vendorSiteFile.doSelect('id="' + vendorSiteId + '"');
-                }
-                if (rcSite != RC_SUCCESS) {
-                    rcSite = vendorSiteFile.doSelect('vendor.id="' + vendorId + '"');
-                }
-
-                if (rcSite == RC_SUCCESS) {
-                    accountNumber = extractAccountNumber(vendorSiteFile['credit.account']);
-                }
-                if (accountNumber) {
-                    var glAccountFile = new SCFile("esdDMglAccount");
-                    var rcGl = glAccountFile.doSelect('account.number="' + accountNumber + '"');
-                    if (rcGl == RC_SUCCESS) {
-                        accountName = glAccountFile['account.name'] || "";
+                var sourceEntryFile = new SCFile("esdHTKTpaymentEntry");
+                try {
+                    var sourceEntryQuery = 'payment.id="' + refId +
+                            '" AND entry.type="PAYABLE" AND account.type="ASSET"';
+                    var rcSourceEntry = sourceEntryFile.doSelect(sourceEntryQuery);
+                    if (rcSourceEntry == RC_SUCCESS) {
+                        accountNumber = sourceEntryFile['account.number'] || "";
+                        accountName = sourceEntryFile['account.name'] || "";
                     }
+                } finally {
+                    closeSCFile(sourceEntryFile);
                 }
 
                 if (rcEntry == RC_SUCCESS) {
