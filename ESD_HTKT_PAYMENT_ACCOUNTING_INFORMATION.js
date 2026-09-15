@@ -330,9 +330,7 @@ function buildVendorPayloads(payment, vendorRow, entries, context, accountingDat
         var invoiceRequestId = uuid();
         var isPersonalVendor = normalizeIdentity(vendorRow.vendor_type) === 'canhan' ||
                 normalizeIdentity(vendorRow.vendor_type) === 'cn';
-        var invoiceAmount = isPersonalVendor
-                ? sumInvoiceLineAmounts(apLines)
-                : vendorRow.approved_invoice_amount;
+        var invoiceAmount = sumInvoiceLineAmounts(apLines);
         var amountPayTemp = isPersonalVendor
                 ? customerPaymentAmount
                 : vendorRow.amount;

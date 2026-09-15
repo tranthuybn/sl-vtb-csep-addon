@@ -1100,10 +1100,6 @@ function savePaymentEntryEdit(details) {
 //    if (!transactionOfficeValidation.success) return transactionOfficeValidation;
 
 
-////    // ===============H===========================/\
-//    // Kiểm tra tổng ghi Có (theo type: Chi Phí) bằng giá trị hóa đơn của NCC từ bảng esdHTKTpaymentVendor
-    var invoiceValidation = validateCostDebitAgainstInvoice(paymentId, normalized.entries);
-    if (!invoiceValidation.success) return invoiceValidation;
 //    // === BỔ SUNG: Kiểm tra khớp chi tiết tài khoản COST với bảng esdHTKTpaymentCostDivision ===
     var costDivisionValidation = validateCostDivisionAgainstTable(paymentId, normalized.entries);
     if (!costDivisionValidation.success) return costDivisionValidation;
