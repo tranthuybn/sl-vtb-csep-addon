@@ -195,16 +195,6 @@ function getListSupplierLedger(input) {
                         item.other_pending_amount += paymentEntryAmount;
                     }
                 }
-//                // 3. Nếu CHƯA Completed (tính cả phiếu hiện tại) (và không bị Hủy/Từ chối) -> "Chờ duyệt ở ĐNTT khác"
-//                if (oglStatus !== "rejected" && oglStatus !== "cancelled" && oglStatus !== "failed") {
-//                    if (entryPaymentId) {
-//                        item.other_pending_amount += paymentEntryAmount;
-//                    }
-//                }
-
-
-
-
 
             }
 
@@ -277,9 +267,9 @@ function getListAccountsPayable(input) {
             "ai.contract.id AS contractId, " +
             "ai.data AS ai_data, " +// Để lấy currency
 
-            "currentEntry.amount AS current_payment_entry_amount, " +
+            (currentPaymentId ? "currentEntry.amount AS current_payment_entry_amount, " +
             "currentEntry.id AS current_payment_entry_id, " +
-            "currentEntry.description, " +
+            "currentEntry.description, " : "") +
 
             "pv.approved.invoice.amount, " +
             "pv.amount, " +
@@ -297,18 +287,18 @@ function getListAccountsPayable(input) {
             "JOIN esdHTKTpaymentVendor pv " +
             "ON (pv.payment.id = pe.payment.id " +
             'AND pv.vendor.id = "' + escapeSmQueryValue(vendorId) + '") ' +
-            "LEFT JOIN esdHTKTpaymentEntry currentEntry " +
+            (currentPaymentId ? "LEFT JOIN esdHTKTpaymentEntry currentEntry " +
             "ON (ai.prepayment.id = currentEntry.ref.id " +
             'AND currentEntry.payment.id = "' + escapeSmQueryValue(currentPaymentId) + '" ' +
             'AND currentEntry.entry.type = "PAYABLE" ' +
             'AND currentEntry.account.type = "DEBIT" ' +
-            'AND currentEntry.vendor.id = "' + escapeSmQueryValue(vendorId) + '") ' +
+            'AND currentEntry.vendor.id = "' + escapeSmQueryValue(vendorId) + '") ' : "") +
             'WHERE ai.sub.type = "THANH_TOAN" ' +
             'AND ai.contract.id = "' + escapeSmQueryValue(contractId) + '" ' +
             'AND ai.vendor.id = "' + escapeSmQueryValue(vendorId) + '" ' +
             'AND ai.status = "COMPLETED" ' +
             'AND ai.type = "AP" ' +
-            'AND ai.prepayment.id ~= "' + escapeSmQueryValue(currentPaymentId) + '" ' +
+            (currentPaymentId ? 'AND ai.prepayment.id ~= "' + escapeSmQueryValue(currentPaymentId) + '" ' : "") +
             'ORDER BY ai.checked.time DESC'; // Sắp xếp ngày hạch toán mới nhất
 
 
@@ -324,9 +314,8 @@ function getListAccountsPayable(input) {
             var accountingInformationId = String(file["requestId"] || "").trim();
             var prepaymentId = String(file["prepaymentId"] || "").trim();
             var amount = getNumberField(file, ["amount"]);
-            var currentPaymentEntryAmount = getNumberField(file, ["currentEntry.amount"]);
-            var currentPaymentEntryDescription = String(file["currentEntry.description"] || "").trim();
-            var approvedInvoiceAmount = getNumberField(file, ["pv.approved.invoice.amount"]);
+            var currentPaymentEntryAmount = currentPaymentId ? getNumberField(file, ["currentEntry.amount"]) : 0;
+            var currentPaymentEntryDescription = currentPaymentId ? String(file["currentEntry.description"] || "").trim() : "";
             var refundAmount = getNumberField(file, ["pv.refund.amount"]);
             var paidAmount = getNumberField(file, ["pv.amount"]);
             var payableAmount = getNumberField(file, ["pe.amount"]);
@@ -358,7 +347,7 @@ function getListAccountsPayable(input) {
                 amount: amount, //Số tiền thanh toán sau 
                 contractId: String(file["contractId"] || "").trim(),
                 description: currentPaymentEntryDescription,           // Nội dung diễn giải của đề nghị lần này
-                id: String(file["currentEntry.id"] || "").trim(),
+                id: currentPaymentId ? String(file["currentEntry.id"] || "").trim() : "",
                 totalTax: totalTax,
                 totalAmountPaid: paidAmount + refundAmount - totalPayableAmountAccounted,  // Số tiền đã thanh toán (đã hạch toán xong và không thuộc ĐNTT hiện tại)
                 other_pending_amount: 0,   // Số tiền chờ duyệt ở các ĐNTT khác
@@ -480,7 +469,7 @@ function getTotalPayableAmount(prepaymentId, currentPaymentId, vendorId) {
             'AND pe.account.type = "DEBIT" ' +
             'AND p.status ~= "cancelled" ' +
             'AND pe.ref.id = "' + escapeSmQueryValue(prepaymentId) + '" ' +
-            'AND pe.payment.id ~= "' + escapeSmQueryValue(currentPaymentId) + '"' +
+            (currentPaymentId ? 'AND pe.payment.id ~= "' + escapeSmQueryValue(currentPaymentId) + '"' : "") +
             (vendorId ? ' AND pe.vendor.id = "' + escapeSmQueryValue(vendorId) + '"' : '');
 
 
