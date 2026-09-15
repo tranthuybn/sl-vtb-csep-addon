@@ -216,6 +216,7 @@ function getListSupplierLedger(input) {
 
     // Tính toán lại remaining_amount và xuất ra danh sách
     var itemList = [];
+    var vendorTransactionDescription = null;
     for (var i = 0; i < resultOrder.length; i++) {
         var resultItem = resultMap[resultOrder[i]];
 
@@ -224,7 +225,25 @@ function getListSupplierLedger(input) {
         resultItem.remaining_amount = resultItem.advance_amount - resultItem.refunded_amount - resultItem.other_pending_amount;
 
         // Chỉ trả các khoản tạm ứng vẫn còn số dư.
-        if (resultItem.remaining_amount > 0) itemList.push(resultItem);
+        if (resultItem.remaining_amount > 0) {
+            if (!resultItem.description && currentPaymentId) {
+                if (vendorTransactionDescription === null) {
+                    vendorTransactionDescription = "";
+                    var paymentVendorFile = new SCFile("esdHTKTpaymentVendor", SCFILE_READONLY);
+                    try {
+                        var paymentVendorQuery = 'payment.id="' + escapeSmQueryValue(currentPaymentId) +
+                                '" AND vendor.id="' + escapeSmQueryValue(vendorId) + '"';
+                        if (paymentVendorFile.doSelect(paymentVendorQuery) == RC_SUCCESS) {
+                            vendorTransactionDescription = String(paymentVendorFile['transaction.des'] || "").trim();
+                        }
+                    } finally {
+                        closeSCFile(paymentVendorFile);
+                    }
+                }
+                resultItem.description = vendorTransactionDescription;
+            }
+            itemList.push(resultItem);
+        }
     }
 
     return itemList;
@@ -295,6 +314,7 @@ function getListAccountsPayable(input) {
 
     var itemList = [];
     var file = null;
+    var vendorTransactionDescription = null;
 
     try {
         file = new SCFile("esdHTKTaccountingInformation", SCFILE_READONLY);
@@ -358,6 +378,22 @@ function getListAccountsPayable(input) {
                 }
             } else {
                 item.currency = String(file["currency"] || "").trim();
+            }
+            if (!item.description && currentPaymentId) {
+                if (vendorTransactionDescription === null) {
+                    vendorTransactionDescription = "";
+                    var paymentVendorFile = new SCFile("esdHTKTpaymentVendor", SCFILE_READONLY);
+                    try {
+                        var paymentVendorQuery = 'payment.id="' + escapeSmQueryValue(currentPaymentId) +
+                                '" AND vendor.id="' + escapeSmQueryValue(vendorId) + '"';
+                        if (paymentVendorFile.doSelect(paymentVendorQuery) == RC_SUCCESS) {
+                            vendorTransactionDescription = String(paymentVendorFile['transaction.des'] || "").trim();
+                        }
+                    } finally {
+                        closeSCFile(paymentVendorFile);
+                    }
+                }
+                item.description = vendorTransactionDescription;
             }
             itemList.push(item);
             rc = file.getNext();
