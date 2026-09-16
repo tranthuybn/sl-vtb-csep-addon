@@ -237,6 +237,17 @@ function updateNextStatus(record, previousRecord) {
     } catch (e) {}
 
     createApprovalHistory(record);
+    /////MAIL/////
+    try {
+        lib.ESD_HTKT_ACTION_WF_SEND_EMAIL.sendEmailPaymentRequestAction(record, currentPhase);
+    } catch (emailError) {
+        print(
+            "[ESD_HTKT_PAYMENT_WF.updateNextStatus] Send email error: " +
+            emailError
+        );
+    }
+    /////////
+
     return documentResult;
 }
 
@@ -706,6 +717,45 @@ function validateVendorAndPaymentDetails(record) {
     var vendorId = String(record["vendor.id"] || record.vendor_id || "").trim();
     var contractId = String(record["contract.id"] || record.contract_id || "").trim();
 
+    if (!isNaN(approvedInvoiceAmount) && approvedInvoiceAmount >= 0 && vendorId) {
+        var attachedInvoiceFile = null;
+        var paymentInvoiceFile = null;
+        try {
+            if (!paymentId || !vendorId) {
+                throw new Error("Thiếu thông tin phiếu thanh toán, nhà cung cấp.");
+            }
+
+            paymentInvoiceFile = new SCFile("esdHTKTpaymentInvoice", SCFILE_READONLY);
+            var paymentInvoiceQuery = 'payment.id="' + escapeSmQueryValue(paymentId) +
+                '" and vendor.id="' + escapeSmQueryValue(vendorId) + '"';
+            if (paymentInvoiceFile.doSelect(paymentInvoiceQuery) == RC_SUCCESS) {
+                // Cùng phạm vi và cách cộng grand.total với createListInvoinVendor.
+                var totalAttachedInvoiceAmount = "0";
+                attachedInvoiceFile = new SCFile("esdHTKTinvoice", SCFILE_READONLY);
+                var attachedInvoiceQuery = "SELECT i.id, i.grand.total " +
+                    "FROM esdHTKTinvoice i JOIN esdHTKTvendor v ON (i.seller.tax.code = v.vendor.number) " +
+                    'WHERE i.request.id = "' + escapeSmQueryValue(paymentId) +
+                    '" AND v.id = "' + escapeSmQueryValue(vendorId) + '"';
+                var rcAttachedInvoice = attachedInvoiceFile.doSelect(attachedInvoiceQuery);
+                while (rcAttachedInvoice == RC_SUCCESS) {
+                    var attachedInvoiceAmount = String(attachedInvoiceFile["grand.total"] || attachedInvoiceFile["grandTotal"] || "0");
+                    totalAttachedInvoiceAmount = lib.ESD_HTKT_Utils.addStringsManual(totalAttachedInvoiceAmount, attachedInvoiceAmount);
+                    rcAttachedInvoice = attachedInvoiceFile.getNext();
+                }
+
+                var approvedInvoiceAmountText = String(vars.$approvedInvoiceAmount).replace(/,/g, "").trim();
+                if (lib.ESD_HTKT_Utils.compareMoneyStrings(approvedInvoiceAmountText, totalAttachedInvoiceAmount) > 0) {
+                    errorMss.push("Giá trị hóa đơn chấp nhận phải nhỏ hơn hoặc bằng tổng giá trị hóa đơn của nhà cung cấp gắn vào phiếu (" + totalAttachedInvoiceAmount + ").");
+                }
+            }
+        } catch (eInvoice) {
+            errorMss.push("Không thể kiểm tra tổng giá trị hóa đơn gắn vào phiếu. " + String(eInvoice.message || eInvoice));
+        } finally {
+            try { if (attachedInvoiceFile) attachedInvoiceFile.doClose(); } catch (eCloseInvoice) {}
+            try { if (paymentInvoiceFile) paymentInvoiceFile.doClose(); } catch (eClosePaymentInvoice) {}
+        }
+    }
+
     if (refundAmount > 0 && vendorId) {
         var paymentFile = null;
         try {
@@ -739,9 +789,9 @@ function validateVendorAndPaymentDetails(record) {
         }
     }
 
-    if(refundAmount == 0 && amountField == 0 && approvedInvoiceAmount == 0) {
-        errorMss.push("Vui lòng nhập số tiền.");
-    }
+//    if(refundAmount == 0 && amountField == 0 && approvedInvoiceAmount == 0) {
+//        errorMss.push("Vui lòng nhập số tiền.");
+//    }
 
     if (amountField > 0) {
         var paymentMethod = record["payment.method"];
