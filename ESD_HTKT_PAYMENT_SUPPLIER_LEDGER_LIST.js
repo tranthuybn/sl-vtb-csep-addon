@@ -214,8 +214,8 @@ function getListSupplierLedger(input) {
         // Còn lại = Số tiền tạm ứng - Đã hoàn ứng - Hoàn ứng chờ duyệt trên các ĐNTT khác
         resultItem.remaining_amount = resultItem.advance_amount - resultItem.refunded_amount - resultItem.other_pending_amount;
 
-        // Chỉ trả các khoản tạm ứng vẫn còn số dư.
-        if (resultItem.remaining_amount > 0) {
+        // Giữ cả khoản đã hết số dư để hiển thị đầy đủ thông tin công nợ.
+        if (resultItem.remaining_amount >= 0) {
             if (!resultItem.description && currentPaymentId) {
                 if (vendorTransactionDescription === null) {
                     vendorTransactionDescription = "";
@@ -322,8 +322,8 @@ function getListAccountsPayable(input) {
             var totalPayableAmount = getTotalPayableAmount(prepaymentId, currentPaymentId, vendorId);
             var totalRemainingAmount = payableAmount - totalPayableAmount;
 
-            // Không xử lý thêm các khoản phải trả đã hết số dư.
-            if (totalRemainingAmount <= 0) {
+            // Giữ cả khoản đã hết số dư để hiển thị đầy đủ thông tin công nợ.
+            if (totalRemainingAmount < 0) {
                 rc = file.getNext();
                 continue;
             }
