@@ -1,11 +1,15 @@
 /**
- * ScriptLibrary:
- * ESD_HTKT_PAYMENT_LOAD_APPROVAL_COMBOBOX
- *
- * Hàm public:
- * loadPaymentApprovalComboBoxes()
- *
+ * ScriptLibrary : ESD_HTKT_PAYMENT_LOAD_APRROVAL_COMBOBOX
+ * -----------------------------------------------------------------------------
+ * Module       : HTKT - Đề nghị thanh toán
+ * Version      : 1.0.0
+ * Chức năng:
+ * - Tải danh sách người duyệt hợp lệ (Reviewer, Approver, Kế toán trưởng, Ban Giám đốc, v.v.).
+ * - Áp dụng ma trận phân quyền phê duyệt dựa trên đơn vị người tạo, hạn mức số tiền và quy trình.
+ * - Hỗ trợ tải dữ liệu động cho các Combobox chọn người phê duyệt trên giao diện đề nghị thanh toán.
+ * -----------------------------------------------------------------------------
  */
+
 // trưởng thêm
 function getPaymentRoleByRights(contactId) {
     var RIGHT_VIEW_INVOICE = "0040040001000001";
@@ -45,9 +49,9 @@ function getPaymentRoleByRights(contactId) {
     }
 
     var canCreatePayment =
-        rightMap[RIGHT_VIEW_INVOICE] &&
-        rightMap[RIGHT_VIEW_PAYMENT] &&
-        rightMap[RIGHT_CREATE_PAYMENT];
+            rightMap[RIGHT_VIEW_INVOICE] &&
+            rightMap[RIGHT_VIEW_PAYMENT] &&
+            rightMap[RIGHT_CREATE_PAYMENT];
 
     if (!canCreatePayment) {
         return "";
@@ -57,7 +61,21 @@ function getPaymentRoleByRights(contactId) {
 }
 
 
-function loadPaymentApprovalComboBoxes() {
+function loadPaymentApprovalComboBoxes(paymentFile) {
+    return loadPaymentApprovalComboBoxesInternal(paymentFile, "");
+}
+
+// Event checkbox Yêu cầu Rà soát 1: chỉ tải user.checker.dmms.
+function loadPaymentDmmsCheckerComboBox(paymentFile) {
+    return loadPaymentApprovalComboBoxesInternal(paymentFile, "user.checker.dmms");
+}
+
+// Event checkbox Yêu cầu Rà soát 2: chỉ tải user.checker.final.
+function loadPaymentFinalCheckerComboBox(paymentFile) {
+    return loadPaymentApprovalComboBoxesInternal(paymentFile, "user.checker.final");
+}
+
+function loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField) {
     var HTKT_SUB_MODULE = "00401";
 
     /*
@@ -134,133 +152,133 @@ function loadPaymentApprovalComboBoxes() {
      * - Sau đó vẫn kiểm tra lại includeRights/excludeRights bằng permsRight().
      */
     var configs = [{
-            key: "kttc",
-            label: "KTTC tiếp nhận",
-            saveField: "user.checker.kttc",
+        key: "kttc",
+        label: "KTTC tiếp nhận",
+        saveField: "user.checker.kttc",
 
-            /*
-             * KTTC tiếp nhận dùng bộ quyền của khởi tạo:
-             * - 0040040001000001: Xem danh sách & chi tiết hóa đơn - Khởi tạo
-             * - 0040040003000001: Xem danh sách đề nghị thanh toán - Khởi tạo
-             * - 0040040003000002: Lập đề nghị thanh toán
-             * - 0040040003000003: Nhập liệu hạch toán
-             */
-            includeRights: RIGHTS_VIEW_CREATE.concat([
-                RIGHT_CREATE_PAYMENT,
-                RIGHT_ACCOUNTING_INPUT
-            ]),
+        /*
+         * KTTC tiếp nhận dùng bộ quyền của khởi tạo:
+         * - 0040040001000001: Xem danh sách & chi tiết hóa đơn - Khởi tạo
+         * - 0040040003000001: Xem danh sách đề nghị thanh toán - Khởi tạo
+         * - 0040040003000002: Lập đề nghị thanh toán
+         * - 0040040003000003: Nhập liệu hạch toán
+         */
+        includeRights: RIGHTS_VIEW_CREATE.concat([
+            RIGHT_CREATE_PAYMENT,
+            RIGHT_ACCOUNTING_INPUT
+        ]),
 
-            excludeRights: [
-                RIGHT_CHECK_1,
-               
-            ],
-            seedRights: [
-                RIGHT_ACCOUNTING_INPUT
-            ],
-            valueList: "$L.kttc.ids",
-            displayList: "$L.kttc.names"
-        },
+        excludeRights: [
+            RIGHT_CHECK_1,
 
-        {
-            key: "dmmsRs1",
-            label: "DMMS rà soát 1",
-            saveField: "user.checker.dmms",
-            includeRights: RIGHTS_VIEW_APPROVAL.concat([
-                RIGHT_CHECK_1
-            ]),
-            excludeRights: [
-                RIGHT_APPROVE_1,
-                RIGHT_APPROVE_2,
-                RIGHT_CHECK_2,
-                RIGHT_APPROVE_3
-            ],
-            seedRights: [
-                RIGHT_CHECK_1
-            ],
-            valueList: "$L.dmms.ids",
-            displayList: "$L.dmms.rs1"
-        },
+        ],
+        seedRights: [
+            RIGHT_ACCOUNTING_INPUT
+        ],
+        valueList: "$L.kttc.ids",
+        displayList: "$L.kttc.names"
+    },
 
-        {
-            key: "dmmsApproval1",
-            label: "DMMS phê duyệt cấp 1",
-            saveField: "user.approver.dmms",
-            includeRights: RIGHTS_VIEW_APPROVAL.concat([
-//                RIGHT_CHECK_1,
-                RIGHT_APPROVE_1
-            ]),
-            excludeRights: [
-                RIGHT_APPROVE_2,
-                RIGHT_CHECK_2,
-                RIGHT_APPROVE_3
-            ],
-            seedRights: [
-                RIGHT_APPROVE_1
-            ],
-            valueList: "$L.dmms.approval1.ids",
-            displayList: "$L.dmms.approval1"
-        },
+    {
+        key: "dmmsRs1",
+        label: "DMMS rà soát 1",
+        saveField: "user.checker.dmms",
+        includeRights: RIGHTS_VIEW_APPROVAL.concat([
+            RIGHT_CHECK_1
+        ]),
+        excludeRights: [
+            RIGHT_APPROVE_1,
+            RIGHT_APPROVE_2,
+            RIGHT_CHECK_2,
+            RIGHT_APPROVE_3
+        ],
+        seedRights: [
+            RIGHT_CHECK_1
+        ],
+        valueList: "$L.dmms.ids",
+        displayList: "$L.dmms.rs1"
+    },
 
-        {
-            key: "kttcApprove2",
-            label: "KTTC phê duyệt cấp 2",
-            saveField: "user.approver.kttc",
-            includeRights: RIGHTS_VIEW_APPROVAL.concat([
-                //                RIGHT_ACCOUNTING_INPUT,
-//                RIGHT_CHECK_1,
-//                RIGHT_APPROVE_1,
-                RIGHT_APPROVE_2
-            ]),
-            excludeRights: [
-                RIGHT_CHECK_2,
-                RIGHT_APPROVE_3
-            ],
-            seedRights: [
-                RIGHT_APPROVE_2
-            ],
-            valueList: "$L.kttc.approve2.ids",
-            displayList: "$L.kttc.approve2"
-        },
+    {
+        key: "dmmsApproval1",
+        label: "DMMS phê duyệt cấp 1",
+        saveField: "user.approver.dmms",
+        includeRights: RIGHTS_VIEW_APPROVAL.concat([
+            //                RIGHT_CHECK_1,
+            RIGHT_APPROVE_1
+        ]),
+        excludeRights: [
+            RIGHT_APPROVE_2,
+            RIGHT_CHECK_2,
+            RIGHT_APPROVE_3
+        ],
+        seedRights: [
+            RIGHT_APPROVE_1
+        ],
+        valueList: "$L.dmms.approval1.ids",
+        displayList: "$L.dmms.approval1"
+    },
 
-        {
-            key: "kttcCheck2",
-            label: "KTTC rà soát 2",
-            saveField: "user.checker.final",
-            includeRights: RIGHTS_VIEW_APPROVAL.concat([
-                RIGHT_CHECK_2
-            ]),
-            excludeRights: [
-                RIGHT_APPROVE_3
-            ],
-            seedRights: [
-                RIGHT_CHECK_2
-            ],
-            valueList: "$L.kttc.check2.ids",
-            displayList: "$L.kttc.check2"
-        },
+    {
+        key: "kttcApprove2",
+        label: "KTTC phê duyệt cấp 2",
+        saveField: "user.approver.kttc",
+        includeRights: RIGHTS_VIEW_APPROVAL.concat([
+            //                RIGHT_ACCOUNTING_INPUT,
+            //                RIGHT_CHECK_1,
+            //                RIGHT_APPROVE_1,
+            RIGHT_APPROVE_2
+        ]),
+        excludeRights: [
+            RIGHT_CHECK_2,
+            RIGHT_APPROVE_3
+        ],
+        seedRights: [
+            RIGHT_APPROVE_2
+        ],
+        valueList: "$L.kttc.approve2.ids",
+        displayList: "$L.kttc.approve2"
+    },
 
-        {
-            key: "approveAll",
-            label: "Phê duyệt cấp có thẩm quyền",
-            saveField: "user.approver.final",
+    {
+        key: "kttcCheck2",
+        label: "KTTC rà soát 2",
+        saveField: "user.checker.final",
+        includeRights: RIGHTS_VIEW_APPROVAL.concat([
+            RIGHT_CHECK_2
+        ]),
+        excludeRights: [
+            RIGHT_APPROVE_3
+        ],
+        seedRights: [
+            RIGHT_CHECK_2
+        ],
+        valueList: "$L.kttc.check2.ids",
+        displayList: "$L.kttc.check2"
+    },
 
-            /*
-             * Cấp có thẩm quyền chỉ cần:
-             * - 0040040001000004: Xem danh sách & chi tiết hóa đơn - Phê duyệt
-             * - 0040040003000009: Xem danh sách đề nghị thanh toán - Phê duyệt
-             * - 0040040003000008: Phê duyệt đề nghị thanh toán cấp 3
-             */
-            includeRights: RIGHTS_VIEW_APPROVAL.concat([
-                RIGHT_APPROVE_3
-            ]),
+    {
+        key: "approveAll",
+        label: "Phê duyệt cấp có thẩm quyền",
+        saveField: "user.approver.final",
 
-            excludeRights: [],
-            seedRights: [
-                RIGHT_APPROVE_3
-            ],
-            valueList: "$L.approve.all.ids",
-            displayList: "$L.approve.all"
-        }
+        /*
+         * Cấp có thẩm quyền chỉ cần:
+         * - 0040040001000004: Xem danh sách & chi tiết hóa đơn - Phê duyệt
+         * - 0040040003000009: Xem danh sách đề nghị thanh toán - Phê duyệt
+         * - 0040040003000008: Phê duyệt đề nghị thanh toán cấp 3
+         */
+        includeRights: RIGHTS_VIEW_APPROVAL.concat([
+            RIGHT_APPROVE_3
+        ]),
+
+        excludeRights: [],
+        seedRights: [
+            RIGHT_APPROVE_3
+        ],
+        valueList: "$L.approve.all.ids",
+        displayList: "$L.approve.all"
+    }
     ];
 
     var output = {
@@ -281,7 +299,43 @@ function loadPaymentApprovalComboBoxes() {
     var contactDataCache = {};
     var orgUnitCache = {};
 
-    var file = vars["$L.file"];
+    // Lọc trước mọi thao tác gán/xóa biến: gọi riêng không ảnh hưởng 5 ô còn lại.
+    if (requestedField) {
+        var requestedConfigs = [];
+        for (var requestedIndex = 0; requestedIndex < configs.length; requestedIndex++) {
+            if (configs[requestedIndex].saveField === requestedField) {
+                requestedConfigs.push(configs[requestedIndex]);
+            }
+        }
+        configs = requestedConfigs;
+    }
+
+    var file = paymentFile || vars["$L.file"];
+    var phase = normalizeValue(safeFileGet(file, ["current.phase"]));
+    var loadDmmsGroup = phase === "initial_dmms" || phase === "approval_dmms";
+    var loadKttcGroup = phase === "initial_kttc" || phase === "approval_kttc";
+    var candidateConfigs = [];
+    output.phase = phase;
+    for (var configIndex = 0; configIndex < configs.length; configIndex++) {
+        var phaseConfig = configs[configIndex];
+        // Checker chỉ tải ứng viên khi checkbox bật và thuộc nhóm phase đang tải.
+        // Checkbox tắt hoặc phase khác: chỉ tra người đã lưu.
+        var dmmsGroup = phaseConfig.saveField === "user.checker.kttc" ||
+                (phaseConfig.saveField === "user.checker.dmms" &&
+                    safeFileGet(file, ["require.check.level1"]) === "true") ||
+                phaseConfig.saveField === "user.approver.dmms";
+        var kttcGroup = phaseConfig.saveField === "user.approver.kttc" ||
+                (phaseConfig.saveField === "user.checker.final" &&
+                    safeFileGet(file, ["require.check.level2"]) === "true") ||
+                phaseConfig.saveField === "user.approver.final";
+        phaseConfig.mode = ((dmmsGroup && loadDmmsGroup) || (kttcGroup && loadKttcGroup)) ? "candidates" : "selected";
+        if (phase === "approval_kttc" && phaseConfig.saveField === "user.checker.kttc") {
+            phaseConfig.mode = "candidates";
+        }
+        // Hàm riêng được caller kích hoạt từ checkbox, luôn tải ứng viên của ô đó.
+        if (requestedField) phaseConfig.mode = "candidates";
+        if (phaseConfig.mode === "candidates") candidateConfigs.push(phaseConfig);
+    }
 
     var targetInfo = getPaymentTargetLv1(file);
 
@@ -303,13 +357,13 @@ function loadPaymentApprovalComboBoxes() {
      * Nếu không có, clear toàn bộ combobox và dừng.
      */
     var currentUser = normalizeValue(
-        safeVarGet("$lo.contact.name", "")
+            safeVarGet("$lo.contact.name", "")
     );
 
     output.currentUser = currentUser;
 
     if (!currentUser) {
-    
+
         clearAllComboBoxes(configs);
 
         output.success = false;
@@ -327,23 +381,31 @@ function loadPaymentApprovalComboBoxes() {
 
         output.success = false;
         output.message =
-            "User đăng nhập không có phân quyền dữ liệu " +
-            HTKT_SUB_MODULE +
-            " trong lv1 của hồ sơ: " +
-            output.targetLv1;
+                "User đăng nhập không có phân quyền dữ liệu " +
+                HTKT_SUB_MODULE +
+                " trong lv1 của hồ sơ: " +
+                output.targetLv1;
         return output;
     }
-    
+
 
     /*
      * User đăng nhập hợp lệ thì mới load danh sách combobox.
      */
-    preloadRoleRights();
+    if (candidateConfigs.length) {
+        preloadRoleRights(candidateConfigs);
+    } else {
+        output.rightsLoad = { mode: "skipped", elapsedMs: 0, rightCount: 0 };
+    }
 
     for (var i = 0; i < configs.length; i++) {
         var config = configs[i];
 
         var result = loadOneComboBox(config, output.targetLv1);
+        if (config.mode === "candidates") {
+//            print("[ApprovalCombo] " + config.saveField + ": " +
+//                    (result.success ? result.count + " nguoi" : "LOI: " + result.message));
+        }
 
         output[config.key] = result;
         output.configs.push({
@@ -352,7 +414,8 @@ function loadPaymentApprovalComboBoxes() {
             valueList: config.valueList,
             displayList: config.displayList,
             saveField: config.saveField,
-            count: result.count
+            count: result.count,
+            mode: result.mode
         });
 
         if (!result.success) {
@@ -361,8 +424,8 @@ function loadPaymentApprovalComboBoxes() {
     }
 
     output.message = output.success ?
-        "Load danh sách combobox thành công." :
-        "Có combobox load không thành công.";
+            "Load danh sách combobox thành công." :
+            "Có combobox load không thành công.";
 
     return output;
 
@@ -380,6 +443,7 @@ function loadPaymentApprovalComboBoxes() {
     function loadOneComboBox(config, targetLv1) {
         var result = {
             success: false,
+            mode: config.mode,
             label: config.label,
             saveField: config.saveField,
             targetLv1: targetLv1,
@@ -399,20 +463,33 @@ function loadPaymentApprovalComboBoxes() {
 
         try {
 
-            var contactIds = getContactsForRoleInLv1(config, targetLv1);
-           
+            var selectedOnly = config.mode === "selected";
+            var selectedId = "";
+            var contactIds;
+            if (selectedOnly) {
+                selectedId = normalizeValue(safeFileGet(file, [config.saveField]));
+                contactIds = { ids: selectedId ? [selectedId] : [], poolCount: 0, rejectedCount: 0 };
+            } else {
+                contactIds = getContactsForRoleInLv1(config, targetLv1);
+            }
+
             result.debug.poolCount = contactIds.poolCount;
             result.debug.rejectedCount = contactIds.rejectedCount;
 
-            var comboData = readContactData(contactIds.ids);
-            
+            // Tra chính xác contact.name đã lưu, không tìm lại pool ứng viên.
+            // Người đã chọn vẫn được hiển thị nếu hiện đã ngừng hoạt động.
+            var comboData = readContactData(contactIds.ids, selectedOnly);
+            if (selectedOnly && selectedId && !comboData.ids.length) {
+                comboData = { ids: [selectedId], names: [selectedId] };
+            }
+
 
             if (comboData.ids.length !== comboData.names.length) {
                 throw new Error(
-                    config.valueList +
-                    " và " +
-                    config.displayList +
-                    " không cùng số phần tử."
+                        config.valueList +
+                        " và " +
+                        config.displayList +
+                        " không cùng số phần tử."
                 );
             }
 
@@ -426,8 +503,8 @@ function loadPaymentApprovalComboBoxes() {
             result.debug.passedCount = comboData.ids.length;
 
             result.message = result.count > 0 ?
-                "Load danh sách thành công." :
-                "Không tìm thấy cán bộ phù hợp.";
+                    "Load danh sách thành công." :
+                    "Không tìm thấy cán bộ phù hợp.";
 
         } catch (e) {
             vars[config.valueList] = [];
@@ -452,11 +529,11 @@ function loadPaymentApprovalComboBoxes() {
         var excludeRights = normalizeArray(config.excludeRights);
 
         var pool = getContactPoolByRights(
-            seedRights.length > 0 ? seedRights : includeRights
+                seedRights.length > 0 ? seedRights : includeRights
         );
 
         pool = normalizeArray(pool);
-        
+
         output.poolCount = pool.length;
         var result = [];
 
@@ -488,7 +565,7 @@ function loadPaymentApprovalComboBoxes() {
 
         return output;
     }
-    
+
 
     function getContactPoolByRights(rightIds) {
         rightIds = normalizeArray(rightIds);
@@ -504,11 +581,11 @@ function loadPaymentApprovalComboBoxes() {
 
         try {
             if (
-                lib.ESD_PERMS_RIGHTS &&
-                lib.ESD_PERMS_RIGHTS.listContactsByRights
+                    lib.ESD_PERMS_RIGHTS &&
+                    lib.ESD_PERMS_RIGHTS.listContactsByRights
             ) {
                 var contactsByRights = normalizeArray(
-                    lib.ESD_PERMS_RIGHTS.listContactsByRights(rightIds) || []
+                        lib.ESD_PERMS_RIGHTS.listContactsByRights(rightIds) || []
                 );
                 contactPoolCache[cacheKey] = contactsByRights;
                 return contactsByRights.slice(0);
@@ -522,13 +599,13 @@ function loadPaymentApprovalComboBoxes() {
          */
         try {
             if (
-                lib.ESD_PERMS_RIGHTS &&
-                lib.ESD_PERMS_RIGHTS.listContactsByRightsAndFilter
+                    lib.ESD_PERMS_RIGHTS &&
+                    lib.ESD_PERMS_RIGHTS.listContactsByRightsAndFilter
             ) {
                 var contactsByFilter = normalizeArray(
-                    lib.ESD_PERMS_RIGHTS.listContactsByRightsAndFilter(
-                        rightIds, {}
-                    ) || []
+                        lib.ESD_PERMS_RIGHTS.listContactsByRightsAndFilter(
+                                rightIds, {}
+                        ) || []
                 );
                 contactPoolCache[cacheKey] = contactsByFilter;
                 return contactsByFilter.slice(0);
@@ -545,14 +622,14 @@ function loadPaymentApprovalComboBoxes() {
      * Không dùng query riêng và không cache quyền giữa các lần load form.
      * Chỉ công bố cache khi mọi lời gọi thành công; lỗi dùng lại đường cũ.
      */
-    function preloadRoleRights() {
+    function preloadRoleRights(configs) {
         var started = new Date().getTime();
         output.rightsLoad = { mode: "fallback", elapsedMs: 0 };
         try {
             var needed = [];
             for (var i = 0; i < configs.length; i++) {
                 needed = needed.concat(configs[i].includeRights,
-                    configs[i].excludeRights, configs[i].seedRights);
+                        configs[i].excludeRights, configs[i].seedRights);
             }
             needed = normalizeArray(needed);
             var rightsByContact = {};
@@ -561,7 +638,7 @@ function loadPaymentApprovalComboBoxes() {
                 // Gọi trực tiếp để lỗi không bị chuyển thành danh sách rỗng:
                 // thiếu dữ liệu excludeRights có thể cho phép nhầm user.
                 var contacts = normalizeArray(
-                    lib.ESD_PERMS_RIGHTS.listContactsByRights([needed[j]]) || []
+                        lib.ESD_PERMS_RIGHTS.listContactsByRights([needed[j]]) || []
                 );
                 contactsByRight["$" + needed[j]] = contacts;
                 for (var k = 0; k < contacts.length; k++) {
@@ -600,7 +677,7 @@ function loadPaymentApprovalComboBoxes() {
         if (!userRightsCache.hasOwnProperty(contactId)) {
             try {
                 userRightsCache[contactId] = normalizeArray(
-                    lib.ESD_PERMS_RIGHTS.permsRight(contactId) || []
+                        lib.ESD_PERMS_RIGHTS.permsRight(contactId) || []
                 );
             } catch (e) {
                 userRightsCache[contactId] = [];
@@ -653,8 +730,8 @@ function loadPaymentApprovalComboBoxes() {
 
         if (!userScopeCache.hasOwnProperty(cacheKey)) {
             userScopeCache[cacheKey] = buildUserScopeContext(
-                normalizedContactId,
-                normalizedTargetLv1
+                    normalizedContactId,
+                    normalizedTargetLv1
             );
         }
 
@@ -663,125 +740,125 @@ function loadPaymentApprovalComboBoxes() {
 
     function buildUserScopeContext(contactId, targetLv1) {
 
-    targetLv1 = normalizeUnitCode(targetLv1);
+        targetLv1 = normalizeUnitCode(targetLv1);
 
-    var result = {
-        contactId: contactId,
-        targetLv1: targetLv1,
-        scope: "",
-        rawUnits: [],
-        resolvedLv1List: [],
-        canAccessTargetLv1: false,
-        message: ""
-    };
+        var result = {
+            contactId: contactId,
+            targetLv1: targetLv1,
+            scope: "",
+            rawUnits: [],
+            resolvedLv1List: [],
+            canAccessTargetLv1: false,
+            message: ""
+        };
 
-    if (!contactId || !targetLv1) {
-        result.message = "Thiếu contactId hoặc targetLv1.";
-        print("[ERROR] " + result.message);
-        return result;
-    }
+        if (!contactId || !targetLv1) {
+            result.message = "Thiếu contactId hoặc targetLv1.";
+            // print("[ERROR] " + result.message);
+            return result;
+        }
 
-    var dp = null;
+        var dp = null;
 
-    try {
-        dp = lib.ESD_PERMS_RIGHTS.getUnitByDataPermissions(
-            contactId,
-            HTKT_SUB_MODULE
-        ) || {};
-
-
-    } catch (e) {
-        result.message = String(e.message || e);
-
-        print("[EXCEPTION] " + result.message);
-
-        return result;
-    }
-
-    result.scope = normalizeValue(
-        dp.scope ||
-        dp.dataScopeList ||
-        dp["permission.scope"] ||
-        ""
-    );
+        try {
+            dp = lib.ESD_PERMS_RIGHTS.getUnitByDataPermissions(
+                    contactId,
+                    HTKT_SUB_MODULE
+            ) || {};
 
 
-    if (!result.scope) {
-        result.scope = "QT_PQDL_01";
-        print("[SCOPE] Không có scope -> mặc định QT_PQDL_01");
-    }
+        } catch (e) {
+            result.message = String(e.message || e);
 
-    result.rawUnits = normalizeArray(
-        dp.unit ||
-        dp.arrUnitRights ||
-        dp.units ||
-        []
-    );
-
-
-    /*
-     * Scope toàn hàng
-     */
-    if (result.scope === "QT_PQDL_06") {
-
-        result.canAccessTargetLv1 =
-            ALLOW_GLOBAL_SCOPE_IN_COMBO === true;
-
-        result.message =
-            result.canAccessTargetLv1 ?
-            "User có scope toàn hàng và hệ thống cho phép dùng toàn hàng." :
-            "User có scope toàn hàng nhưng nghiệp vụ đang chặn mở dữ liệu khác lv1.";
-
-        return result;
-    }
-
-    /*
-     * Scope cá nhân
-     */
-    if (result.scope === "QT_PQDL_01") {
-
-        result.canAccessTargetLv1 = false;
-        result.message =
-            "User chỉ có scope cá nhân, không được load combobox theo lv1.";
-
-        return result;
-    }
-
-    if (result.rawUnits.length === 0) {
-
-        result.canAccessTargetLv1 = false;
-        result.message =
-            "User có scope đơn vị nhưng không có unit phân quyền dữ liệu.";
-
-        return result;
-    }
-
-
-    result.resolvedLv1List =
-        resolveLv1ListFromUnits(result.rawUnits);
-
-
-    for (var i = 0; i < result.resolvedLv1List.length; i++) {
-
-        var currentLv1 =
-            normalizeUnitCode(result.resolvedLv1List[i]);
-
-        if (currentLv1 === targetLv1) {
-
-            result.canAccessTargetLv1 = true;
-            result.message =
-                "User có data permission 00401 trong lv1 của hồ sơ.";
+            // print("[EXCEPTION] " + result.message);
 
             return result;
         }
+
+        result.scope = normalizeValue(
+                dp.scope ||
+                dp.dataScopeList ||
+                dp["permission.scope"] ||
+                ""
+        );
+
+
+        if (!result.scope) {
+            result.scope = "QT_PQDL_01";
+            // print("[SCOPE] Không có scope -> mặc định QT_PQDL_01");
+        }
+
+        result.rawUnits = normalizeArray(
+                dp.unit ||
+                dp.arrUnitRights ||
+                dp.units ||
+                []
+        );
+
+
+        /*
+         * Scope toàn hàng
+         */
+        if (result.scope === "QT_PQDL_06") {
+
+            result.canAccessTargetLv1 =
+                    ALLOW_GLOBAL_SCOPE_IN_COMBO === true;
+
+            result.message =
+                    result.canAccessTargetLv1 ?
+                            "User có scope toàn hàng và hệ thống cho phép dùng toàn hàng." :
+                            "User có scope toàn hàng nhưng nghiệp vụ đang chặn mở dữ liệu khác lv1.";
+
+            return result;
+        }
+
+        /*
+         * Scope cá nhân
+         */
+        if (result.scope === "QT_PQDL_01") {
+
+            result.canAccessTargetLv1 = false;
+            result.message =
+                    "User chỉ có scope cá nhân, không được load combobox theo lv1.";
+
+            return result;
+        }
+
+        if (result.rawUnits.length === 0) {
+
+            result.canAccessTargetLv1 = false;
+            result.message =
+                    "User có scope đơn vị nhưng không có unit phân quyền dữ liệu.";
+
+            return result;
+        }
+
+
+        result.resolvedLv1List =
+                resolveLv1ListFromUnits(result.rawUnits);
+
+
+        for (var i = 0; i < result.resolvedLv1List.length; i++) {
+
+            var currentLv1 =
+                    normalizeUnitCode(result.resolvedLv1List[i]);
+
+            if (currentLv1 === targetLv1) {
+
+                result.canAccessTargetLv1 = true;
+                result.message =
+                        "User có data permission 00401 trong lv1 của hồ sơ.";
+
+                return result;
+            }
+        }
+
+        result.canAccessTargetLv1 = false;
+        result.message =
+                "User không có data permission 00401 trùng lv1 của hồ sơ.";
+
+        return result;
     }
-
-    result.canAccessTargetLv1 = false;
-    result.message =
-        "User không có data permission 00401 trùng lv1 của hồ sơ.";
-
-    return result;
-}
 
     /* =========================================================
      * TARGET LV1
@@ -797,12 +874,12 @@ function loadPaymentApprovalComboBoxes() {
          * Ưu tiên lv1 của hồ sơ.
          */
         var lv1 = normalizeUnitCode(
-            safeFileGet(file, [
-                "unit.lv1",
-                "unit_lv1",
-                "lv1.id",
-                "lv1_id"
-            ])
+                safeFileGet(file, [
+                    "unit.lv1",
+                    "unit_lv1",
+                    "lv1.id",
+                    "lv1_id"
+                ])
         );
 
         if (lv1) {
@@ -815,11 +892,11 @@ function loadPaymentApprovalComboBoxes() {
          * Nếu hồ sơ chỉ có unit.id thì resolve ngược lên lv1.
          */
         var unitId = normalizeUnitCode(
-            safeFileGet(file, [
-                "unit.id",
-                "unit_id",
-                "unit"
-            ])
+                safeFileGet(file, [
+                    "unit.id",
+                    "unit_id",
+                    "unit"
+                ])
         );
 
         if (unitId) {
@@ -834,7 +911,7 @@ function loadPaymentApprovalComboBoxes() {
          * Sau đó vẫn có guard currentUserScope để đảm bảo hợp lệ.
          */
         var currentContactLv1 = normalizeUnitCode(
-            safeVarGet("$G.contacts.lv1", "")
+                safeVarGet("$G.contacts.lv1", "")
         );
 
         if (currentContactLv1) {
@@ -844,7 +921,7 @@ function loadPaymentApprovalComboBoxes() {
         }
 
         var currentUnit = normalizeUnitCode(
-            safeVarGet("$unit", "")
+                safeVarGet("$unit", "")
         );
 
         if (currentUnit) {
@@ -959,7 +1036,7 @@ function loadPaymentApprovalComboBoxes() {
              * esdQTorgUnit.unit.id mới là mã đơn vị nghiệp vụ.
              */
             var rc = f.doSelect(
-                'unit.id="' + escapeQueryValue(unitCode) + '"'
+                    'unit.id="' + escapeQueryValue(unitCode) + '"'
             );
 
             if (rc === RC_SUCCESS) {
@@ -1002,9 +1079,9 @@ function loadPaymentApprovalComboBoxes() {
      * CONTACT DISPLAY
      * ========================================================= */
 
-    function readContactData(contactIds) {
+    function readContactData(contactIds, includeInactive) {
         var ids = normalizeArray(contactIds);
-        var cacheKey = ids.slice(0).sort().join("|");
+        var cacheKey = (includeInactive ? "selected|" : "candidates|") + ids.slice(0).sort().join("|");
 
         var data = {
             ids: [],
@@ -1025,9 +1102,9 @@ function loadPaymentApprovalComboBoxes() {
 
         for (var i = 0; i < ids.length; i++) {
             conditions.push(
-                'contact.name="' +
-                escapeQueryValue(ids[i]) +
-                '"'
+                    'contact.name="' +
+                    escapeQueryValue(ids[i]) +
+                    '"'
             );
         }
 
@@ -1046,34 +1123,34 @@ function loadPaymentApprovalComboBoxes() {
             ]);
 
             var rc = contactFile.doSelect(
-                "(" + conditions.join(" or ") + ")"
+                    "(" + conditions.join(" or ") + ")"
             );
 
             while (rc === RC_SUCCESS) {
                 var contactId = normalizeValue(
-                    contactFile["contact.name"]
+                        contactFile["contact.name"]
                 );
 
                 var status = normalizeValue(
-                    contactFile["status"]
+                        contactFile["status"]
                 );
 
                 /*
                  * Chỉ lấy user đang hoạt động.
                  */
                 if (
-                    contactId &&
-                    !seen[contactId] &&
-                    (!status || status === "Dang hoat dong")
+                        contactId &&
+                        !seen[contactId] &&
+                        (includeInactive || !status || status === "Dang hoat dong")
                 ) {
                     seen[contactId] = true;
 
                     var fullName = normalizeValue(
-                        contactFile["full.name"]
+                            contactFile["full.name"]
                     );
 
                     var position = normalizeValue(
-                        contactFile["position"]
+                            contactFile["position"]
                     );
 
                     var display = "";
@@ -1184,8 +1261,8 @@ function loadPaymentApprovalComboBoxes() {
 
     function escapeQueryValue(value) {
         return normalizeValue(value)
-            .replace(/\\/g, "\\\\")
-            .replace(/"/g, '\\"');
+                .replace(/\\/g, "\\\\")
+                .replace(/"/g, '\\"');
     }
 
     function safeFileGet(file, fields) {

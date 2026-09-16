@@ -43,7 +43,21 @@ function getPrepaymentRoleByRights(contactId) {
     return rightMap[RIGHT_ACCOUNTING_INPUT] ? "kttc" : "dmms";
 }
 
-function loadPrepaymentApprovalComboBoxes() {
+function loadPrepaymentApprovalComboBoxes(prepaymentFile) {
+    return loadPrepaymentApprovalComboBoxesInternal(prepaymentFile, "");
+}
+
+// Event checkbox Yêu cầu Rà soát 1: chỉ tải user.checker.dmms.
+function loadPrepaymentDmmsCheckerComboBox(prepaymentFile) {
+    return loadPrepaymentApprovalComboBoxesInternal(prepaymentFile, "user.checker.dmms");
+}
+
+// Event checkbox Yêu cầu Rà soát 2: chỉ tải user.checker.final.
+function loadPrepaymentFinalCheckerComboBox(prepaymentFile) {
+    return loadPrepaymentApprovalComboBoxesInternal(prepaymentFile, "user.checker.final");
+}
+
+function loadPrepaymentApprovalComboBoxesInternal(prepaymentFile, requestedField) {
     var HTKT_SUB_MODULE = "00401";
     var ALLOW_GLOBAL_SCOPE_IN_COMBO = false;
 
@@ -164,7 +178,44 @@ function loadPrepaymentApprovalComboBoxes() {
     var contactDataCache = {};
     var orgUnitCache = {};
 
-    var file = vars["$L.file"];
+    // Lọc trước mọi thao tác gán/xóa biến: gọi riêng không ảnh hưởng 5 ô còn lại.
+    if (requestedField) {
+        var requestedConfigs = [];
+        for (var requestedIndex = 0; requestedIndex < configs.length; requestedIndex++) {
+            if (configs[requestedIndex].saveField === requestedField) {
+                requestedConfigs.push(configs[requestedIndex]);
+            }
+        }
+        configs = requestedConfigs;
+    }
+
+    var file = prepaymentFile || vars["$L.file"];
+    var phase = normalizeValue(safeFileGet(file, ["current.phase"]));
+    var loadDmmsGroup = phase === "initial_dmms" || phase === "approval_dmms";
+    var loadKttcGroup = phase === "initial_kttc" || phase === "approval_kttc";
+    var candidateConfigs = [];
+    output.phase = phase;
+    for (var configIndex = 0; configIndex < configs.length; configIndex++) {
+        var phaseConfig = configs[configIndex];
+        // Checker chỉ tải ứng viên khi checkbox bật và thuộc nhóm phase đang tải.
+        // Checkbox tắt hoặc phase khác: chỉ tra người đã lưu.
+        var dmmsGroup = phaseConfig.saveField === "user.checker.kttc" ||
+                (phaseConfig.saveField === "user.checker.dmms" &&
+                    safeFileGet(file, ["require.check.level1"]) === "true") ||
+                phaseConfig.saveField === "user.approver.dmms";
+        var kttcGroup = phaseConfig.saveField === "user.approver.kttc" ||
+                (phaseConfig.saveField === "user.checker.final" &&
+                    safeFileGet(file, ["require.check.level2"]) === "true") ||
+                phaseConfig.saveField === "user.approver.final";
+        phaseConfig.mode = ((dmmsGroup && loadDmmsGroup) || (kttcGroup && loadKttcGroup)) ? "candidates" : "selected";
+        if (phase === "approval_kttc" && phaseConfig.saveField === "user.checker.kttc") {
+            phaseConfig.mode = "candidates";
+        }
+        // Hàm riêng được caller kích hoạt từ checkbox, luôn tải ứng viên của ô đó.
+        if (requestedField) phaseConfig.mode = "candidates";
+        if (phaseConfig.mode === "candidates") candidateConfigs.push(phaseConfig);
+    }
+
     var targetInfo = getPrepaymentTargetLv1(file);
 
     output.targetLv1 = targetInfo.lv1;
@@ -197,7 +248,11 @@ function loadPrepaymentApprovalComboBoxes() {
         return output;
     }
 
-    preloadRoleRights();
+    if (candidateConfigs.length) {
+        preloadRoleRights(candidateConfigs);
+    } else {
+        output.rightsLoad = { mode: "skipped", elapsedMs: 0, rightCount: 0 };
+    }
 
     for (var i = 0; i < configs.length; i++) {
         var config = configs[i];
@@ -210,7 +265,8 @@ function loadPrepaymentApprovalComboBoxes() {
             valueList: config.valueList,
             displayList: config.displayList,
             saveField: config.saveField,
-            count: result.count
+            count: result.count,
+            mode: result.mode
         });
 
         if (!result.success) {
@@ -231,6 +287,7 @@ function loadPrepaymentApprovalComboBoxes() {
     function loadOneComboBox(config, targetLv1) {
         var result = {
             success: false,
+            mode: config.mode,
             label: config.label,
             saveField: config.saveField,
             targetLv1: targetLv1,
@@ -238,20 +295,46 @@ function loadPrepaymentApprovalComboBoxes() {
             ids: [],
             names: [],
             message: "",
-            debug: { poolCount: 0, passedCount: 0, rejectedCount: 0 }
+            debug: {
+                poolCount: 0,
+                passedCount: 0,
+                rejectedCount: 0
+            }
         };
 
         vars[config.valueList] = [];
         vars[config.displayList] = [];
 
         try {
-            var contactIds = getContactsForRoleInLv1(config, targetLv1);
+
+            var selectedOnly = config.mode === "selected";
+            var selectedId = "";
+            var contactIds;
+            if (selectedOnly) {
+                selectedId = normalizeValue(safeFileGet(file, [config.saveField]));
+                contactIds = { ids: selectedId ? [selectedId] : [], poolCount: 0, rejectedCount: 0 };
+            } else {
+                contactIds = getContactsForRoleInLv1(config, targetLv1);
+            }
+
             result.debug.poolCount = contactIds.poolCount;
             result.debug.rejectedCount = contactIds.rejectedCount;
 
-            var comboData = readContactData(contactIds.ids);
+            // Tra chính xác contact.name đã lưu, không tìm lại pool ứng viên.
+            // Người đã chọn vẫn được hiển thị nếu hiện đã ngừng hoạt động.
+            var comboData = readContactData(contactIds.ids, selectedOnly);
+            if (selectedOnly && selectedId && !comboData.ids.length) {
+                comboData = { ids: [selectedId], names: [selectedId] };
+            }
+
+
             if (comboData.ids.length !== comboData.names.length) {
-                throw new Error(config.valueList + " và " + config.displayList + " không cùng số phần tử.");
+                throw new Error(
+                        config.valueList +
+                        " và " +
+                        config.displayList +
+                        " không cùng số phần tử."
+                );
             }
 
             vars[config.valueList] = comboData.ids;
@@ -262,13 +345,19 @@ function loadPrepaymentApprovalComboBoxes() {
             result.ids = comboData.ids;
             result.names = comboData.names;
             result.debug.passedCount = comboData.ids.length;
-            result.message = result.count > 0 ? "Load danh sách thành công." : "Không tìm thấy cán bộ phù hợp.";
+
+            result.message = result.count > 0 ?
+                    "Load danh sách thành công." :
+                    "Không tìm thấy cán bộ phù hợp.";
+
         } catch (e) {
             vars[config.valueList] = [];
             vars[config.displayList] = [];
+
             result.success = false;
             result.message = String(e.message || e);
         }
+
         return result;
     }
 
@@ -345,7 +434,7 @@ function loadPrepaymentApprovalComboBoxes() {
      * Không dùng query riêng và không cache quyền giữa các lần load form.
      * Chỉ công bố cache khi mọi lời gọi thành công; lỗi dùng lại đường cũ.
      */
-    function preloadRoleRights() {
+    function preloadRoleRights(configs) {
         var started = new Date().getTime();
         output.rightsLoad = { mode: "fallback", elapsedMs: 0 };
         try {
@@ -652,9 +741,9 @@ function loadPrepaymentApprovalComboBoxes() {
         return level.indexOf("lv1") === 0;
     }
 
-    function readContactData(contactIds) {
+    function readContactData(contactIds, includeInactive) {
         var ids = normalizeArray(contactIds);
-        var cacheKey = ids.slice(0).sort().join("|");
+        var cacheKey = (includeInactive ? "selected|" : "candidates|") + ids.slice(0).sort().join("|");
         var data = { ids: [], names: [] };
 
         if (ids.length === 0) return data;
@@ -684,7 +773,7 @@ function loadPrepaymentApprovalComboBoxes() {
                 var contactId = normalizeValue(contactFile["contact.name"]);
                 var status = normalizeValue(contactFile["status"]);
 
-                if (contactId && !seen[contactId] && (!status || status === "Dang hoat dong")) {
+                if (contactId && !seen[contactId] && (includeInactive || !status || status === "Dang hoat dong")) {
                     seen[contactId] = true;
                     var fullName = normalizeValue(contactFile["full.name"]);
                     var position = normalizeValue(contactFile["position"]);
