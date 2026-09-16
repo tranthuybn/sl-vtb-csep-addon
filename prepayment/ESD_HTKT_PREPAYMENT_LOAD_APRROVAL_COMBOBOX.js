@@ -118,7 +118,7 @@ function loadPrepaymentApprovalComboBoxes() {
             key: "kttcApprove2",
             label: "KTTC phê duyệt cấp 2",
             saveField: "user.approver.kttc",
-            includeRights: RIGHTS_VIEW_APPROVAL.concat([RIGHT_CHECK_1, RIGHT_APPROVE_1, RIGHT_APPROVE_2]),
+            includeRights: RIGHTS_VIEW_APPROVAL.concat([ RIGHT_APPROVE_2]),
             excludeRights: [RIGHT_CHECK_2, RIGHT_APPROVE_3],
             seedRights: [RIGHT_APPROVE_2],
             valueList: "$L.kttc.approve2.ids",
