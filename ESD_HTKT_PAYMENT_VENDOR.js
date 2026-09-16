@@ -1023,7 +1023,7 @@ function syncVendorOglFromPayment(record) {
 
 /**
  * Số tiền còn lại = số tiền ban đầu của NCC theo hợp đồng
- * - tổng thanh toán đã accounted - tổng thanh toán đã accounted.
+ * - tổng thanh toán đã accounted, approved - tổng thanh toán đã accounted, approved.
  */
 function calculateVendorRemainingAmount(contractId, supplierId, initialRemainingAmount) {
     var contract = String(contractId || '').trim();
@@ -1032,22 +1032,27 @@ function calculateVendorRemainingAmount(contractId, supplierId, initialRemaining
 
     if (!contract || !supplier) return finalRemainingAmount;
 
-    var totalApprovedAmount = sumAccountedVendorAmount(
+    var totalPrepaymentAmount = sumVendorAmount(
+            'esdHTKTprepaymentVendor',
+            'esdHTKTprepayment',
+            'prepayment.id',
+            contract,
+            supplier
+    );
+    var totalPaidAmount = sumVendorAmount(
             'esdHTKTpaymentVendor',
             'esdHTKTpayment',
             'payment.id',
             contract,
             supplier
     );
-    var totalPaidAmount = sumAccountedVendorAmount(
-            'esdHTKTpaymentVendor',
-            'esdHTKTpayment',
-            'payment.id',
-            contract,
-            supplier
-    );
+//    print('contract' + contract)
+//    print('supplier' + supplier)
+//    print('initialRemainingAmount' + initialRemainingAmount)
+//    print('totalPrepaymentAmount' + totalPrepaymentAmount)
+//    print('totalPaidAmount' + totalPaidAmount)
 
-    finalRemainingAmount = lib.ESD_HTKT_Utils.subtractStringsManual(finalRemainingAmount, totalApprovedAmount);
+    finalRemainingAmount = lib.ESD_HTKT_Utils.subtractStringsManual(finalRemainingAmount, totalPrepaymentAmount);
     finalRemainingAmount = lib.ESD_HTKT_Utils.subtractStringsManual(finalRemainingAmount, totalPaidAmount);
 
     if (
@@ -1061,7 +1066,7 @@ function calculateVendorRemainingAmount(contractId, supplierId, initialRemaining
     return finalRemainingAmount;
 }
 
-function sumAccountedVendorAmount(vendorTable, requestTable, requestIdField, contractId, supplierId) {
+function sumVendorAmount(vendorTable, requestTable, requestIdField, contractId, supplierId) {
     var totalAmount = '0';
     var file = null;
     var query =
@@ -1071,7 +1076,7 @@ function sumAccountedVendorAmount(vendorTable, requestTable, requestIdField, con
             'join esdHTKTvendor v on (pv.vendor.id = v.id) ' +
             'where p.contract.id = "' + escapePaymentVendorQueryValue(contractId) + '" ' +
             'and v.supplier.id = "' + escapePaymentVendorQueryValue(supplierId) + '" ' +
-            'and p.status = "accounted"';
+            'and (p.status="approved" or p.status="accounted")';
 
     try {
         file = new SCFile(vendorTable, SCFILE_READONLY);
@@ -1102,6 +1107,7 @@ function loadPaymentVendorInfo(record) {
             ' hv.vendor.name as supplier.name,' +
             ' hpv.payment.method as payment.method,' +
             ' hpv.amount as amount,' +
+            ' hpv.payable.amount as payable.amount,' +
             ' hpv.approved.invoice.amount as approved.invoice.amount,' +
             ' hpv.refund.amount as refund.amount,' +
             ' hpv.vendor.type as vendor.type,' +
@@ -1141,6 +1147,7 @@ function loadPaymentVendorInfo(record) {
         vars.$suppliervalues = [itemFile["supplier.id"]];
         vars.$oglSiteCode = itemFile["ogl.site.code"];
         vars.$amount = itemFile["amount"];
+        vars.$payableAmount = itemFile["payable.amount"];
         vars.$approvedInvoiceAmount = itemFile["approved.invoice.amount"];
         vars.$refundAmount = itemFile["refund.amount"];
         vars.$unitLv1 = itemFile["unit.lv1"];
