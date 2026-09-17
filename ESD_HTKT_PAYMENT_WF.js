@@ -186,43 +186,43 @@ function updateNextStatus(record, previousRecord) {
     }
 
     // trưởng thêm: Chỉ tạo bản trình ký khi rời phase initial_kttc.
-    if (oldPhase === HTKT_WF_PHASE.INITIAL_KTTC) {
-        try {
-            htktWfAssertDependencies(true);
-
-            var paymentId = htktWfPaymentId(record);
-
-            var currentDocument = htktWfDocument().getCurrentPresentation({
-                paymentId: paymentId
-            });
-
-            if (currentDocument && currentDocument.success === true) {
-                documentResult = htktWfOk({
-                    idempotent: true,
-                    document: currentDocument.data
-                }, "Bản trình ký đã được tạo trước đó.");
-            } else if (currentDocument && currentDocument.code && currentDocument.code !== "DOCUMENT_NOT_FOUND") {
-//                throw new Error(currentDocument.message || "Không kiểm tra được bản trình ký hiện tại.");
-            } else {
-                documentResult = htktWfDocument().generateAndUploadPresentation({
-                    paymentId: paymentId,
-                    currentUser: htktWfCurrentUser()
-                });
-
-                if (!documentResult || documentResult.success !== true) {
-                    var documentError = documentResult && documentResult.message
-                            ? documentResult.message
-                            : "Không sinh và lưu được bản trình ký.";
-                    if (documentResult && documentResult.detail) {
-                        documentError += " " + documentResult.detail;
-                    }
-                    throw new Error(documentError);
-                }
-            }
-        } catch (docErr) {
-//            throw docErr;
-        }
-    }
+//    if (oldPhase === HTKT_WF_PHASE.INITIAL_KTTC) {
+//        try {
+//            htktWfAssertDependencies(true);
+//
+//            var paymentId = htktWfPaymentId(record);
+//
+//            var currentDocument = htktWfDocument().getCurrentPresentation({
+//                paymentId: paymentId
+//            });
+//
+//            if (currentDocument && currentDocument.success === true) {
+//                documentResult = htktWfOk({
+//                    idempotent: true,
+//                    document: currentDocument.data
+//                }, "Bản trình ký đã được tạo trước đó.");
+//            } else if (currentDocument && currentDocument.code && currentDocument.code !== "DOCUMENT_NOT_FOUND") {
+////                throw new Error(currentDocument.message || "Không kiểm tra được bản trình ký hiện tại.");
+//            } else {
+//                documentResult = htktWfDocument().generateAndUploadPresentation({
+//                    paymentId: paymentId,
+//                    currentUser: htktWfCurrentUser()
+//                });
+//
+//                if (!documentResult || documentResult.success !== true) {
+//                    var documentError = documentResult && documentResult.message
+//                            ? documentResult.message
+//                            : "Không sinh và lưu được bản trình ký.";
+//                    if (documentResult && documentResult.detail) {
+//                        documentError += " " + documentResult.detail;
+//                    }
+//                    throw new Error(documentError);
+//                }
+//            }
+//        } catch (docErr) {
+////            throw docErr;
+//        }
+//    }
 
     if (currentPhase === "start") {
         record.status = "initialized";
@@ -237,16 +237,16 @@ function updateNextStatus(record, previousRecord) {
     } catch (e) {}
 
     createApprovalHistory(record);
-    /////MAIL/////
-    try {
-        lib.ESD_HTKT_ACTION_WF_SEND_EMAIL.sendEmailPaymentRequestAction(record, currentPhase);
-    } catch (emailError) {
-        print(
-            "[ESD_HTKT_PAYMENT_WF.updateNextStatus] Send email error: " +
-            emailError
-        );
-    }
-    /////////
+//    /////MAIL/////
+//    try {
+//        lib.ESD_HTKT_ACTION_WF_SEND_EMAIL.sendEmailPaymentRequestAction(record);
+//    } catch (emailError) {
+//        print(
+//            "[ESD_HTKT_PAYMENT_WF.updateNextStatus] Send email error: " +
+//            emailError
+//        );
+//    }
+//    /////////
 
     return documentResult;
 }
@@ -688,6 +688,7 @@ function validateVendorAndPaymentDetails(record) {
     var approvedInvoiceAmount = parseAmount(vars.$approvedInvoiceAmount);
     var refundAmount = parseAmount(vars.$refundAmount);
     var remainingAmount = parseAmount(vars.$remainingAmount);
+    var payableaAmount = parseAmount(vars.$payableAmount);
 
     if (isNaN(amountField)) {
         errorMss.push("Số tiền đề nghị thanh toán là bắt buộc.");
@@ -716,6 +717,25 @@ function validateVendorAndPaymentDetails(record) {
     var paymentId = String(record["payment.id"] || record.payment_id || "").trim();
     var vendorId = String(record["vendor.id"] || record.vendor_id || "").trim();
     var contractId = String(record["contract.id"] || record.contract_id || "").trim();
+
+    if (payableaAmount > 0 && vendorId) {
+        try {
+            if (!paymentId) {
+                throw new Error("Thiếu thông tin phiếu thanh toán.");
+            }
+            var totalPayableRemaining = parseAmount(
+                lib.ESD_HTKT_PAYMENT_SUPPLIER_LEDGER_LIST.getTotalAccountsPayableRemainingAmount(paymentId, vendorId)
+            );
+            if (isNaN(totalPayableRemaining)) {
+                throw new Error("Tổng số tiền phải trả còn lại không hợp lệ.");
+            }
+            if (payableaAmount >= totalPayableRemaining) {
+                errorMss.push("Số tiền thanh toán khoản phải trả phải nhỏ hơn Tổng số tiền phải trả còn lại (" + totalPayableRemaining + ").");
+            }
+        } catch (ePayable) {
+            errorMss.push("Không thể kiểm tra Tổng số tiền phải trả còn lại. " + String(ePayable.message || ePayable));
+        }
+    }
 
     if (!isNaN(approvedInvoiceAmount) && approvedInvoiceAmount >= 0 && vendorId) {
         var attachedInvoiceFile = null;

@@ -276,29 +276,7 @@ function getListAccountsPayable(input) {
             "pv.refund.amount, " +
             "pe.amount " +
 
-            "FROM esdHTKTaccountingInformation ai " +
-            "JOIN esdHTKTpayment payment " +
-            'ON (ai.prepayment.id = payment.id AND payment.status = "accounted") ' +
-            "JOIN esdHTKTpaymentEntry pe " +
-            "ON (ai.prepayment.id = pe.payment.id " +
-            'AND pe.entry.type = "PAYABLE" ' +
-            'AND pe.account.type = "ASSET" ' +
-            'AND pe.vendor.id = "' + escapeSmQueryValue(vendorId) + '") ' +
-            "JOIN esdHTKTpaymentVendor pv " +
-            "ON (pv.payment.id = pe.payment.id " +
-            'AND pv.vendor.id = "' + escapeSmQueryValue(vendorId) + '") ' +
-            (currentPaymentId ? "LEFT JOIN esdHTKTpaymentEntry currentEntry " +
-            "ON (ai.prepayment.id = currentEntry.ref.id " +
-            'AND currentEntry.payment.id = "' + escapeSmQueryValue(currentPaymentId) + '" ' +
-            'AND currentEntry.entry.type = "PAYABLE" ' +
-            'AND currentEntry.account.type = "DEBIT" ' +
-            'AND currentEntry.vendor.id = "' + escapeSmQueryValue(vendorId) + '") ' : "") +
-            'WHERE ai.sub.type = "THANH_TOAN" ' +
-            'AND ai.contract.id = "' + escapeSmQueryValue(contractId) + '" ' +
-            'AND ai.vendor.id = "' + escapeSmQueryValue(vendorId) + '" ' +
-            'AND ai.status = "COMPLETED" ' +
-            'AND ai.type = "AP" ' +
-            (currentPaymentId ? 'AND ai.prepayment.id ~= "' + escapeSmQueryValue(currentPaymentId) + '" ' : "") +
+            buildAccountsPayableQueryScope(vendorId, contractId, currentPaymentId) +
             'ORDER BY ai.checked.time DESC'; // Sắp xếp ngày hạch toán mới nhất
 
 
@@ -319,8 +297,7 @@ function getListAccountsPayable(input) {
             var refundAmount = getNumberField(file, ["pv.refund.amount"]);
             var paidAmount = getNumberField(file, ["pv.amount"]);
             var payableAmount = getNumberField(file, ["pe.amount"]);
-            var totalPayableAmount = getTotalPayableAmount(prepaymentId, currentPaymentId, vendorId);
-            var totalRemainingAmount = payableAmount - totalPayableAmount;
+            var totalRemainingAmount = getAccountPayableRemainingAmount(prepaymentId, currentPaymentId, vendorId, payableAmount);
 
             // Giữ cả khoản đã hết số dư để hiển thị đầy đủ thông tin công nợ.
             if (totalRemainingAmount < 0) {
@@ -396,6 +373,86 @@ function getListAccountsPayable(input) {
 }
 
 
+
+// Dùng chung phạm vi dữ liệu giữa danh sách và tổng phục vụ validation.
+function buildAccountsPayableQueryScope(vendorId, contractId, currentPaymentId) {
+    return (
+            "FROM esdHTKTaccountingInformation ai " +
+            "JOIN esdHTKTpayment payment " +
+            'ON (ai.prepayment.id = payment.id AND payment.status = "accounted") ' +
+            "JOIN esdHTKTpaymentEntry pe " +
+            "ON (ai.prepayment.id = pe.payment.id " +
+            'AND pe.entry.type = "PAYABLE" ' +
+            'AND pe.account.type = "ASSET" ' +
+            'AND pe.vendor.id = "' + escapeSmQueryValue(vendorId) + '") ' +
+            "JOIN esdHTKTpaymentVendor pv " +
+            "ON (pv.payment.id = pe.payment.id " +
+            'AND pv.vendor.id = "' + escapeSmQueryValue(vendorId) + '") ' +
+            (currentPaymentId ? "LEFT JOIN esdHTKTpaymentEntry currentEntry " +
+            "ON (ai.prepayment.id = currentEntry.ref.id " +
+            'AND currentEntry.payment.id = "' + escapeSmQueryValue(currentPaymentId) + '" ' +
+            'AND currentEntry.entry.type = "PAYABLE" ' +
+            'AND currentEntry.account.type = "DEBIT" ' +
+            'AND currentEntry.vendor.id = "' + escapeSmQueryValue(vendorId) + '") ' : "") +
+            'WHERE ai.sub.type = "THANH_TOAN" ' +
+            'AND ai.contract.id = "' + escapeSmQueryValue(contractId) + '" ' +
+            'AND ai.vendor.id = "' + escapeSmQueryValue(vendorId) + '" ' +
+            'AND ai.status = "COMPLETED" ' +
+            'AND ai.type = "AP" ' +
+            (currentPaymentId ? 'AND ai.prepayment.id ~= "' + escapeSmQueryValue(currentPaymentId) + '" ' : "")
+    );
+}
+
+function getAccountPayableRemainingAmount(prepaymentId, currentPaymentId, vendorId, payableAmount, paidByReference) {
+    var key = "$" + prepaymentId;
+    var paidAmount;
+    if (paidByReference && paidByReference.hasOwnProperty(key)) {
+        paidAmount = paidByReference[key];
+    } else {
+        paidAmount = getTotalPayableAmount(prepaymentId, currentPaymentId, vendorId);
+        if (paidByReference) paidByReference[key] = paidAmount;
+    }
+    return payableAmount - paidAmount;
+}
+
+// Chỉ đọc trường phục vụ tính tổng, không tải thuế, tiền đã trả và diễn giải.
+function getTotalAccountsPayableRemainingAmount(paymentId, vendorId) {
+    paymentId = String(paymentId || "").trim();
+    vendorId = String(vendorId || "").trim();
+    if (!paymentId || !vendorId) throw new Error("Thiếu thông tin phiếu thanh toán, nhà cung cấp.");
+
+    var contractId = "";
+    var paymentFile = null;
+    try {
+        paymentFile = new SCFile("esdHTKTpayment", SCFILE_READONLY);
+        if (paymentFile.doSelect('id="' + escapeSmQueryValue(paymentId) + '"') != RC_SUCCESS) {
+            throw new Error("Không tìm thấy phiếu thanh toán: " + paymentId);
+        }
+        contractId = String(paymentFile["contract.id"] || "").trim();
+        if (!contractId) throw new Error("Phiếu thanh toán chưa có thông tin hợp đồng.");
+    } finally {
+        closeSCFile(paymentFile);
+    }
+
+    var total = 0;
+    var paidByReference = {};
+    var file = null;
+    try {
+        file = new SCFile("esdHTKTaccountingInformation", SCFILE_READONLY);
+        var rc = file.doSelect("SELECT ai.prepayment.id AS prepaymentId, pe.amount " +
+                buildAccountsPayableQueryScope(vendorId, contractId, paymentId));
+        while (rc == RC_SUCCESS) {
+            var prepaymentId = String(file["prepaymentId"] || "").trim();
+            var remaining = getAccountPayableRemainingAmount(prepaymentId, paymentId, vendorId,
+                    getNumberField(file, ["pe.amount", "amount"]), paidByReference);
+            if (remaining >= 0) total += remaining;
+            rc = file.getNext();
+        }
+    } finally {
+        closeSCFile(file);
+    }
+    return total;
+}
 
 function getTotalTax(prepaymentId, vendorId) {
     var totalTax = 0;
