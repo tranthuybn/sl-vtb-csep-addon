@@ -416,22 +416,25 @@ function getAccountPayableRemainingAmount(prepaymentId, currentPaymentId, vendor
 }
 
 // Chỉ đọc trường phục vụ tính tổng, không tải thuế, tiền đã trả và diễn giải.
-function getTotalAccountsPayableRemainingAmount(paymentId, vendorId) {
+function getTotalAccountsPayableRemainingAmount(paymentId, vendorId, contractId) {
     paymentId = String(paymentId || "").trim();
     vendorId = String(vendorId || "").trim();
+    contractId = String(contractId || "").trim();
     if (!paymentId || !vendorId) throw new Error("Thiếu thông tin phiếu thanh toán, nhà cung cấp.");
 
-    var contractId = "";
-    var paymentFile = null;
-    try {
-        paymentFile = new SCFile("esdHTKTpayment", SCFILE_READONLY);
-        if (paymentFile.doSelect('id="' + escapeSmQueryValue(paymentId) + '"') != RC_SUCCESS) {
-            throw new Error("Không tìm thấy phiếu thanh toán: " + paymentId);
+    // Validation chỉ truyền paymentId và vendorId; lấy hợp đồng từ phiếu khi thiếu.
+    if (!contractId) {
+        var paymentFile = null;
+        try {
+            paymentFile = new SCFile("esdHTKTpayment", SCFILE_READONLY);
+            if (paymentFile.doSelect('id="' + escapeSmQueryValue(paymentId) + '"') != RC_SUCCESS) {
+                throw new Error("Không tìm thấy phiếu thanh toán: " + paymentId);
+            }
+            contractId = String(paymentFile["contract.id"] || "").trim();
+            if (!contractId) throw new Error("Phiếu thanh toán chưa có thông tin hợp đồng.");
+        } finally {
+            closeSCFile(paymentFile);
         }
-        contractId = String(paymentFile["contract.id"] || "").trim();
-        if (!contractId) throw new Error("Phiếu thanh toán chưa có thông tin hợp đồng.");
-    } finally {
-        closeSCFile(paymentFile);
     }
 
     var total = 0;
