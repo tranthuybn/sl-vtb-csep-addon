@@ -329,6 +329,7 @@ function getListAccountsPayable(input) {
             }
 
             var totalPayableAmountAccounted = getTotalPayableAmountAccounted(prepaymentId, vendorId);
+            var totalReferencedAmountAccounted = getTotalReferencedPayableAmountAccounted(prepaymentId, vendorId);
             var totalTax = getTotalTax(prepaymentId, vendorId);
 
 
@@ -349,7 +350,7 @@ function getListAccountsPayable(input) {
                 description: currentPaymentEntryDescription,           // Nội dung diễn giải của đề nghị lần này
                 id: currentPaymentId ? String(file["currentEntry.id"] || "").trim() : "",
                 totalTax: totalTax,
-                totalAmountPaid: paidAmount + refundAmount - totalPayableAmountAccounted,  // Số tiền đã thanh toán (đã hạch toán xong và không thuộc ĐNTT hiện tại)
+                totalAmountPaid: paidAmount + refundAmount - totalPayableAmountAccounted + totalReferencedAmountAccounted, // Cộng thanh toán tham chiếu đã hạch toán.
                 other_pending_amount: 0,   // Số tiền chờ duyệt ở các ĐNTT khác
                 currentPaymentAmount: currentPaymentEntryAmount,   // Số tiền thanh toán lần này (của ĐNTT hiện tại)
                 totalRemainingAmount: totalRemainingAmount,
@@ -433,12 +434,14 @@ function getTotalPayableAmountAccounted(prepaymentId, vendorId) {
     if (!prepaymentId) return totalAmount;
 
     var query =
-            "SELECT amount FROM esdHTKTpaymentEntry " +
-            'WHERE entry.type = "PAYABLE" ' +
-            'AND account.type = "DEBIT" ' +
-            'AND accounting.request.id ~= NULL ' +
-            'AND payment.id = "' + escapeSmQueryValue(prepaymentId) + '"' +
-            (vendorId ? ' AND vendor.id = "' + escapeSmQueryValue(vendorId) + '"' : '');
+            "SELECT pe.amount AS amount FROM esdHTKTpaymentEntry pe " +
+            "JOIN esdHTKTpayment p ON (pe.payment.id = p.id) " +
+            'WHERE pe.entry.type = "PAYABLE" ' +
+            'AND pe.account.type = "DEBIT" ' +
+            'AND pe.accounting.request.id ~= NULL ' +
+            'AND p.status = "accounted" ' +
+            'AND pe.payment.id = "' + escapeSmQueryValue(prepaymentId) + '"' +
+            (vendorId ? ' AND pe.vendor.id = "' + escapeSmQueryValue(vendorId) + '"' : '');
 
     try {
         paymentEntryFile = new SCFile("esdHTKTpaymentEntry", SCFILE_READONLY);
@@ -446,6 +449,36 @@ function getTotalPayableAmountAccounted(prepaymentId, vendorId) {
 
         while (rc == RC_SUCCESS) {
             totalAmount += getNumberField(paymentEntryFile, ["amount"]);
+            rc = paymentEntryFile.getNext();
+        }
+    } finally {
+        closeSCFile(paymentEntryFile);
+    }
+
+    return totalAmount;
+}
+
+
+function getTotalReferencedPayableAmountAccounted(prepaymentId, vendorId) {
+    var totalAmount = 0;
+    var paymentEntryFile = null;
+
+    if (!prepaymentId) return totalAmount;
+
+    var query =
+            "SELECT pe.amount AS amount FROM esdHTKTpaymentEntry pe " +
+            "JOIN esdHTKTpayment p ON (pe.payment.id = p.id) " +
+            'WHERE pe.entry.type = "PAYABLE" ' +
+            'AND pe.account.type = "DEBIT" ' +
+            'AND pe.ref.id = "' + escapeSmQueryValue(prepaymentId) + '" ' +
+            'AND p.status = "accounted"' +
+            (vendorId ? ' AND pe.vendor.id = "' + escapeSmQueryValue(vendorId) + '"' : '');
+
+    try {
+        paymentEntryFile = new SCFile("esdHTKTpaymentEntry", SCFILE_READONLY);
+        var rc = paymentEntryFile.doSelect(query);
+        while (rc == RC_SUCCESS) {
+            totalAmount += getNumberField(paymentEntryFile, ["amount", "pe.amount"]);
             rc = paymentEntryFile.getNext();
         }
     } finally {
