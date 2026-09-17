@@ -1227,12 +1227,15 @@ function getSupplierDebtSummary(input) {
         var remPt = itemPt.amount - itemPt.paid_amount - itemPt.other_pending_amount;
         if (remPt > 0) summary.tongPhaiTraConLai += remPt;
     }
-
+    //anhtc fix
+    summary.tongPhaiTra += totalAdvanceTax;
+    
     // Trường 2: Tổng tiền đã thanh toán = Tổng ĐNTT đã hạch toán + Tổng thuế ĐNTƯ đã hạch toán
     summary.tongDaThanhToan = totalPaymentCompleted + totalAdvanceTax;
 
     return summary;
 }
+
 
 function safeString(value) {
     if (value === null || value === undefined) return '';
