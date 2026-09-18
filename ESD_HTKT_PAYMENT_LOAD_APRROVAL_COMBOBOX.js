@@ -104,13 +104,13 @@ function loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField) {
     var RIGHT_VIEW_PAYMENT_CREATE = "0040040003000001";
     var RIGHT_VIEW_PAYMENT_APPROVAL = "0040040003000009";
 
-    var RIGHT_CREATE_PAYMENT = "0040040003000002";
-    var RIGHT_ACCOUNTING_INPUT = "0040040003000003";
-    var RIGHT_CHECK_1 = "0040040003000004";
-    var RIGHT_APPROVE_1 = "0040040003000005";
-    var RIGHT_APPROVE_2 = "0040040003000006";
-    var RIGHT_CHECK_2 = "0040040003000007";
-    var RIGHT_APPROVE_3 = "0040040003000008";
+    var RIGHT_CREATE_PAYMENT = "0040040003000002"; //Lập đề nghị thanh toán
+    var RIGHT_ACCOUNTING_INPUT = "0040040003000003"; //Nhập liệu hạch toán
+    var RIGHT_CHECK_1 = "0040040003000004"; //Rà soát đề nghị thanh toán 1
+    var RIGHT_APPROVE_1 = "0040040003000005"; //Phê duyệt đề nghị thanh toán cấp 1
+    var RIGHT_APPROVE_2 = "0040040003000006"; //Phê duyệt đề nghị thanh toán cấp 2
+    var RIGHT_CHECK_2 = "0040040003000007"; //Rà soát đề nghị thanh toán 2
+    var RIGHT_APPROVE_3 = "0040040003000008"; //Phê duyệt đề nghị thanh toán cấp 3
 
     /*
      * Quyền view dùng cho role khởi tạo và KTTC tiếp nhận.
@@ -135,22 +135,8 @@ function loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField) {
         RIGHT_VIEW_PAYMENT_APPROVAL
     ];
 
-    /*
-     * ===== Role configs =====
-     *
-     * includeRights:
-     * - User bắt buộc phải có đủ các quyền này.
-     *
-     * excludeRights:
-     * - Dùng để tránh user cấp cao xuất hiện nhầm ở combobox cấp thấp,
-     *   do bộ quyền đang thiết kế theo hướng lũy tiến.
-     * - Nếu sau này muốn một user cấp cao xuất hiện ở nhiều combobox,
-     *   chỉ cần bỏ excludeRights tương ứng.
-     *
-     * seedRights:
-     * - Dùng để lấy pool ứng viên ban đầu cho nhanh.
-     * - Sau đó vẫn kiểm tra lại includeRights/excludeRights bằng permsRight().
-     */
+    // Mỗi seedRights xác định nhóm ứng viên. Không kiểm tra include/exclude.
+    // Vẫn kiểm tra phân quyền dữ liệu theo lv1 hồ sơ sau khi lấy ứng viên.
     var configs = [{
         key: "kttc",
         label: "KTTC tiếp nhận",
@@ -163,15 +149,7 @@ function loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField) {
          * - 0040040003000002: Lập đề nghị thanh toán
          * - 0040040003000003: Nhập liệu hạch toán
          */
-        includeRights: RIGHTS_VIEW_CREATE.concat([
-            RIGHT_CREATE_PAYMENT,
-            RIGHT_ACCOUNTING_INPUT
-        ]),
 
-        excludeRights: [
-            RIGHT_CHECK_1,
-
-        ],
         seedRights: [
             RIGHT_ACCOUNTING_INPUT
         ],
@@ -183,15 +161,6 @@ function loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField) {
         key: "dmmsRs1",
         label: "DMMS rà soát 1",
         saveField: "user.checker.dmms",
-        includeRights: RIGHTS_VIEW_APPROVAL.concat([
-            RIGHT_CHECK_1
-        ]),
-        excludeRights: [
-            RIGHT_APPROVE_1,
-            RIGHT_APPROVE_2,
-            RIGHT_CHECK_2,
-            RIGHT_APPROVE_3
-        ],
         seedRights: [
             RIGHT_CHECK_1
         ],
@@ -203,15 +172,6 @@ function loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField) {
         key: "dmmsApproval1",
         label: "DMMS phê duyệt cấp 1",
         saveField: "user.approver.dmms",
-        includeRights: RIGHTS_VIEW_APPROVAL.concat([
-            //                RIGHT_CHECK_1,
-            RIGHT_APPROVE_1
-        ]),
-        excludeRights: [
-            RIGHT_APPROVE_2,
-            RIGHT_CHECK_2,
-            RIGHT_APPROVE_3
-        ],
         seedRights: [
             RIGHT_APPROVE_1
         ],
@@ -223,16 +183,6 @@ function loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField) {
         key: "kttcApprove2",
         label: "KTTC phê duyệt cấp 2",
         saveField: "user.approver.kttc",
-        includeRights: RIGHTS_VIEW_APPROVAL.concat([
-            //                RIGHT_ACCOUNTING_INPUT,
-            //                RIGHT_CHECK_1,
-            //                RIGHT_APPROVE_1,
-            RIGHT_APPROVE_2
-        ]),
-        excludeRights: [
-            RIGHT_CHECK_2,
-            RIGHT_APPROVE_3
-        ],
         seedRights: [
             RIGHT_APPROVE_2
         ],
@@ -244,12 +194,6 @@ function loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField) {
         key: "kttcCheck2",
         label: "KTTC rà soát 2",
         saveField: "user.checker.final",
-        includeRights: RIGHTS_VIEW_APPROVAL.concat([
-            RIGHT_CHECK_2
-        ]),
-        excludeRights: [
-            RIGHT_APPROVE_3
-        ],
         seedRights: [
             RIGHT_CHECK_2
         ],
@@ -268,11 +212,7 @@ function loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField) {
          * - 0040040003000009: Xem danh sách đề nghị thanh toán - Phê duyệt
          * - 0040040003000008: Phê duyệt đề nghị thanh toán cấp 3
          */
-        includeRights: RIGHTS_VIEW_APPROVAL.concat([
-            RIGHT_APPROVE_3
-        ]),
 
-        excludeRights: [],
         seedRights: [
             RIGHT_APPROVE_3
         ],
@@ -292,8 +232,6 @@ function loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField) {
     };
 
     /* Cache trong một lần load form để không truy vấn lặp cùng user/role. */
-    var userRightsCache = {};
-    var userRightMapCache = {};
     var userScopeCache = {};
     var contactPoolCache = {};
     var contactDataCache = {};
@@ -392,20 +330,20 @@ function loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField) {
     /*
      * User đăng nhập hợp lệ thì mới load danh sách combobox.
      */
-    if (candidateConfigs.length) {
-        preloadRoleRights(candidateConfigs);
-    } else {
-        output.rightsLoad = { mode: "skipped", elapsedMs: 0, rightCount: 0 };
-    }
+    output.rightsLoad = {
+        mode: candidateConfigs.length ? "seed-only" : "skipped",
+        elapsedMs: 0,
+        rightCount: 0
+    };
 
     for (var i = 0; i < configs.length; i++) {
         var config = configs[i];
 
         var result = loadOneComboBox(config, output.targetLv1);
-        if (config.mode === "candidates") {
+//        if (config.mode === "candidates") {
 //            print("[ApprovalCombo] " + config.saveField + ": " +
 //                    (result.success ? result.count + " nguoi" : "LOI: " + result.message));
-        }
+//        }
 
         output[config.key] = result;
         output.configs.push({
@@ -525,12 +463,7 @@ function loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField) {
         };
 
         var seedRights = normalizeArray(config.seedRights);
-        var includeRights = normalizeArray(config.includeRights);
-        var excludeRights = normalizeArray(config.excludeRights);
-
-        var pool = getContactPoolByRights(
-                seedRights.length > 0 ? seedRights : includeRights
-        );
+        var pool = getContactPoolByRights(seedRights);
 
         pool = normalizeArray(pool);
 
@@ -541,11 +474,6 @@ function loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField) {
             var contactId = normalizeValue(pool[i]);
 
             if (!contactId) {
-                output.rejectedCount++;
-                continue;
-            }
-
-            if (!contactHasRightRule(contactId, includeRights, excludeRights)) {
                 output.rejectedCount++;
                 continue;
             }
@@ -578,6 +506,8 @@ function loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField) {
         if (contactPoolCache.hasOwnProperty(cacheKey)) {
             return contactPoolCache[cacheKey].slice(0);
         }
+        output.rightsLoad.rightCount += rightIds.length;
+        var rightsStarted = new Date().getTime();
 
         try {
             if (
@@ -588,6 +518,7 @@ function loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField) {
                         lib.ESD_PERMS_RIGHTS.listContactsByRights(rightIds) || []
                 );
                 contactPoolCache[cacheKey] = contactsByRights;
+                output.rightsLoad.elapsedMs += new Date().getTime() - rightsStarted;
                 return contactsByRights.slice(0);
             }
         } catch (e1) {}
@@ -608,110 +539,14 @@ function loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField) {
                         ) || []
                 );
                 contactPoolCache[cacheKey] = contactsByFilter;
+                output.rightsLoad.elapsedMs += new Date().getTime() - rightsStarted;
                 return contactsByFilter.slice(0);
             }
         } catch (e2) {}
 
         contactPoolCache[cacheKey] = [];
+        output.rightsLoad.elapsedMs += new Date().getTime() - rightsStarted;
         return [];
-    }
-
-    /*
-     * Dùng API chung để lấy danh sách user theo từng quyền liên quan.
-     * Đảo danh sách thành quyền theo user, tránh permsRight cho từng ứng viên.
-     * Không dùng query riêng và không cache quyền giữa các lần load form.
-     * Chỉ công bố cache khi mọi lời gọi thành công; lỗi dùng lại đường cũ.
-     */
-    function preloadRoleRights(configs) {
-        var started = new Date().getTime();
-        output.rightsLoad = { mode: "fallback", elapsedMs: 0 };
-        try {
-            var needed = [];
-            for (var i = 0; i < configs.length; i++) {
-                needed = needed.concat(configs[i].includeRights,
-                        configs[i].excludeRights, configs[i].seedRights);
-            }
-            needed = normalizeArray(needed);
-            var rightsByContact = {};
-            var contactsByRight = {};
-            for (var j = 0; j < needed.length; j++) {
-                // Gọi trực tiếp để lỗi không bị chuyển thành danh sách rỗng:
-                // thiếu dữ liệu excludeRights có thể cho phép nhầm user.
-                var contacts = normalizeArray(
-                        lib.ESD_PERMS_RIGHTS.listContactsByRights([needed[j]]) || []
-                );
-                contactsByRight["$" + needed[j]] = contacts;
-                for (var k = 0; k < contacts.length; k++) {
-                    var key = "$" + contacts[k];
-                    if (!rightsByContact[key]) rightsByContact[key] = [];
-                    rightsByContact[key].push(needed[j]);
-                }
-            }
-            for (var key in rightsByContact) {
-                if (rightsByContact.hasOwnProperty(key)) {
-                    userRightsCache[key.substring(1)] = rightsByContact[key];
-                }
-            }
-            for (var c = 0; c < configs.length; c++) {
-                var seeds = normalizeArray(configs[c].seedRights);
-                if (!seeds.length) seeds = normalizeArray(configs[c].includeRights);
-                var pool = [];
-                for (var n = 0; n < seeds.length; n++) {
-                    pool = pool.concat(contactsByRight["$" + seeds[n]] || []);
-                }
-                contactPoolCache[seeds.slice(0).sort().join("|")] = normalizeArray(pool);
-            }
-            output.rightsLoad.mode = "shared-rights";
-            output.rightsLoad.rightCount = needed.length;
-        } catch (e) {
-            output.rightsLoad.message = String(e.message || e);
-        } finally {
-            output.rightsLoad.elapsedMs = new Date().getTime() - started;
-        }
-    }
-
-    function getCachedUserRights(contactId) {
-        contactId = normalizeValue(contactId);
-        if (!contactId) return [];
-
-        if (!userRightsCache.hasOwnProperty(contactId)) {
-            try {
-                userRightsCache[contactId] = normalizeArray(
-                        lib.ESD_PERMS_RIGHTS.permsRight(contactId) || []
-                );
-            } catch (e) {
-                userRightsCache[contactId] = [];
-            }
-        }
-
-        return userRightsCache[contactId];
-    }
-
-    function contactHasRightRule(contactId, includeRights, excludeRights) {
-        var cacheKey = "$" + contactId;
-        var map = userRightMapCache[cacheKey];
-        if (!map) {
-            var userRights = getCachedUserRights(contactId);
-            map = {};
-            for (var i = 0; i < userRights.length; i++) {
-                map[userRights[i]] = true;
-            }
-            userRightMapCache[cacheKey] = map;
-        }
-
-        for (var j = 0; j < includeRights.length; j++) {
-            if (!map[includeRights[j]]) {
-                return false;
-            }
-        }
-
-        for (var k = 0; k < excludeRights.length; k++) {
-            if (map[excludeRights[k]]) {
-                return false;
-            }
-        }
-
-        return true;
     }
 
     function contactDataPermissionInLv1(contactId, targetLv1) {
