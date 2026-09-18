@@ -543,6 +543,8 @@ function mapGlPayload(requestId, accountingDate, payment, context, entries) {
 }
 
 function mapCorePayload(requestId, entry, context) {
+    var maker = safeString(context.maker).toLowerCase();
+    var checker = safeString(context.checker).toLowerCase();
     var branchCode = String(entry.branch).slice(2);
     if (branchCode.indexOf('007') === 0) branchCode = '107' + branchCode.slice(3);
     var bankParts = safeString(context.beneficiaryBank).split('|');
@@ -551,21 +553,22 @@ function mapCorePayload(requestId, entry, context) {
     var description = normalizeBusinessText(entry.description).toUpperCase();
     var clientDate = safeString(lib.ESD_HTKT_Utils.formatDateToISOWithOffset()).trim();
     if (internal) return { subType: SUB_INHOUSE, data: {
-            requestId: requestId, clientDt: clientDate, channel: 'A101_IBR',
+            requestId: requestId, clientDt: clientDate, channel: 'A414_QLTS',
             spname: 'com.xesapi.xferadd20.FunsTransferAdd', data: {
                 depAcctIdFrom: { acctId: '1111', acctCur: entry.currency },
                 depAcctIdTo: { acctId: entry.account_number, acctCur: entry.currency, toBranchId: branchCode },
                 amount: amount, curCode: entry.currency, reversedInd: 'N',
-                trnRefNum: requestId, maker: context.maker, checker: context.checker, notes: description } } };
+                trnRefNum: requestId, maker: maker, checker: checker, notes: description } } };
     return { subType: SUB_CITAD, data: {
-            requestId: requestId, clientDt: clientDate, channel: 'A101_IBR', reftype: 'IB',
+            requestId: requestId, clientDt: clientDate, channel: 'A414_QLTS', reftype: 'A414_QLTS',
             spname: 'com.fnf.xes.PRF', data: {
                 pmtType: 'Outgoing IBPS_Bilateral', pmtMethod: 'Account',
+                approveId: checker,
                 trnType: 'Transaction Internet Banking', fromAcctId: '101870783864',
                 toAcctId: entry.account_number, toBankId: safeString(bankParts[1]).trim(),
                 toBranchId: safeString(bankParts[0]).trim(), toAcctName: truncate(entry.account_name, 150), serviceBranch: branchCode,
                 amount: [{ amount: amount, crcd: entry.currency, amountType: 'TRAN_AMOUNT' }],
-                maker: context.maker, checker: context.checker, trnDesc: truncate(description, 269), chanRefNum: requestId } } };
+                makerId: maker, trnDesc: truncate(description, 269), chanRefNum: requestId } } };
 }
 
 function validateInvoicePayload(p) {

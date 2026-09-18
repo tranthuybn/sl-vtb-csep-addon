@@ -96,10 +96,10 @@ var CASHOUT_NO = 'N';
 
 var CORE_PAYMENT_ENTRY_CODE = 'TU-BT-03';
 var CORE_VIETINBANK_NAPAS_CODE = '970415';
-var CORE_CHANNEL = 'A101_IBR';
+var CORE_CHANNEL = 'A414_QLTS';
 var CORE_INTERNAL_SP_NAME = 'com.xesapi.xferadd20.FunsTransferAdd';
 var CORE_EXTERNAL_SP_NAME = 'com.fnf.xes.PRF';
-var CORE_EXTERNAL_REFERENCE_TYPE = 'IB';
+var CORE_EXTERNAL_REFERENCE_TYPE = 'A414_QLTS';
 var CORE_CITAD_DESCRIPTION_MAX_LENGTH = 269;
 var CORE_EXTERNAL_TO_ACCOUNT_NAME_MAX_LENGTH = 150;
 var CORE_INTERNAL_SOURCE_ACCOUNT = '1111';
@@ -1205,6 +1205,8 @@ function truncateCoreText(value, maxLength) {
 function mapCoreTransferPayloadForEntry(requestId, entry, context) {
     var branchCode = String(entry.branch);
     if (branchCode === '007') branchCode = '107';
+    var maker = safeString(context.accountingCreator).trim().toLowerCase();
+    var checker = safeString(context.accountingApprover).trim().toLowerCase();
     var bank = mapCoreBeneficiaryBank(context.beneficiaryBank);
     var isInternal = bank.napasCode === CORE_VIETINBANK_NAPAS_CODE;
     var accountNumber = safeString(entry.account_number).trim();
@@ -1249,8 +1251,8 @@ function mapCoreTransferPayloadForEntry(requestId, entry, context) {
                 curCode: currency,
                 reversedInd: 'N',
                 trnRefNum: requestId,
-                maker: context.accountingCreator,
-                checker: context.accountingApprover,
+                maker: maker,
+                checker: checker,
                 notes: description
             }
         };
@@ -1264,6 +1266,7 @@ function mapCoreTransferPayloadForEntry(requestId, entry, context) {
             data: {
                 pmtType: 'Outgoing IBPS_Bilateral',
                 pmtMethod: 'GL Account',
+                approveId: checker,
                 trnType: 'Transaction Internet Banking',
                 fromAcctId: '224420600',
                 toAcctId: accountNumber,
@@ -1278,8 +1281,7 @@ function mapCoreTransferPayloadForEntry(requestId, entry, context) {
                         amountType: 'TRAN_AMOUNT'
                     }
                 ],
-                maker: context.accountingCreator,
-                checker: context.accountingApprover,
+                makerId: maker,
                 trnDesc: description,
                 chanRefNum: requestId
             }
