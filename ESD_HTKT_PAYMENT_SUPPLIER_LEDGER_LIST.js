@@ -179,7 +179,7 @@ function getListSupplierLedger(input) {
 
             if (paymentEntryAmount > 0) {
                 // 1. Cứ COMPLETED là tính vào "Số tiền đã hoàn ứng" (Không quan tâm phiếu nào)
-                if (oglStatus === "completed") {
+                if (oglStatus === "completed" && entryPaymentStatus == "accounted") {
                     item.refunded_amount += paymentEntryAmount;
                 };
                 // 2. Nếu thuộc Phiếu hiện tại -> "Số tiền hoàn ứng lần này"
