@@ -543,8 +543,8 @@ function mapGlPayload(requestId, accountingDate, payment, context, entries) {
 }
 
 function mapCorePayload(requestId, entry, context) {
-    var maker = safeString(context.maker).toLowerCase();
-    var checker = safeString(context.checker).toLowerCase();
+    var maker = safeString(context.maker).trim().toLowerCase();
+    var checker = safeString(context.checker).trim().toLowerCase();
     var branchCode = String(entry.branch).slice(2);
     if (branchCode.indexOf('007') === 0) branchCode = '107' + branchCode.slice(3);
     var bankParts = safeString(context.beneficiaryBank).split('|');
