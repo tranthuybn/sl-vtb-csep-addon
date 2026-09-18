@@ -76,13 +76,14 @@ function createPaymentRequest(input) {
                     "0"
                 );
                 var remainingContractValue = calculateContractRemainingValue(contractId, currentContractAmount);
+                var remainingRefundValue = calculateContractRemainingRefund(contractId);
+                var remainingPayableValue = calculateContractRemainingPayable(contractId);
 
-                // 4. KIỂM TRA CHẶN
-                // Ép kiểu về số để kiểm tra <= 0
-                if (Number(remainingContractValue) <= 0) {
+                // 4. KIỂM TRA CHẶN: Chặn tạo nếu giá trị HĐ còn lại = 0 VÀ hoàn ứng còn lại = 0 VÀ số tiền phải trả còn lại = 0
+                if (Number(remainingContractValue) <= 0 && Number(remainingRefundValue) <= 0 && Number(remainingPayableValue) <= 0) {
                     return {
                         success: false,
-                        message: "Tổng giá trị HĐ/KMS còn lại của hợp đồng đã về 0. Không thể tạo thêm phiếu thanh toán mới."
+                        message: "Tổng giá trị HĐ/KMS còn lại, hoàn ứng còn lại và số tiền phải trả còn lại của hợp đồng đều đã về 0. Không thể tạo thêm phiếu thanh toán mới."
                     };
                 }
 
@@ -133,7 +134,7 @@ function createPaymentRequest(input) {
 
         var returnCode;
         var previousSkipAutoPaymentActivity = htktCreatePay_normalizeValue(
-                vars["$L.skipAutoPaymentActivity"]
+            vars["$L.skipAutoPaymentActivity"]
         );
 
         try {
@@ -151,13 +152,13 @@ function createPaymentRequest(input) {
              * Lưu lịch sử với operator là user thật.
              */
             createActivity(
-                    "activityHTKTpayment",
-                    'Thêm mới Đề nghị Thanh toán: Mã đề nghị: "' +
-                    paymentRec["id"] +
-                    '"',
-                    paymentRec["id"],
-                    "Thêm mới",
-                    currentUser
+                "activityHTKTpayment",
+                'Thêm mới Đề nghị Thanh toán: Mã đề nghị: "' +
+                paymentRec["id"] +
+                '"',
+                paymentRec["id"],
+                "Thêm mới",
+                currentUser
             );
 
             //Đồng bộ giá trị Tạm ứng/Thanh toán giữa Squad 6 và Squad 2
@@ -176,7 +177,7 @@ function createPaymentRequest(input) {
         } else {
             return {
                 success: false,
-                message: "Lỗi ghi nhận vào Database esdHTKTpayment. Code: " + returnCode
+                message: "Lỗi ghi nhận vào Database esdHTKTpayment. Code: " + returnCode + " reason " + paymentRec.getMessages()
             };
         }
 
@@ -187,16 +188,16 @@ function createPaymentRequest(input) {
 }
 
 function mapPaymentRecord(paymentRec, contractData, paymentId) {
-    // Để null để hệ thống tự động tăng ID khi insert
+    // Mã đã được cấp bởi Sequential Numbers trước khi insert.
     paymentRec['id'] = paymentId;
 
     // 4. Map riêng biệt chi tiết từng trường một từ JSON vào Record
     paymentRec['transaction.type'] = "Thanh toán";
     paymentRec['department'] =
-            contractData['unitLv3'] ||
-            contractData['unitLv2'] ||
-            contractData['unitLv1'] ||
-            "";
+        contractData['unitLv3'] ||
+        contractData['unitLv2'] ||
+        contractData['unitLv1'] ||
+        "";
 
     paymentRec['description'] = "";
 
@@ -222,7 +223,7 @@ function mapPaymentRecord(paymentRec, contractData, paymentId) {
 
 
     var creatorUser = htktCreatePay_resolveCurrentUser(
-            contractData
+        contractData
     );
 
     if (!creatorUser) {
@@ -239,9 +240,9 @@ function mapPaymentRecord(paymentRec, contractData, paymentId) {
         paymentRec['initial.role'] = "dmms";
     } else {
         throw new Error(
-                "Người tạo " +
-                creatorUser +
-                " chưa có quyền phù hợp để lập phiếu thanh toán. Cần quyền lập đề nghị thanh toán; nếu là KTTC cần thêm quyền nhập liệu hạch toán."
+            "Người tạo " +
+            creatorUser +
+            " chưa có quyền phù hợp để lập phiếu thanh toán. Cần quyền lập đề nghị thanh toán; nếu là KTTC cần thêm quyền nhập liệu hạch toán."
         );
     }
 
@@ -249,33 +250,57 @@ function mapPaymentRecord(paymentRec, contractData, paymentId) {
 
 
 function generateDocumentCode(docType, branchCode) {
-    var now = new Date();
-    var year = (now.getFullYear() % 100).toString(); // "26"
-
-    var queryPattern = docType + ".*." + year + ".*";
-    var query = 'id like "' + queryPattern + '"';
-
-    var file = new SCFile("esdHTKTpayment");
-    var rc = file.doSelect(query);
-
-    var maxSeq = 0;
-
-    while (rc == RC_SUCCESS) {
-        var currentId = file.id;
-        if (currentId) {
-            var parts = currentId.split(".");
-            var seq = parseInt(parts[parts.length - 1], 10);
-            if (!isNaN(seq) && seq > maxSeq) {
-                maxSeq = seq;
-            }
-        }
-        rc = file.getNext();
+    var fullYear = new Date().getFullYear();
+    var year = ("0" + (fullYear % 100)).slice(-2);
+    // Shared existing SM counter; never reset when the year changes.
+    var numberClass = "esdHTKTpayment";
+    var numberRc = new SCDatum();
+    numberRc.setValue(-1);
+    var nextNumber = new SCDatum();
+    system.functions.rtecall(
+        "getnumber", numberRc, nextNumber, numberClass
+    );
+    // String(SCDatum) includes a native-object label; read its payload instead.
+    var rcText = String(numberRc.getText()).replace(/^\s+|\s+$/g, "");
+    var rawNumber = String(nextNumber.getText()).replace(/^\s+|\s+$/g, "");
+    // SM may render a string datum with surrounding quotes.
+    if (/^"[^"]*"$/.test(rawNumber) || /^'[^']*'$/.test(rawNumber)) {
+        rawNumber = rawNumber.substring(1, rawNumber.length - 1);
     }
-
-    var newSeq = maxSeq + 1;
-    var seqStr = ("0000000" + newSeq).slice(-7);
-
-    return docType + "." + branchCode + "." + year + "." + seqStr;
+    // The existing class has a TT prefix.
+    // Padding/length from Sequential Numbers is normalized below to 7 digits.
+    if (rawNumber.indexOf(docType) === 0) {
+        rawNumber = rawNumber.substring(docType.length);
+    }
+    // Never fall back to MAX + 1, which races between concurrent sessions.
+    // Use the output status and payload, not JS truthiness of the bridge return.
+    if (rcText !== "0" || !/^\d+$/.test(rawNumber)) {
+        throw new Error("Không cấp được số phiếu từ Sequential Numbers: " +
+            numberClass + ". Kiểm tra bộ đếm hiện có, Prefix TT, Suffix trống, " +
+            "Increment=1 và không Decrement. rc=" + rcText +
+            ", number=" + rawNumber);
+    }
+    var sequence = Number(rawNumber);
+    if (sequence < 1 || sequence > 9999999) {
+        throw new Error("Số phiếu ngoài phạm vi 0000001..9999999: " + rawNumber);
+    }
+    var paymentId = docType + "." + branchCode + "." + year + "." +
+        ("0000000" + sequence).slice(-7);
+    // Detect a mis-seeded counter. Concurrency safety comes from getnumber.
+    var existing = new SCFile("esdHTKTpayment", SCFILE_READONLY);
+    try {
+        var rc = existing.doSelect('id="' + escapeSmQueryValue(paymentId) + '"');
+        if (rc === RC_SUCCESS) {
+            throw new Error("Bộ đếm " + numberClass + " cấp mã đã tồn tại: " +
+                paymentId + ". Dừng tạo phiếu và đồng bộ bộ đếm với dữ liệu hiện có.");
+        }
+        if (rc !== RC_NO_MORE) {
+            throw new Error("Không kiểm tra được mã phiếu " + paymentId + ". Code: " + rc);
+        }
+    } finally {
+        closeSCFile(existing);
+    }
+    return paymentId;
 }
 
 function listPurchaseContracts() {
@@ -519,14 +544,20 @@ function listPurchaseContracts(input) {
                 itemData.totalValue = itemData["contract.value.after.tax"] || itemData.totalValue || "0";
             }
 
-            // --- LỌC BẢN GHI CÓ SỐ TIỀN CÒN LẠI > 0 (THEO CÁCH TÍNH CHẶN KHI TẠO PHIẾU) ---
+            // --- LỌC BẢN GHI: HIỂN THỊ NẾU CÒN GIÁ TRỊ HĐ HOẶC CÒN HOÀN ỨNG HOẶC CÒN PHẢI TRẢ ---
             var contractId = itemData.id;
             var currentContractAmount = String(itemData.totalValue || itemData['contract.amount'] || "0");
             var remainingVal = calculateContractRemainingValue(contractId, currentContractAmount);
+            var remainingRefundVal = calculateContractRemainingRefund(contractId);
+            var remainingPayableVal = calculateContractRemainingPayable(contractId);
+
             itemData.remainingValue = remainingVal;
             itemData["remaining.amount"] = remainingVal;
+            itemData.remainingRefundValue = remainingRefundVal;
+            itemData.remainingPayableValue = remainingPayableVal;
 
-            if (Number(remainingVal) > 0) {
+            // Chỉ chặn khi cả 3 giá trị (giá trị HĐ còn lại, hoàn ứng còn lại, số tiền phải trả còn lại) đều <= 0
+            if (Number(remainingVal) > 0 || Number(remainingRefundVal) > 0 || Number(remainingPayableVal) > 0) {
                 dataArray.push(itemData);
             }
 
@@ -574,25 +605,15 @@ function calculateContractRemainingValue(contractId, currentContractAmount) {
         }
         prepaymentFile.doClose();
 
-        // 2. TỔNG GIÁ TRỊ ĐÃ THANH TOÁN (HÓA ĐƠN ĐÃ DUYỆT / CHI TIỀN)
+        // 2. TỔNG GIÁ TRỊ ĐÃ THANH TOÁN (ĐNTT có trạng thái = "Đã duyệt" hoặc "Đã hạch toán")
         var totalPayment = "0";
         var paymentFile = new SCFile("esdHTKTpayment", SCFILE_READONLY);
         var sqlPayment = 'contract.id="' + contractId + '" and (status="approved" or status="accounted")';
 
         if (paymentFile.doSelect(sqlPayment) === RC_SUCCESS) {
             do {
-                var paymentVendorFile = new SCFile("esdHTKTpaymentVendor", SCFILE_READONLY);
-                if (paymentVendorFile.doSelect('payment.id="' + paymentFile.id + '"') === RC_SUCCESS) {
-                    do {
-                        var paymentVendorAmt = paymentVendorFile["approved.invoice.amount"]
-                                ? String(paymentVendorFile["approved.invoice.amount"])
-                                : (paymentVendorFile.amount ? String(paymentVendorFile.amount) : "0");
-                        totalPayment = lib.ESD_HTKT_Utils.addStringsManual(totalPayment, paymentVendorAmt);
-
-                    } while (paymentVendorFile.getNext() === RC_SUCCESS);
-                }
-                paymentVendorFile.doClose();
-
+                var paidAmt = paymentFile["total.amount.paid"] ? String(paymentFile["total.amount.paid"]) : "0";
+                totalPayment = lib.ESD_HTKT_Utils.addStringsManual(totalPayment, paidAmt);
             } while (paymentFile.getNext() === RC_SUCCESS);
         }
         paymentFile.doClose();
@@ -601,7 +622,11 @@ function calculateContractRemainingValue(contractId, currentContractAmount) {
         var remainingContractValue = lib.ESD_HTKT_Utils.subtractStringsManual(String(currentContractAmount || "0"), totalPrepayment);
         remainingContractValue = lib.ESD_HTKT_Utils.subtractStringsManual(remainingContractValue, totalPayment);
 
-        if (Number(remainingContractValue) < 0) {
+        if (
+            remainingContractValue &&
+            (remainingContractValue.charAt(0) === "-" ||
+                lib.ESD_HTKT_Utils.compareMoneyStrings(remainingContractValue, "0") < 0)
+        ) {
             remainingContractValue = "0";
         }
 
@@ -609,6 +634,173 @@ function calculateContractRemainingValue(contractId, currentContractAmount) {
     } catch (e) {
         return String(currentContractAmount || "0");
     }
+}
+
+function calculateContractRemainingRefund(contractId) {
+    if (!contractId) return 0;
+
+    var query =
+        "SELECT " +
+        "ai.request.id AS requestId, " +
+        "ai.prepayment.id AS prepaymentId, " +
+        "ai.vendor.id AS vendorId, " +
+        "ai.amount AS advance_amount, " +
+        "pe.amount AS payment_entry_amount, " +
+        "pe.payment.id AS entry_payment_id, " +
+        "aip.status AS ogl_status " +
+        "FROM esdHTKTaccountingInformation ai " +
+        "LEFT JOIN esdHTKTpaymentEntry pe " +
+        'ON (ai.prepayment.id = pe.ref.id AND pe.entry.type = "PREPAYMENT" AND pe.vendor.id = ai.vendor.id) ' +
+        "LEFT JOIN esdHTKTaccountingInformation aip " +
+        "ON (pe.accounting.request.id = aip.request.id) " +
+        'WHERE ai.sub.type = "TAM_UNG" ' +
+        'AND ai.contract.id = "' + escapeSmQueryValue(contractId) + '" ' +
+        'AND ai.status = "COMPLETED" ' +
+        'AND ai.type = "AP" ' +
+        'ORDER BY ai.checked.time DESC';
+
+    var resultMap = {};
+    var resultOrder = [];
+    var file = null;
+
+    try {
+        file = new SCFile("esdHTKTaccountingInformation", SCFILE_READONLY);
+        var rc = file.doSelect(query);
+
+        while (rc == RC_SUCCESS) {
+            var accountingInformationId = String(file["requestId"] || "").trim();
+            var prepaymentId = String(file["prepaymentId"] || "").trim();
+            var vendorId = String(file["vendorId"] || "").trim();
+            var advanceAmount = getNumberField(file, ["advance_amount", "ai.amount", "amount"]);
+            var paymentEntryAmount = getNumberField(file, ["payment_entry_amount", "pe.amount"]);
+            var oglStatus = String(file["aip.status"] || "").trim().toLowerCase();
+
+            var key = accountingInformationId + "|" + prepaymentId + "|" + vendorId;
+
+            if (!resultMap[key]) {
+                resultMap[key] = {
+                    advance_amount: advanceAmount,
+                    refunded_amount: 0,
+                    other_pending_amount: 0
+                };
+                resultOrder.push(key);
+            }
+
+            var item = resultMap[key];
+            if (paymentEntryAmount > 0) {
+                if (oglStatus === "completed") {
+                    item.refunded_amount += paymentEntryAmount;
+                } else if (oglStatus !== "rejected" && oglStatus !== "cancelled" && oglStatus !== "failed") {
+                    item.other_pending_amount += paymentEntryAmount;
+                }
+            }
+
+            rc = file.getNext();
+        }
+    } catch (e) {
+        // print("[DEBUG calculateContractRemainingRefund] Error: " + e);
+    } finally {
+        closeSCFile(file);
+    }
+
+    var totalRemainingRefund = 0;
+    for (var i = 0; i < resultOrder.length; i++) {
+        var resItem = resultMap[resultOrder[i]];
+        var rem = resItem.advance_amount - resItem.refunded_amount - resItem.other_pending_amount;
+        if (rem > 0) {
+            totalRemainingRefund += rem;
+        }
+    }
+
+    return totalRemainingRefund;
+}
+
+function calculateContractRemainingPayable(contractId) {
+    if (!contractId) return 0;
+
+    var query =
+        "SELECT " +
+        "ai.request.id AS requestId, " +
+        "ai.prepayment.id AS prepaymentId, " +
+        "ai.vendor.id AS vendorId, " +
+        "pe.amount AS payable_amount " +
+        "FROM esdHTKTaccountingInformation ai " +
+        "JOIN esdHTKTpaymentEntry pe " +
+        'ON (ai.prepayment.id = pe.payment.id AND pe.entry.type = "PAYABLE" AND pe.account.type = "ASSET" AND pe.vendor.id = ai.vendor.id) ' +
+        'WHERE ai.sub.type = "THANH_TOAN" ' +
+        'AND ai.contract.id = "' + escapeSmQueryValue(contractId) + '" ' +
+        'AND ai.status = "COMPLETED" ' +
+        'AND ai.type = "AP" ' +
+        'ORDER BY ai.checked.time DESC';
+
+    var totalRemainingPayable = 0;
+    var file = null;
+
+    try {
+        file = new SCFile("esdHTKTaccountingInformation", SCFILE_READONLY);
+        var rc = file.doSelect(query);
+
+        while (rc == RC_SUCCESS) {
+            var prepaymentId = String(file["prepaymentId"] || "").trim();
+            var vendorId = String(file["vendorId"] || "").trim();
+            var payableAmount = getNumberField(file, ["payable_amount", "pe.amount"]);
+
+            // Tính tổng tiền đã trả của khoản nợ này
+            var paidAmount = 0;
+            if (prepaymentId) {
+                var queryPaid =
+                    "SELECT amount FROM esdHTKTpaymentEntry " +
+                    'WHERE entry.type = "PAYABLE" ' +
+                    'AND account.type = "DEBIT" ' +
+                    'AND ref.id = "' + escapeSmQueryValue(prepaymentId) + '"' +
+                    (vendorId ? ' AND vendor.id = "' + escapeSmQueryValue(vendorId) + '"' : '');
+
+                var debitFile = new SCFile("esdHTKTpaymentEntry", SCFILE_READONLY);
+                if (debitFile.doSelect(queryPaid) === RC_SUCCESS) {
+                    do {
+                        paidAmount += getNumberField(debitFile, ["amount"]);
+                    } while (debitFile.getNext() === RC_SUCCESS);
+                }
+                closeSCFile(debitFile);
+            }
+
+            var remainingAmount = payableAmount - paidAmount;
+            if (remainingAmount > 0) {
+                totalRemainingPayable += remainingAmount;
+            }
+
+            rc = file.getNext();
+        }
+    } catch (e) {
+        // print("[DEBUG calculateContractRemainingPayable] Error: " + e);
+    } finally {
+        closeSCFile(file);
+    }
+
+    return totalRemainingPayable;
+}
+
+function getNumberField(file, fieldNames) {
+    for (var i = 0; i < fieldNames.length; i++) {
+        var value = file[fieldNames[i]];
+        if (value !== null && value !== undefined && value !== "") {
+            var numberValue = Number(value);
+            if (!isNaN(numberValue)) return numberValue;
+        }
+    }
+    return 0;
+}
+
+function escapeSmQueryValue(value) {
+    return String(value || "")
+        .replace(/\\/g, "\\\\")
+        .replace(/"/g, '\\"');
+}
+
+function closeSCFile(file) {
+    try {
+        if (file) file.doClose();
+    } catch (ignore) {}
 }
 
 function mapRowToObject(scFileRecord, fieldMappings) {
@@ -668,22 +860,22 @@ function htktCreatePay_detectInitialRoleByRights(contactId) {
      */
 
     if (
-            htktCreatePay_hasAllRights(rights, [
-                RIGHT_VIEW_INVOICE,
-                RIGHT_VIEW_PAYMENT,
-                RIGHT_CREATE_PAYMENT,
-                RIGHT_ACCOUNTING_INPUT
-            ])
+        htktCreatePay_hasAllRights(rights, [
+            RIGHT_VIEW_INVOICE,
+            RIGHT_VIEW_PAYMENT,
+            RIGHT_CREATE_PAYMENT,
+            RIGHT_ACCOUNTING_INPUT
+        ])
     ) {
         return "kttc";
     }
 
     if (
-            htktCreatePay_hasAllRights(rights, [
-                RIGHT_VIEW_INVOICE,
-                RIGHT_VIEW_PAYMENT,
-                RIGHT_CREATE_PAYMENT
-            ])
+        htktCreatePay_hasAllRights(rights, [
+            RIGHT_VIEW_INVOICE,
+            RIGHT_VIEW_PAYMENT,
+            RIGHT_CREATE_PAYMENT
+        ])
     ) {
         return "dmms";
     }
@@ -694,7 +886,7 @@ function htktCreatePay_detectInitialRoleByRights(contactId) {
 function htktCreatePay_getRights(contactId) {
     try {
         return htktCreatePay_normalizeArray(
-                lib.ESD_PERMS_RIGHTS.permsRight(contactId) || []
+            lib.ESD_PERMS_RIGHTS.permsRight(contactId) || []
         );
     } catch (e) {
         return [];
@@ -724,17 +916,17 @@ function htktCreatePay_resolveCurrentUser(source) {
     source = source || {};
 
     return htktCreatePay_normalizeValue(
-            source["currentUser"] ||
-            source["current_user"] ||
-            source["user"] ||
-            source["contactId"] ||
-            source["contact_id"] ||
-            source["contact.id"] ||
-            source["contact.name"] ||
-            source["createdBy"] ||
-            source["created.by"] ||
-            source["created_by"] ||
-            ""
+        source["currentUser"] ||
+        source["current_user"] ||
+        source["user"] ||
+        source["contactId"] ||
+        source["contact_id"] ||
+        source["contact.id"] ||
+        source["contact.name"] ||
+        source["createdBy"] ||
+        source["created.by"] ||
+        source["created_by"] ||
+        ""
     );
 }
 
@@ -898,3 +1090,4 @@ function listFileAttachment(input) {
     // Trả mảng kết quả
     input.queryReturnArray = system.functions.denull(dataArray);
 }
+
