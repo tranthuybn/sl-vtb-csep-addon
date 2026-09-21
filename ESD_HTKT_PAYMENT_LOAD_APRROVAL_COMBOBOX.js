@@ -60,6 +60,109 @@ function getPaymentRoleByRights(contactId) {
     return rightMap[RIGHT_ACCOUNTING_INPUT] ? "kttc" : "dmms";
 }
 
+/*
+ * Hàm dùng chung cho cả Thanh toán và Tạm ứng.
+ * Dùng listContactsByRights() của ESD_PERMS_RIGHTS để lấy pool, sau đó lọc
+ * data permission 00401 theo toàn bộ unit thuộc target lv1 ngay tại đây.
+ */
+function listContactsByRightsAndLv1(rightIds, targetLv1, subModuleId) {
+    var normalizedLv1 = String(targetLv1 == null ? "" : targetLv1).trim().replace(/\.0$/, "");
+    var normalizedRights = rightIds || [];
+    var units = [];
+    var seenUnits = {};
+    var orgFile = null;
+
+    if (!normalizedLv1 || !normalizedRights.length) {
+        return [];
+    }
+
+    function addUnit(unitId) {
+        var value = String(unitId == null ? "" : unitId).trim().replace(/\.0$/, "");
+        if (value && !seenUnits[value]) {
+            seenUnits[value] = true;
+            units.push(value);
+        }
+    }
+
+    addUnit(normalizedLv1);
+
+    try {
+        orgFile = new SCFile("esdQTorgUnit", SCFILE_READONLY);
+        orgFile.setFields(["unit.id", "lv1.id"]);
+        var orgRc = orgFile.doSelect(
+                'unit.id="' + normalizedLv1.replace(/\\/g, "\\\\").replace(/"/g, '\\"') +
+                '" or lv1.id="' + normalizedLv1.replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"'
+        );
+
+        while (orgRc === RC_SUCCESS) {
+            addUnit(orgFile["unit.id"]);
+            orgRc = orgFile.getNext();
+        }
+    } finally {
+        try { if (orgFile) orgFile.doClose(); } catch (closeError) {}
+    }
+
+    if (!lib.ESD_PERMS_RIGHTS || !lib.ESD_PERMS_RIGHTS.listContactsByRights) {
+        return [];
+    }
+
+    var contacts = lib.ESD_PERMS_RIGHTS.listContactsByRights(normalizedRights) || [];
+    if (contacts.toArray) contacts = contacts.toArray();
+    if (!contacts.length) return [];
+
+    var contactConditions = [];
+    var unitConditions = [];
+    var result = [];
+    var seenContacts = {};
+
+    for (var contactIndex = 0; contactIndex < contacts.length; contactIndex++) {
+        contactConditions.push(
+                'contact.id="' + String(contacts[contactIndex]).replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"'
+        );
+    }
+    for (var unitIndex = 0; unitIndex < units.length; unitIndex++) {
+        unitConditions.push(
+                'unit.id="' + String(units[unitIndex]).replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"'
+        );
+    }
+
+    var permissionFile = null;
+    try {
+        permissionFile = new SCFile("esdQTdataPermissions", SCFILE_READONLY);
+        permissionFile.setFields(["id", "contact.id", "permission.scope"]);
+        var permissionRc = permissionFile.doSelect(
+                "(" + contactConditions.join(" or ") + ")" +
+                ' and sub.module="' + String(subModuleId || "00401").replace(/"/g, '\\"') + '"' +
+                ' and permission.scope~="QT_PQDL_01"' +
+                ' and permission.scope~="QT_PQDL_06"'
+        );
+
+        while (permissionRc === RC_SUCCESS) {
+            var permissionId = String(permissionFile["id"] == null ? "" : permissionFile["id"]).trim();
+            var contactId = String(permissionFile["contact.id"] == null ? "" : permissionFile["contact.id"]).trim();
+
+            if (permissionId && contactId && !seenContacts[contactId]) {
+                var count = lib.ESD_Utils.countFile(
+                        "esdjoinDatapermissionUnits",
+                        'data.permission.id="' + permissionId.replace(/\\/g, "\\\\").replace(/"/g, '\\"') +
+                        '" and status="Dang hoat dong" and (' + unitConditions.join(" or ") + ")"
+                );
+
+                if (count > 0) {
+                    seenContacts[contactId] = true;
+                    result.push(contactId);
+                }
+            }
+
+            permissionRc = permissionFile.getNext();
+        }
+    } finally {
+        try { if (permissionFile) permissionFile.doClose(); } catch (permissionCloseError) {}
+    }
+
+    return result;
+}
+
 
 function loadPaymentApprovalComboBoxes(paymentFile) {
     return loadPaymentApprovalComboBoxesInternal(paymentFile, "");
@@ -456,7 +559,8 @@ function loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField) {
     }
 
     function getContactsForRoleInLv1(config, targetLv1) {
-        return listContactsByRightsAndLv1(config.seedRights, targetLv1);
+        var ids = normalizeArray(listContactsByRightsAndLv1(config.seedRights, targetLv1, HTKT_SUB_MODULE));
+        return { ids: ids, poolCount: ids.length, rejectedCount: 0 };
     }
 
     /*
@@ -466,7 +570,7 @@ function loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField) {
      * - esdjoinDatapermissionUnits theo từng batch permission id.
      * Nếu batch query lỗi, fallback về cơ chế cũ để không ảnh hưởng nghiệp vụ.
      */
-    function listContactsByRightsAndLv1(rightIds, targetLv1) {
+    function listContactsByRightsAndLv1Legacy(rightIds, targetLv1) {
         var output = {
             ids: [],
             poolCount: 0,
