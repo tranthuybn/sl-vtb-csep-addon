@@ -62,8 +62,8 @@ function getPaymentRoleByRights(contactId) {
 
 /*
  * Hàm dùng chung cho cả Thanh toán và Tạm ứng.
- * Dùng listContactsByRights() của ESD_PERMS_RIGHTS để lấy pool, sau đó lọc
- * data permission 00401 theo toàn bộ unit thuộc target lv1 ngay tại đây.
+ * Lọc contact theo quyền và lv1 ngay từ truy vấn đầu tiên, sau đó xác minh
+ * data permission 00401 theo toàn bộ unit thuộc target lv1 bằng batch query.
  */
 function listContactsByRightsAndLv1(rightIds, targetLv1, subModuleId) {
     var normalizedLv1 = String(targetLv1 == null ? "" : targetLv1).trim().replace(/\.0$/, "");
@@ -102,18 +102,27 @@ function listContactsByRightsAndLv1(rightIds, targetLv1, subModuleId) {
         try { if (orgFile) orgFile.doClose(); } catch (closeError) {}
     }
 
-    if (!lib.ESD_PERMS_RIGHTS || !lib.ESD_PERMS_RIGHTS.listContactsByRights) {
+    if (!lib.ESD_PERMS_RIGHTS || !lib.ESD_PERMS_RIGHTS.listContactsByRightsAndFilter) {
         return [];
     }
 
-    var contacts = lib.ESD_PERMS_RIGHTS.listContactsByRights(normalizedRights) || [];
+    /*
+     * Không lấy toàn bộ người có quyền trên toàn hàng rồi mới lọc từng người.
+     * Hàm chung đã lọc group/contact active và hiệu lực ngày; bổ sung lv1.id
+     * tại chính query đó để chỉ trả người thuộc lv1 của hồ sơ.
+     */
+    var contacts = lib.ESD_PERMS_RIGHTS.listContactsByRightsAndFilter(
+            normalizedRights,
+            { "lv1.id": [normalizedLv1] }
+    ) || [];
     if (contacts.toArray) contacts = contacts.toArray();
     if (!contacts.length) return [];
 
     var contactConditions = [];
     var unitConditions = [];
-    var result = [];
-    var seenContacts = {};
+    var permissionIds = [];
+    var contactByPermissionId = {};
+    var acceptedContacts = {};
 
     for (var contactIndex = 0; contactIndex < contacts.length; contactIndex++) {
         contactConditions.push(
@@ -140,18 +149,15 @@ function listContactsByRightsAndLv1(rightIds, targetLv1, subModuleId) {
         while (permissionRc === RC_SUCCESS) {
             var permissionId = String(permissionFile["id"] == null ? "" : permissionFile["id"]).trim();
             var contactId = String(permissionFile["contact.id"] == null ? "" : permissionFile["contact.id"]).trim();
+            var scope = String(permissionFile["permission.scope"] == null ? "" : permissionFile["permission.scope"]).trim();
 
-            if (permissionId && contactId && !seenContacts[contactId]) {
-                var count = lib.ESD_Utils.countFile(
-                        "esdjoinDatapermissionUnits",
-                        'data.permission.id="' + permissionId.replace(/\\/g, "\\\\").replace(/"/g, '\\"') +
-                        '" and status="Dang hoat dong" and (' + unitConditions.join(" or ") + ")"
-                );
-
-                if (count > 0) {
-                    seenContacts[contactId] = true;
-                    result.push(contactId);
-                }
+            /*
+             * QT_PQDL_01 = chỉ cá nhân; QT_PQDL_06 = toàn hàng nhưng đang bị
+             * chặn ở combobox. Hai scope này không được mở rộng sang lv1 hồ sơ.
+             */
+            if (permissionId && contactId && scope !== "QT_PQDL_01" && scope !== "QT_PQDL_06") {
+                permissionIds.push(permissionId);
+                contactByPermissionId[permissionId] = contactId;
             }
 
             permissionRc = permissionFile.getNext();
@@ -160,7 +166,66 @@ function listContactsByRightsAndLv1(rightIds, targetLv1, subModuleId) {
         try { if (permissionFile) permissionFile.doClose(); } catch (permissionCloseError) {}
     }
 
+    permissionIds = uniqueStrings(permissionIds);
+    if (!permissionIds.length) return [];
+
+    /* Một query theo batch thay cho countFile() lặp cho từng permission. */
+    var BATCH_SIZE = 100;
+    for (var offset = 0; offset < permissionIds.length; offset += BATCH_SIZE) {
+        var permissionConditions = [];
+        var permissionBatch = permissionIds.slice(offset, offset + BATCH_SIZE);
+        for (var permissionIndex = 0; permissionIndex < permissionBatch.length; permissionIndex++) {
+            permissionConditions.push(
+                    'data.permission.id="' + escapeSmQueryValue(permissionBatch[permissionIndex]) + '"'
+            );
+        }
+
+        var unitFile = null;
+        try {
+            unitFile = new SCFile("esdjoinDatapermissionUnits", SCFILE_READONLY);
+            unitFile.setFields(["data.permission.id", "unit.id", "status"]);
+            var unitRc = unitFile.doSelect(
+                    "(" + permissionConditions.join(" or ") + ') and status="Dang hoat dong" and (' +
+                    unitConditions.join(" or ") + ")"
+            );
+            while (unitRc === RC_SUCCESS) {
+                var mappedPermissionId = String(
+                        unitFile["data.permission.id"] || unitFile.data_permission_id || ""
+                ).trim();
+                var mappedContactId = contactByPermissionId[mappedPermissionId];
+                if (mappedContactId) acceptedContacts[mappedContactId] = true;
+                unitRc = unitFile.getNext();
+            }
+        } finally {
+            try { if (unitFile) unitFile.doClose(); } catch (unitCloseError) {}
+        }
+    }
+
+    var result = [];
+    for (var resultIndex = 0; resultIndex < contacts.length; resultIndex++) {
+        var resultContactId = String(contacts[resultIndex] == null ? "" : contacts[resultIndex]).trim();
+        if (resultContactId && acceptedContacts[resultContactId]) result.push(resultContactId);
+    }
+    return uniqueStrings(result);
+}
+
+function uniqueStrings(source) {
+    var result = [];
+    var seen = {};
+    for (var i = 0; source && i < source.length; i++) {
+        var value = String(source[i] == null ? "" : source[i]).trim();
+        if (value && !seen[value]) {
+            seen[value] = true;
+            result.push(value);
+        }
+    }
     return result;
+}
+
+function escapeSmQueryValue(value) {
+    return String(value == null ? "" : value)
+            .replace(/\\/g, "\\\\")
+            .replace(/"/g, '\\"');
 }
 
 
@@ -336,7 +401,6 @@ function loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField) {
 
     /* Cache trong một lần load form để không truy vấn lặp cùng user/role. */
     var userScopeCache = {};
-    var contactPoolCache = {};
     var contactDataCache = {};
     var orgUnitCache = {};
 
@@ -433,12 +497,6 @@ function loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField) {
     /*
      * User đăng nhập hợp lệ thì mới load danh sách combobox.
      */
-    output.rightsLoad = {
-        mode: candidateConfigs.length ? "seed-only" : "skipped",
-        elapsedMs: 0,
-        rightCount: 0
-    };
-
     for (var i = 0; i < configs.length; i++) {
         var config = configs[i];
 
@@ -561,294 +619,6 @@ function loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField) {
     function getContactsForRoleInLv1(config, targetLv1) {
         var ids = normalizeArray(listContactsByRightsAndLv1(config.seedRights, targetLv1, HTKT_SUB_MODULE));
         return { ids: ids, poolCount: ids.length, rejectedCount: 0 };
-    }
-
-    /*
-     * Lấy ứng viên theo quyền và lọc data permission theo lv1 theo kiểu batch.
-     * Thay vì gọi getUnitByDataPermissions() cho từng contact, hàm chỉ query:
-     * - esdQTdataPermissions theo từng batch contact;
-     * - esdjoinDatapermissionUnits theo từng batch permission id.
-     * Nếu batch query lỗi, fallback về cơ chế cũ để không ảnh hưởng nghiệp vụ.
-     */
-    function listContactsByRightsAndLv1Legacy(rightIds, targetLv1) {
-        var output = {
-            ids: [],
-            poolCount: 0,
-            rejectedCount: 0
-        };
-
-        var pool = normalizeArray(getContactPoolByRights(rightIds));
-        var normalizedTargetLv1 = normalizeUnitCode(targetLv1);
-
-        output.poolCount = pool.length;
-
-        if (!pool.length || !normalizedTargetLv1) {
-            output.rejectedCount = pool.length;
-            return output;
-        }
-
-        var batchSucceeded = preloadUserScopeContexts(pool, normalizedTargetLv1);
-        var accepted = [];
-
-        for (var i = 0; i < pool.length; i++) {
-            var contactId = normalizeValue(pool[i]);
-
-            if (!contactId) {
-                output.rejectedCount++;
-                continue;
-            }
-
-            /*
-             * Check user ứng viên cũng phải có data permission 00401 trong lv1 hồ sơ.
-             */
-            /*
-             * Khi preload lỗi, cache không được ghi và hàm này tự fallback
-             * sang getUnitByDataPermissions() theo từng contact như trước.
-             */
-            if (!contactDataPermissionInLv1(contactId, normalizedTargetLv1)) {
-                output.rejectedCount++;
-                continue;
-            }
-
-            accepted.push(contactId);
-        }
-
-        output.ids = normalizeArray(accepted);
-        output.batchSucceeded = batchSucceeded;
-
-        return output;
-    }
-
-    function preloadUserScopeContexts(contactIds, targetLv1) {
-        var contacts = normalizeArray(contactIds);
-        var pendingContacts = [];
-        var BATCH_SIZE = 100;
-
-        for (var i = 0; i < contacts.length; i++) {
-            var contactId = normalizeValue(contacts[i]);
-            var cacheKey = contactId + "|" + targetLv1;
-
-            if (contactId && !userScopeCache.hasOwnProperty(cacheKey)) {
-                pendingContacts.push(contactId);
-            }
-        }
-
-        if (!pendingContacts.length) {
-            return true;
-        }
-
-        var permissionByContact = {};
-        var contactByPermissionId = {};
-        var permissionIds = [];
-
-        try {
-            for (var offset = 0; offset < pendingContacts.length; offset += BATCH_SIZE) {
-                var contactBatch = pendingContacts.slice(offset, offset + BATCH_SIZE);
-                var contactConditions = [];
-
-                for (var contactIndex = 0; contactIndex < contactBatch.length; contactIndex++) {
-                    contactConditions.push(
-                            'contact.id="' + escapeQueryValue(contactBatch[contactIndex]) + '"'
-                    );
-                }
-
-                var permissionFile = new SCFile("esdQTdataPermissions", SCFILE_READONLY);
-                permissionFile.setFields(["id", "contact.id", "permission.scope"]);
-                var permissionRc = permissionFile.doSelect(
-                        "(" + contactConditions.join(" or ") + ")" +
-                        ' and sub.module="' + escapeQueryValue(HTKT_SUB_MODULE) + '"'
-                );
-
-                while (permissionRc === RC_SUCCESS) {
-                    var permissionId = normalizeValue(permissionFile["id"]);
-                    var permissionContact = normalizeValue(permissionFile["contact.id"]);
-                    var permissionScope = normalizeValue(
-                            permissionFile["permission.scope"] || permissionFile.permission_scope
-                    );
-
-                    if (permissionContact && !permissionByContact[permissionContact]) {
-                        permissionByContact[permissionContact] = {
-                            scope: permissionScope,
-                            units: []
-                        };
-                    }
-
-                    if (permissionId && permissionContact) {
-                        permissionIds.push(permissionId);
-                        contactByPermissionId[permissionId] = permissionContact;
-                    }
-
-                    permissionRc = permissionFile.getNext();
-                }
-
-                try { permissionFile.doClose(); } catch (permissionCloseError) {}
-            }
-
-            permissionIds = normalizeArray(permissionIds);
-
-            for (var permissionOffset = 0; permissionOffset < permissionIds.length; permissionOffset += BATCH_SIZE) {
-                var permissionBatch = permissionIds.slice(permissionOffset, permissionOffset + BATCH_SIZE);
-                var permissionConditions = [];
-
-                for (var permissionIndex = 0; permissionIndex < permissionBatch.length; permissionIndex++) {
-                    permissionConditions.push(
-                            'data.permission.id="' + escapeQueryValue(permissionBatch[permissionIndex]) + '"'
-                    );
-                }
-
-                var unitFile = new SCFile("esdjoinDatapermissionUnits", SCFILE_READONLY);
-                unitFile.setFields(["data.permission.id", "unit.id", "status"]);
-                var unitRc = unitFile.doSelect(
-                        "(" + permissionConditions.join(" or ") + ') and status="Dang hoat dong"'
-                );
-
-                while (unitRc === RC_SUCCESS) {
-                    var mappedPermissionId = normalizeValue(
-                            unitFile["data.permission.id"] || unitFile.data_permission_id
-                    );
-                    var mappedContact = contactByPermissionId[mappedPermissionId];
-                    var mappedUnit = normalizeUnitCode(
-                            unitFile["unit.id"] || unitFile.unit_id
-                    );
-
-                    if (mappedContact && mappedUnit && permissionByContact[mappedContact]) {
-                        permissionByContact[mappedContact].units.push(mappedUnit);
-                    }
-
-                    unitRc = unitFile.getNext();
-                }
-
-                try { unitFile.doClose(); } catch (unitCloseError) {}
-            }
-
-            for (var pendingIndex = 0; pendingIndex < pendingContacts.length; pendingIndex++) {
-                var pendingContact = pendingContacts[pendingIndex];
-                var permissionData = permissionByContact[pendingContact] || {
-                    scope: "QT_PQDL_01",
-                    units: []
-                };
-
-                userScopeCache[pendingContact + "|" + targetLv1] =
-                        buildUserScopeContextFromPermissionData(
-                                pendingContact,
-                                targetLv1,
-                                permissionData.scope,
-                                permissionData.units
-                        );
-            }
-
-            return true;
-        } catch (batchError) {
-            return false;
-        }
-    }
-
-    function buildUserScopeContextFromPermissionData(contactId, targetLv1, scope, units) {
-        var result = {
-            contactId: contactId,
-            targetLv1: targetLv1,
-            scope: normalizeValue(scope) || "QT_PQDL_01",
-            rawUnits: normalizeArray(units),
-            resolvedLv1List: [],
-            canAccessTargetLv1: false,
-            message: ""
-        };
-
-        if (result.scope === "QT_PQDL_06") {
-            result.canAccessTargetLv1 = ALLOW_GLOBAL_SCOPE_IN_COMBO === true;
-            result.message = result.canAccessTargetLv1 ?
-                    "User có scope toàn hàng và hệ thống cho phép dùng toàn hàng." :
-                    "User có scope toàn hàng nhưng nghiệp vụ đang chặn mở dữ liệu khác lv1.";
-            return result;
-        }
-
-        if (result.scope === "QT_PQDL_01" || !result.rawUnits.length) {
-            result.message = result.scope === "QT_PQDL_01" ?
-                    "User chỉ có scope cá nhân, không được load combobox theo lv1." :
-                    "User có scope đơn vị nhưng không có unit phân quyền dữ liệu.";
-            return result;
-        }
-
-        var resolvedLv1Map = {};
-
-        for (var i = 0; i < result.rawUnits.length; i++) {
-            var rawUnit = normalizeUnitCode(result.rawUnits[i]);
-            var currentLv1 = rawUnit === targetLv1 ? rawUnit : resolveLv1FromUnit(rawUnit);
-
-            if (currentLv1 && !resolvedLv1Map[currentLv1]) {
-                resolvedLv1Map[currentLv1] = true;
-                result.resolvedLv1List.push(currentLv1);
-            }
-
-            if (currentLv1 === targetLv1) {
-                result.canAccessTargetLv1 = true;
-                result.message = "User có data permission 00401 trong lv1 của hồ sơ.";
-                return result;
-            }
-        }
-
-        result.message = "User không có data permission 00401 trùng lv1 của hồ sơ.";
-        return result;
-    }
-
-
-    function getContactPoolByRights(rightIds) {
-        rightIds = normalizeArray(rightIds);
-
-        if (rightIds.length === 0) {
-            return [];
-        }
-
-        var cacheKey = rightIds.slice(0).sort().join("|");
-        if (contactPoolCache.hasOwnProperty(cacheKey)) {
-            return contactPoolCache[cacheKey].slice(0);
-        }
-        output.rightsLoad.rightCount += rightIds.length;
-        var rightsStarted = new Date().getTime();
-
-        try {
-            if (
-                    lib.ESD_PERMS_RIGHTS &&
-                    lib.ESD_PERMS_RIGHTS.listContactsByRights
-            ) {
-                var contactsByRights = normalizeArray(
-                        lib.ESD_PERMS_RIGHTS.listContactsByRights(rightIds) || []
-                );
-                contactPoolCache[cacheKey] = contactsByRights;
-                output.rightsLoad.elapsedMs += new Date().getTime() - rightsStarted;
-                return contactsByRights.slice(0);
-            }
-        } catch (e1) {}
-
-        /*
-         * Fallback nếu môi trường không expose listContactsByRights().
-         * Không truyền filter org ở đây, vì phạm vi dữ liệu sẽ check bằng
-         * getUnitByDataPermissions(contact, "00401") ở bước sau.
-         */
-        try {
-            if (
-                    lib.ESD_PERMS_RIGHTS &&
-                    lib.ESD_PERMS_RIGHTS.listContactsByRightsAndFilter
-            ) {
-                var contactsByFilter = normalizeArray(
-                        lib.ESD_PERMS_RIGHTS.listContactsByRightsAndFilter(
-                                rightIds, {}
-                        ) || []
-                );
-                contactPoolCache[cacheKey] = contactsByFilter;
-                output.rightsLoad.elapsedMs += new Date().getTime() - rightsStarted;
-                return contactsByFilter.slice(0);
-            }
-        } catch (e2) {}
-
-        contactPoolCache[cacheKey] = [];
-        output.rightsLoad.elapsedMs += new Date().getTime() - rightsStarted;
-        return [];
-    }
-
-    function contactDataPermissionInLv1(contactId, targetLv1) {
-        var ctx = getUserScopeContext(contactId, targetLv1);
-        return ctx.canAccessTargetLv1 === true;
     }
 
     /* =========================================================
@@ -1074,21 +844,6 @@ function loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField) {
     /* =========================================================
      * ORG UNIT RESOLVE
      * ========================================================= */
-
-    function resolveLv1ListFromUnits(unitArr) {
-        var result = [];
-        var units = normalizeArray(unitArr);
-
-        for (var i = 0; i < units.length; i++) {
-            var lv1 = resolveLv1FromUnit(units[i]);
-
-            if (lv1) {
-                result.push(lv1);
-            }
-        }
-
-        return normalizeArray(result);
-    }
 
     function resolveLv1FromUnit(unitCode) {
         unitCode = normalizeUnitCode(unitCode);

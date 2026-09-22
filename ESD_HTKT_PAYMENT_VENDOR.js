@@ -1550,12 +1550,12 @@ function getAllVendorsByPaymentId(paymentId) {
             vendors.push({
                 id: String(f["pv.id"] || f["id"] || "").trim(),
                 vendorId: String(f["pv.vendor.id"] || f["vendor.id"] || "").trim(),
-                amount: Number(f["pv.amount"] || f["amount"]) || 0,
-                refundAmount: Number(f["pv.refund.amount"] || f["refund.amount"]) || 0,
-                approvedInvoiceAmount: Number(
+                amount: toPaymentVendorMoneyString(f["pv.amount"] || f["amount"]),
+                refundAmount: toPaymentVendorMoneyString(f["pv.refund.amount"] || f["refund.amount"]),
+                approvedInvoiceAmount: toPaymentVendorMoneyString(
                         f["pv.approved.invoice.amount"] ||
                         f["approved.invoice.amount"]
-                ) || 0
+                )
             });
             rc = f.getNext();
         }
@@ -1576,32 +1576,51 @@ function getAllVendorsByPaymentId(paymentId) {
 
 
 /**
- * Tính tổng thông tin Vendor của Payment
+ * Chuẩn hóa số tiền trả về từ SCFile thành chuỗi để không mất chính xác số lớn.
  */
-function getPaymentVendorList(paymentId) {
-    var vendorList = getAllVendorsByPaymentId(paymentId) || [];
+function toPaymentVendorMoneyString(value) {
+    var amount = String(value == null || value === "" ? "0" : value).trim();
+    return amount || "0";
+}
 
+/**
+ * Dùng chung để cộng các trường tiền của danh sách vendor bằng số học chuỗi.
+ */
+function calculatePaymentVendorTotals(vendorList) {
     var totals = {
-        approvedInvoiceAmount: 0,
-        paidAmount: 0,
-        refundAmount: 0
+        approvedInvoiceAmount: "0",
+        paidAmount: "0",
+        refundAmount: "0"
     };
 
-    if (vendorList.length === 0) {
-        return totals;
-    }
+    vendorList = vendorList || [];
 
     for (var i = 0; i < vendorList.length; i++) {
         var vendor = vendorList[i];
 
-        totals.approvedInvoiceAmount += Number(vendor.approvedInvoiceAmount) || 0;
-        totals.paidAmount += Number(vendor.amount) || 0;
-        totals.refundAmount += Number(vendor.refundAmount) || 0;
+        totals.approvedInvoiceAmount = lib.ESD_HTKT_Utils.addStringsManual(
+                totals.approvedInvoiceAmount,
+                toPaymentVendorMoneyString(vendor.approvedInvoiceAmount)
+        );
+        totals.paidAmount = lib.ESD_HTKT_Utils.addStringsManual(
+                totals.paidAmount,
+                toPaymentVendorMoneyString(vendor.amount)
+        );
+        totals.refundAmount = lib.ESD_HTKT_Utils.addStringsManual(
+                totals.refundAmount,
+                toPaymentVendorMoneyString(vendor.refundAmount)
+        );
     }
 
     return totals;
 }
 
+/**
+ * Tính tổng thông tin Vendor của Payment.
+ */
+function getPaymentVendorList(paymentId) {
+    return calculatePaymentVendorTotals(getAllVendorsByPaymentId(paymentId));
+}
 
 
 /**
@@ -1635,8 +1654,8 @@ function handleVendorChangeUpdate(record) {
 
         if (!totals) {
             totals = {
-                approvedInvoiceAmount: 0,
-                paidAmount: 0
+                approvedInvoiceAmount: "0",
+                paidAmount: "0"
             };
         }
 
@@ -1655,9 +1674,9 @@ function handleVendorChangeUpdate(record) {
         }
 
         // Cập nhật tổng tiền từ kết quả vừa tính lại
-        f["total.amount.paid"] = totals.paidAmount || 0;
+        f["total.amount.paid"] = totals.paidAmount || "0";
 
-        f["approved.invoice.amount"] = totals.approvedInvoiceAmount || 0;
+        f["approved.invoice.amount"] = totals.approvedInvoiceAmount || "0";
 
         var updateRc = f.doUpdate();
 
