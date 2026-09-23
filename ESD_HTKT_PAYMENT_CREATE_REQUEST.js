@@ -993,6 +993,104 @@ function getOglBranchCodeByDepartment(departmentCode) {
 
 
 //
+//function listFileAttachment(input) {
+//
+//    // 1. Lấy dữ liệu linh hoạt từ details hoặc queryString
+//    var rawData = input ? (input.details || input.queryString) : null;
+//    if (!rawData) return { success: false, message: "Thiếu dữ liệu đầu vào." };
+//
+//    var params = {};
+//    try {
+//        params = JSON.parse(rawData);
+//        if (Array.isArray(params)) {
+//            params = params[0] || {};
+//        }
+//    } catch (e) {
+//        return { success: false, message: "Dữ liệu JSON đầu vào không hợp lệ." };
+//    }
+//
+//    // 2. Cập nhật fieldMappings bao gồm các trường từ bảng chính và các bảng join
+//    var fieldMappings = [
+//        ['id', 'id', 'S'],
+//        ['id.activity.vj', 'id.activity.vj', 'S'],
+//        ['name', 'name', 'S'],
+//        ['status', 'status', 'S'],
+//        ['created.by', 'created.by', 'S'],
+//        ['created.at', 'created.at', 'D'],
+//        ['sysmodtime', 'sysmodtime', 'D'],
+//        ['sysmoduser', 'sysmoduser', 'S'],
+//        ['sizeKb', 'sizeKb', 'N'],
+//        ['parent.id', 'parent.id', 'S'],
+//        ['attach.type', 'attach.type', 'S'],
+//        ['note', 'note', 'S'],
+//        ['executor', 'executor', 'S'],
+//        ['document.type', 'document.type', 'S'],
+//        ['attach.id', 'attach.id', 'S'],
+//        ['table', 'table', 'S'],
+//        ['doc.id', 'doc.id', 'S'],
+//        ['document.source', 'document.source', 'S'],
+//        ['document.date', 'document.date', 'D'],
+//        ['category', 'category', 'S'],
+//        ['step.status', 'step.status', 'S'],
+//        ['transaction.id', 'transaction.id', 'S'],
+//        ['function', 'function', 'S'],
+//        ['original.id', 'original.id', 'S'],
+//
+//        ['at.id', 'at_id', 'S'],
+//        ['at.name', 'at_name', 'S'],
+//        ['p.id', 'p_id', 'S'],
+//        ['p.contract.id', 'p_contract_id', 'S']
+//    ];
+//
+//    // 3. Xây dựng điều kiện lọc WHERE
+//    var conditions = [];
+//
+//    if (params.status) {
+//        conditions.push("status=\"" + params.status + "\"");
+//    }
+//    if (params.paymentId) {
+//        conditions.push("p.id=\"" + params.paymentId + "\"");
+//    }
+//
+//    conditions.push("original.id = at.id");
+//    conditions.push("p.contract.id = at.parent.id");
+//
+//    var whereClause = conditions.length > 0 ? conditions.join(" and ") : "true";
+//
+//    var sqlFields = fieldMappings.map(function(item) {
+//        return item[0];
+//    }).join(", ");
+//
+//    // 4. Truy vấn đa bảng trong Service Manager
+//    var querySQL = " SELECT " + sqlFields + " FROM esdHDtlks, esdHDattachment at, esdHTKTpayment p WHERE " + whereClause;
+//
+//    var dataArray = [];
+//    var f = new SCFile('esdHDtlks', SCFILE_READONLY);
+//
+//    try {
+//        var rc = f.doSelect(querySQL);
+//
+//        while (rc == RC_SUCCESS) {
+//            var itemData = mapRowToObject(f, fieldMappings);
+//
+//            var wrappedItem = {
+//                "esdHDtlks": itemData
+//            };
+//
+//            dataArray.push(JSON.stringify(wrappedItem));
+//
+//            rc = f.getNext();
+//        }
+//    } catch (e) {
+//        // print("[ERROR listFileAttachment] Lỗi doSelect: " + e);
+//    } finally {
+//        try { if (f) f.doClose(); } catch (e) {}
+//    }
+//
+//    // Trả mảng kết quả
+//    input.queryReturnArray = system.functions.denull(dataArray);
+//}
+
 function listFileAttachment(input) {
 
     // 1. Lấy dữ liệu linh hoạt từ details hoặc queryString
@@ -1009,7 +1107,7 @@ function listFileAttachment(input) {
         return { success: false, message: "Dữ liệu JSON đầu vào không hợp lệ." };
     }
 
-    // 2. Cập nhật fieldMappings bao gồm các trường từ bảng chính và các bảng join
+    // 2. Định nghĩa fieldMappings chỉ cho bảng esdHDtlks
     var fieldMappings = [
         ['id', 'id', 'S'],
         ['id.activity.vj', 'id.activity.vj', 'S'],
@@ -1034,12 +1132,7 @@ function listFileAttachment(input) {
         ['step.status', 'step.status', 'S'],
         ['transaction.id', 'transaction.id', 'S'],
         ['function', 'function', 'S'],
-        ['original.id', 'original.id', 'S'],
-
-        ['at.id', 'at_id', 'S'],
-        ['at.name', 'at_name', 'S'],
-        ['p.id', 'p_id', 'S'],
-        ['p.contract.id', 'p_contract_id', 'S']
+        ['original.id', 'original.id', 'S']
     ];
 
     // 3. Xây dựng điều kiện lọc WHERE
@@ -1048,22 +1141,15 @@ function listFileAttachment(input) {
     if (params.status) {
         conditions.push("status=\"" + params.status + "\"");
     }
-    if (params.paymentId) {
-        conditions.push("p.id=\"" + params.paymentId + "\"");
+    if (params.role !== "kttc") {
+        if (params.createdBy) {
+            conditions.push("tolower(executor)=\"" + params.createdBy.toLowerCase() + "\"");
+        }
     }
 
-    conditions.push("original.id = at.id");
-    conditions.push("p.contract.id = at.parent.id");
+    var querySQL = conditions.length > 0 ? conditions.join(" and ") : "true";
 
-    var whereClause = conditions.length > 0 ? conditions.join(" and ") : "true";
-
-    var sqlFields = fieldMappings.map(function(item) {
-        return item[0];
-    }).join(", ");
-
-    // 4. Truy vấn đa bảng trong Service Manager
-    var querySQL = " SELECT " + sqlFields + " FROM esdHDtlks, esdHDattachment at, esdHTKTpayment p WHERE " + whereClause;
-
+    // 4. Truy vấn đơn bảng trong Service Manager
     var dataArray = [];
     var f = new SCFile('esdHDtlks', SCFILE_READONLY);
 
@@ -1082,7 +1168,7 @@ function listFileAttachment(input) {
             rc = f.getNext();
         }
     } catch (e) {
-        // print("[ERROR listFileAttachment] Lỗi doSelect: " + e);
+        print("[ERROR listFileAttachment] Lỗi doSelect: " + e);
     } finally {
         try { if (f) f.doClose(); } catch (e) {}
     }
@@ -1090,4 +1176,3 @@ function listFileAttachment(input) {
     // Trả mảng kết quả
     input.queryReturnArray = system.functions.denull(dataArray);
 }
-
