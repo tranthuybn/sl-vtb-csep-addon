@@ -397,6 +397,7 @@ function buildAccountingInformationRecord(
         message: '',
         response: '',
         'transaction.id': '',
+        'host.res.num': '',
         'ref.id': '',
         'ap.code': '',
         'batch.name': '',
@@ -596,6 +597,7 @@ function mapAccountingResponseToRecord(record) {
     }
 
     var transactionId = safeString(responseData.transactionId).trim();
+    var hostRefNum = safeString(responseData.hostRefNum).trim();
     var referenceId = safeString(responseData.referenceId).trim();
     var batchName = safeString(responseData.batchName).trim();
     var invoiceNumber = safeString(responseData.invoiceNumber).trim();
@@ -612,6 +614,7 @@ function mapAccountingResponseToRecord(record) {
     record['checked.time'] = system.functions.tod();
 
     if (transactionId) record['transaction.id'] = transactionId;
+    if (hostRefNum) record['host.res.num'] = hostRefNum;
     if (referenceId) record['ref.id'] = referenceId;
     if (batchName) record['batch.name'] = batchName;
     if (invoiceNumber) record['ap.code'] = invoiceNumber;
@@ -629,6 +632,7 @@ function mapAccountingResponseToRecord(record) {
         requestId: readText(record, 'request.id').trim(),
         status: mappedStatus,
         transactionId: transactionId,
+        hostRefNum: hostRefNum,
         referenceId: referenceId,
         batchName: batchName,
         invoiceNumber: invoiceNumber,
@@ -1283,7 +1287,7 @@ function mapCoreTransferPayloadForEntry(requestId, entry, context) {
                 ],
                 makerId: maker,
                 trnDesc: description,
-                chanRefNum: requestId
+                chanRefNum: requestId.substring(0,16)
             }
         };
     }

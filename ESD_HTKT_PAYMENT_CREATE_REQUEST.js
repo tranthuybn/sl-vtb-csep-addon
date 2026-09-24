@@ -544,22 +544,8 @@ function listPurchaseContracts(input) {
                 itemData.totalValue = itemData["contract.value.after.tax"] || itemData.totalValue || "0";
             }
 
-            // --- LỌC BẢN GHI: HIỂN THỊ NẾU CÒN GIÁ TRỊ HĐ HOẶC CÒN HOÀN ỨNG HOẶC CÒN PHẢI TRẢ ---
-            var contractId = itemData.id;
-            var currentContractAmount = String(itemData.totalValue || itemData['contract.amount'] || "0");
-            var remainingVal = calculateContractRemainingValue(contractId, currentContractAmount);
-            var remainingRefundVal = calculateContractRemainingRefund(contractId);
-            var remainingPayableVal = calculateContractRemainingPayable(contractId);
-
-            itemData.remainingValue = remainingVal;
-            itemData["remaining.amount"] = remainingVal;
-            itemData.remainingRefundValue = remainingRefundVal;
-            itemData.remainingPayableValue = remainingPayableVal;
-
-            // Chỉ chặn khi cả 3 giá trị (giá trị HĐ còn lại, hoàn ứng còn lại, số tiền phải trả còn lại) đều <= 0
-            if (Number(remainingVal) > 0 || Number(remainingRefundVal) > 0 || Number(remainingPayableVal) > 0) {
-                dataArray.push(itemData);
-            }
+            // Không tính/lọc số dư tại đây để tránh query lồng theo từng hợp đồng.
+            dataArray.push(itemData);
 
             rc = f.getNext();
         }
@@ -579,6 +565,8 @@ function listPurchaseContracts(input) {
     };
 }
 
+// Các hàm calculate chỉ dùng để kiểm tra số dư khi createPaymentRequest.
+// listPurchaseContracts không gọi chúng để tránh query lồng theo từng hợp đồng.
 function calculateContractRemainingValue(contractId, currentContractAmount) {
     if (!contractId) return String(currentContractAmount || "0");
 
@@ -779,7 +767,6 @@ function calculateContractRemainingPayable(contractId) {
 
     return totalRemainingPayable;
 }
-
 function getNumberField(file, fieldNames) {
     for (var i = 0; i < fieldNames.length; i++) {
         var value = file[fieldNames[i]];

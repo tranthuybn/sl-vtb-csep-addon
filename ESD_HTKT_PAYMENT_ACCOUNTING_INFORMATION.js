@@ -326,7 +326,7 @@ function buildVendorPayloads(payment, vendorRow, entries, context, accountingDat
         }
     }
 
-    if (toNumber(vendorRow.approved_invoice_amount) > 0 && apLines.length) {
+    if (apLines.length > 0) {
         var invoiceRequestId = uuid();
         var isPersonalVendor = normalizeIdentity(vendorRow.vendor_type) === 'canhan' ||
                 normalizeIdentity(vendorRow.vendor_type) === 'cn';
@@ -555,8 +555,8 @@ function mapCorePayload(requestId, entry, context) {
     if (internal) return { subType: SUB_INHOUSE, data: {
             requestId: requestId, clientDt: clientDate, channel: 'A414_QLTS',
             spname: 'com.xesapi.xferadd20.FunsTransferAdd', data: {
-                depAcctIdFrom: { acctId: '1111', acctCur: entry.currency },
-                depAcctIdTo: { acctId: entry.account_number, acctCur: entry.currency, toBranchId: branchCode },
+                depAcctIdFrom: { acctId: '1111', acctCur: entry.currency, branchId: branchCode },
+                depAcctIdTo: { acctId: entry.account_number, acctCur: entry.currency},
                 amount: amount, curCode: entry.currency, reversedInd: 'N',
                 trnRefNum: requestId, maker: maker, checker: checker, notes: description } } };
     return { subType: SUB_CITAD, data: {
