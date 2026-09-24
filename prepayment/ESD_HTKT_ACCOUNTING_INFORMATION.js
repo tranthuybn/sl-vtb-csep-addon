@@ -1244,12 +1244,12 @@ function mapCoreTransferPayloadForEntry(requestId, entry, context) {
             data: {
                 depAcctIdFrom: {
                     acctId: CORE_INTERNAL_SOURCE_ACCOUNT,
-                    acctCur: currency
+                    acctCur: currency,
+                    branchId: branchCode + '98'
                 },
                 depAcctIdTo: {
                     acctId: accountNumber,
-                    acctCur: currency,
-                    toBranchId: branchCode + '98'
+                    acctCur: currency
                 },
                 amount: amountText,
                 curCode: currency,
