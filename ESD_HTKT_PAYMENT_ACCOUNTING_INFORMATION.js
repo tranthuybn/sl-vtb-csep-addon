@@ -451,7 +451,8 @@ function buildVendorContext(payment, vendorRow) {
             entity: vendorSite.ogl_entity,
             segment1: entityResult.segment1, maker: maker, checker: checker,
             cashout: cashout,
-            beneficiaryBank: vendorRow.beneficiary_bank
+            beneficiaryBank: vendorRow.beneficiary_bank,
+            bankBranchCode: vendorRow.bank_branch_code
         } };
 }
 
@@ -558,6 +559,8 @@ function mapCorePayload(requestId, entry, context) {
                 depAcctIdFrom: { acctId: '1111', acctCur: entry.currency, branchId: branchCode },
                 depAcctIdTo: { acctId: entry.account_number, acctCur: entry.currency},
                 amount: amount, curCode: entry.currency, reversedInd: 'N',
+                fromCostCentre: safeString(branchCode).trim(),
+                toCostCentre: safeString(context.bankBranchCode).trim(),
                 trnRefNum: requestId, maker: maker, checker: checker, notes: description } } };
     return { subType: SUB_CITAD, data: {
             requestId: requestId, clientDt: clientDate, channel: 'A414_QLTS', reftype: 'A414_QLTS',
@@ -668,6 +671,7 @@ function getPaymentVendors(paymentId) {
             refund_amount: readNumber(f, 'refund.amount'), vendor_type: readText(f, 'vendor.type').trim(),
             currency: readText(f, 'currency').trim(),
             payment_method: readText(f, 'payment.method').trim(), beneficiary_bank: readText(f, 'beneficiary.bank').trim(),
+            bank_branch_code: readText(f, 'bank.branch.code').trim(),
             transaction_des: readText(f, 'transaction.des').trim() };
     });
 }
