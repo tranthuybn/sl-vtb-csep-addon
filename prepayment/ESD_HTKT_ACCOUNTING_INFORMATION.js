@@ -753,6 +753,7 @@ function mapPrepaymentApiContext(prepayment) {
             accountingApprover: accountingApprover,
             paymentMethod: prepaymentVendor.payment_method,
             beneficiaryBank: prepaymentVendor.beneficiary_bank,
+            bankBranchCode: prepaymentVendor.bank_branch_code,
             cashout: cashout,
             vatList: vatListResult.data
         }
@@ -1215,6 +1216,17 @@ function mapCoreTransferPayloadForEntry(requestId, entry, context) {
     var isInternal = bank.napasCode === CORE_VIETINBANK_NAPAS_CODE;
     var accountNumber = safeString(entry.account_number).trim();
     var accountName = safeString(entry.account_name).trim();
+    var bankBranchCode = safeString(context.bankBranchCode).trim();
+
+    if (isInternal && !bankBranchCode) {
+        return mapError(
+            'MISSING_PREPAYMENT_VENDOR_BANK_BRANCH_CODE',
+            'Thieu ' +
+                TABLE_PREPAYMENT_VENDOR +
+                '.bank.branch.code cua tai khoan thu huong.'
+        );
+    }
+
     var externalAccountName = truncateCoreText(
         accountName,
         CORE_EXTERNAL_TO_ACCOUNT_NAME_MAX_LENGTH
@@ -1245,12 +1257,14 @@ function mapCoreTransferPayloadForEntry(requestId, entry, context) {
                 depAcctIdFrom: {
                     acctId: CORE_INTERNAL_SOURCE_ACCOUNT,
                     acctCur: currency,
-                    branchId: branchCode + '98'
+                    branchId: branchCode + '98',
                 },
                 depAcctIdTo: {
                     acctId: accountNumber,
-                    acctCur: currency
+                    acctCur: currency,
                 },
+                fromCostCentre: branchCode + '98',
+                toCostCentre: bankBranchCode,
                 amount: amountText,
                 curCode: currency,
                 reversedInd: 'N',
@@ -1660,7 +1674,8 @@ function mapSinglePrepaymentVendor(prepaymentId) {
             vendor_id: readText(f, 'vendor.id').trim(),
             vendor_site_id: readText(f, 'vendor.site.id').trim(),
             payment_method: readText(f, 'payment.method').trim(),
-            beneficiary_bank: readText(f, 'beneficiary.bank').trim()
+            beneficiary_bank: readText(f, 'beneficiary.bank').trim(),
+            bank_branch_code: readText(f, 'bank.branch.code').trim()
         };
         var nextRc = f.getNext();
         // closeFile(f);
