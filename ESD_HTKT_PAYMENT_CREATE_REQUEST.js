@@ -220,6 +220,7 @@ function mapPaymentRecord(paymentRec, contractData, paymentId) {
     paymentRec['contract.id'] = contractData['id'];
     paymentRec['contract.name'] = contractData['name'];
     paymentRec['current.phase'] = "start";
+    paymentRec['executor.payment'] = contractData['currentUser'];
 
 
     var creatorUser = htktCreatePay_resolveCurrentUser(

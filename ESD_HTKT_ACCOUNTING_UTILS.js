@@ -173,7 +173,7 @@ function checkOpenAccoutingTime() {
 }
 
 function processAccounting(esdHTKTprepayment) {
-    logger.info('ESD_HTKT_ACCOUNTING_UTILS::processAccounting: ' + rteJSONStringify(esdHTKTprepayment));
+    // logger.info('ESD_HTKT_ACCOUNTING_UTILS::processAccounting: ' + rteJSONStringify(esdHTKTprepayment));
     if (!esdHTKTprepayment || !esdHTKTprepayment.id) return;
 
     var accountingInTime = checkOpenAccoutingTime();
@@ -223,6 +223,9 @@ function processAccounting(esdHTKTprepayment) {
             //                hasOGLError = true;
             //            }
         });
+        if (arrAPItem.length == 0 && arrGLItem.length == 0) {
+            checkCompleteAccounting(esdHTKTprepayment.id);
+        }
         //        if (!hasOGLError) {
         //            arrCoreItem.forEach(itemHt => {
         //                callApiCore(itemHt);
@@ -238,14 +241,14 @@ function processAccounting(esdHTKTprepayment) {
 function callApiAp(esdHTKTacountingInfo) {
     var success = false;
     if (!esdHTKTacountingInfo || !esdHTKTacountingInfo['request.id'] || !esdHTKTacountingInfo.data) {
-        logger.info('ESD_HTKT_ACCOUNTING_UTILS::callApiAp: invalid payload');
+        // logger.info('ESD_HTKT_ACCOUNTING_UTILS::callApiAp: invalid payload');
         return success;
     }
     var payload = null;
     try {
         payload = rteJSONParse(esdHTKTacountingInfo.data);
     } catch (e) {
-        logger.info("ESD_HTKT_ACCOUNTING_UTILS::callApiAp: sub.type không xác định");
+        // logger.info("ESD_HTKT_ACCOUNTING_UTILS::callApiAp: sub.type không xác định");
     }
 
     if (payload) {
@@ -254,11 +257,11 @@ function callApiAp(esdHTKTacountingInfo) {
             esdHTKTacountingInfo['sub.type'] == ACCOUNTING_SUB_TYPE.TAM_UNG ||
             esdHTKTacountingInfo['sub.type'] == ACCOUNTING_SUB_TYPE.THUE) {
             response = lib.ESD_HTKT_INVOICE_OGL_INTEGRATION.createApInvoice(payload);
-//            response = { success : false }
+//            response = { success: false }
         } else if (esdHTKTacountingInfo['sub.type'] == ACCOUNTING_SUB_TYPE.TAT_TOAN) {
             response = lib.ESD_HTKT_INVOICE_OGL_INTEGRATION.createApPayment(payload);
         } else {
-            logger.info("ESD_HTKT_ACCOUNTING_UTILS::callApiAp: sub.type không xác định");
+            // logger.info("ESD_HTKT_ACCOUNTING_UTILS::callApiAp: sub.type không xác định");
         }
         if (response) {
             success = response.success;
@@ -285,14 +288,14 @@ function callApiAp(esdHTKTacountingInfo) {
 function callApiGl(esdHTKTacountingInfo) {
     var success = false;
     if (!esdHTKTacountingInfo || !esdHTKTacountingInfo['request.id'] || !esdHTKTacountingInfo.data) {
-        logger.info('ESD_HTKT_ACCOUNTING_UTILS::callApiGl: invalid payload');
+        // logger.info('ESD_HTKT_ACCOUNTING_UTILS::callApiGl: invalid payload');
         return success;
     }
     var payload = null;
     try {
         payload = rteJSONParse(esdHTKTacountingInfo.data);
     } catch (e) {
-        logger.info("ESD_HTKT_ACCOUNTING_UTILS::callApiGl: QLTS Cannot parse json payload");
+        // logger.info("ESD_HTKT_ACCOUNTING_UTILS::callApiGl: QLTS Cannot parse json payload");
     }
     if (payload) {
         var response = lib.ESD_HTKT_INVOICE_OGL_INTEGRATION.createBatchGL(payload);
@@ -318,20 +321,22 @@ function callApiGl(esdHTKTacountingInfo) {
     return success;
 }
 
+
 // Goi API chuyen tien
+//checkCompleteAccounting('TU.106.26.0000013')
 function callApiCore(esdHTKTacountingInfo) {
     // Đặt false để tắt giả lập và gọi lại CORE thật.
     var USE_FAKE_CORE_RESPONSE = true;
     var success = false;
     if (!esdHTKTacountingInfo || !esdHTKTacountingInfo['request.id'] || !esdHTKTacountingInfo.data) {
-        logger.info('ESD_HTKT_ACCOUNTING_UTILS::callApiCore: invalid payload');
+        // logger.info('ESD_HTKT_ACCOUNTING_UTILS::callApiCore: invalid payload');
         return success;
     }
     var payload = null;
     try {
         payload = rteJSONParse(esdHTKTacountingInfo.data);
     } catch (e) {
-        logger.info("ESD_HTKT_ACCOUNTING_UTILS::callApiCore: QLTS Cannot parse json payload");
+        // logger.info("ESD_HTKT_ACCOUNTING_UTILS::callApiCore: QLTS Cannot parse json payload");
     }
     if (payload) {
         var response = null;
@@ -339,7 +344,7 @@ function callApiCore(esdHTKTacountingInfo) {
         var statusDetail = null;
         if (USE_FAKE_CORE_RESPONSE &&
             (esdHTKTacountingInfo['sub.type'] == ACCOUNTING_SUB_TYPE.INHOUSE ||
-             esdHTKTacountingInfo['sub.type'] == ACCOUNTING_SUB_TYPE.CITAD)) {
+                esdHTKTacountingInfo['sub.type'] == ACCOUNTING_SUB_TYPE.CITAD)) {
             var fakeStatuses = [
                 { code: "1", detail: "Thất bại" },
                 { code: "1001", detail: "Lỗi server" },
@@ -348,19 +353,36 @@ function callApiCore(esdHTKTacountingInfo) {
                 { code: "100", detail: "Lỗi dữ liệu. Mã lỗi hệ thống chung" }
             ];
             var fakeStatus = fakeStatuses[Math.floor(Math.random() * fakeStatuses.length)];
-            response = { status: { code: fakeStatus.code, detail: fakeStatus.detail + " (Giả lập)" } };
+            response = {
+                status: {
+                    code: fakeStatus.code,
+                    detail: fakeStatus.detail + " (Giả lập)"
+                },
+            };
         } else if (esdHTKTacountingInfo['sub.type'] == ACCOUNTING_SUB_TYPE.INHOUSE) {
             response = lib.ESD_HTKT_FUND_TRANSFER_INTEGRATION.fundTranfer(payload);
         } else if (esdHTKTacountingInfo['sub.type'] == ACCOUNTING_SUB_TYPE.CITAD) {
             response = lib.ESD_HTKT_FUND_TRANSFER_INTEGRATION.fundTranferOut(payload);
         } else {
-            logger.info("ESD_HTKT_ACCOUNTING_UTILS::callApiCore: sub.type không xác định");
+            // logger.info("ESD_HTKT_ACCOUNTING_UTILS::callApiCore: sub.type không xác định");
         }
+
+        // Log duy nhất response trả về của call core
+        logger.info("ESD_HTKT_ACCOUNTING_UTILS::callApiCore response: " + rteJSONStringify(response));
+
         if (response) {
+            var responseData = response.data && typeof response.data === "object" ?
+                response.data :
+                {};
+            var hostRefNum = String(responseData.hostRefNum || "").trim();
+
             if (response.status) {
                 status = response.status.code === "0" ? ACCOUNTING_STATUS.COMPLETED : ACCOUNTING_STATUS.ERROR;
                 statusDetail = response.status.detail;
                 success = (status == ACCOUNTING_STATUS.COMPLETED);
+            } else {
+                status = ACCOUNTING_STATUS.ERROR;
+                statusDetail = response.message || "Response không có status.code";
             }
             var itemAccounting = new SCFile('esdHTKTaccountingInformation');
             var result = itemAccounting.doSelect(`request.id = "${esdHTKTacountingInfo['request.id']}"`);
@@ -369,6 +391,17 @@ function callApiCore(esdHTKTacountingInfo) {
                 itemAccounting.status = status;
                 itemAccounting.response = rteJSONStringify(response);
                 itemAccounting.message = statusDetail;
+                itemAccounting['host.res.num'] = hostRefNum;
+                itemAccounting.doUpdate();
+            }
+            try { if (itemAccounting) itemAccounting.doClose(); } catch (e) {}
+        } else {
+            var itemAccounting = new SCFile('esdHTKTaccountingInformation');
+            var result = itemAccounting.doSelect(`request.id = "${esdHTKTacountingInfo['request.id']}"`);
+            if (result == RC_SUCCESS) {
+                itemAccounting['checked.time'] = funcs.tod();
+                itemAccounting.status = ACCOUNTING_STATUS.ERROR;
+                itemAccounting.message = "Không nhận được phản hồi từ hệ thống CORE";
                 itemAccounting.doUpdate();
             }
             try { if (itemAccounting) itemAccounting.doClose(); } catch (e) {}
@@ -379,14 +412,20 @@ function callApiCore(esdHTKTacountingInfo) {
 
 // kiem tra thong tin hach toan theo request ID
 function checkAccountingInfo(requestId) {
-    logger.info(`checkAccountingInfo: ${requestId}`);
+    // logger.info(`checkAccountingInfo: ${requestId}`);
     if (!requestId || requestId.trim().length == 0) return;
     var itemAccounting = new SCFile('esdHTKTaccountingInformation');
     var result = itemAccounting.doSelect(`request.id = "${requestId}"`);
     if (result == RC_SUCCESS) {
         var response = null;
+        var prepId = itemAccounting['prepayment.id'];
         if (itemAccounting.status !== ACCOUNTING_STATUS.NEW && itemAccounting.status !== ACCOUNTING_STATUS.PROCESSING) {
             // chi check voi 2 trang thai NEW && PROCESSING
+            var currentStatus = itemAccounting.status;
+            try { if (itemAccounting) itemAccounting.doClose(); } catch (e) {}
+            if (currentStatus === ACCOUNTING_STATUS.COMPLETED && prepId) {
+                checkCompleteAccounting(prepId);
+            }
             return;
         }
         if (itemAccounting.type == ACCOUNTING_TYPE.AP) {
@@ -396,9 +435,9 @@ function checkAccountingInfo(requestId) {
             });
         } else if (itemAccounting.type == ACCOUNTING_TYPE.GL) {
             response = lib.ESD_HTKT_INVOICE_OGL_INTEGRATION.checkBatchGl(itemAccounting['transaction.id']);
-            print("resds", response);
+            // print("resds", response);
         }
-        
+
         if (response) {
             itemAccounting.response = rteJSONStringify(response);
             var status = "UNKNOWN";
@@ -426,15 +465,19 @@ function checkAccountingInfo(requestId) {
             }
             itemAccounting.status = status;
             itemAccounting.doUpdate();
-            
+
         }
-        checkCompleteAccounting(itemAccounting['prepayment.id']);
+        try { if (itemAccounting) itemAccounting.doClose(); } catch (e) {}
+        if (prepId) {
+            checkCompleteAccounting(prepId);
+        }
+    } else {
+        try { if (itemAccounting) itemAccounting.doClose(); } catch (e) {}
     }
-    try { if (itemAccounting) itemAccounting.doClose(); } catch (e) {}
 }
 
 function createJobCheckAccounting(requestId) {
-    logger.info(`createJobCheckAccounting: ${requestId}`);
+    // logger.info(`createJobCheckAccounting: ${requestId}`);
     var workerName = "ESD HTKT CHECK ACCOUNTING == " + requestId;
     lib.ESD_HTKT_Utils.createSchedule({
         name: workerName,
@@ -446,10 +489,12 @@ function createJobCheckAccounting(requestId) {
 //createJobCheckAccounting('8257D136-145F-4B85-8C12-CAB1E6001A51');
 //checkAccountingInfo('1BCFEC01-BED7-4BBB-9E98-C376F7001A44');
 
+
 // Moi lan kiem tra xong 1 row
 // Kiem tra de nghi da hach toan thanh cong chua
 // duyet ds accountingInformation, neu tat ca ban ghi da complete -> cap nhat esdHTKTprepayment.status = ACCOUNTED;
 function checkCompleteAccounting(prepaymentId) {
+
     var fields = ['request.id', 'prepayment.id', 'type', 'sub.type', 'data'];
     var countRecord = 0;
     var countRecordCompleted = 0;
@@ -490,6 +535,7 @@ function checkCompleteAccounting(prepaymentId) {
     if (countRecord == countRecordCompleted && countRecordCompleted > 0) {
         updatePaymentAccountingCompletedStatus(prepaymentId, isPayment);
     }
+
     if (countOGL == countOGLCompleted && itemAccountingCore.length > 0) {
         itemAccountingCore.forEach(itemHT => {
             if (callApiCore(itemHT)) {
@@ -539,11 +585,11 @@ function updateInvoiceAccountingStatusByRequestId(requestId) {
             selectRc = invoiceFile.getNext();
         }
     } catch (eSelect) {
-        logger.info(
-            "ESD_HTKT_ACCOUNTING_UTILS::updateInvoiceAccountingStatusByRequestId SELECT ERROR" +
-            " requestId=" + safeRequestId +
-            " error=" + eSelect
-        );
+        // logger.info(
+        //      "ESD_HTKT_ACCOUNTING_UTILS::updateInvoiceAccountingStatusByRequestId SELECT ERROR" +
+        //      " requestId=" + safeRequestId +
+        //      " error=" + eSelect
+        // );
         return;
     } finally {
         try {
@@ -555,7 +601,7 @@ function updateInvoiceAccountingStatusByRequestId(requestId) {
 
     /*
      * Bước 2: update từng hóa đơn theo ID.
-         */
+     */
     for (var i = 0; i < invoiceIds.length; i++) {
         var invoiceItem = null;
         var invoiceIdToUpdate = invoiceIds[i];
@@ -580,22 +626,22 @@ function updateInvoiceAccountingStatusByRequestId(requestId) {
                     if (updateInvoiceRc == RC_SUCCESS) {
                         updatedCount++;
                     } else {
-                        logger.info(
-                            "ESD_HTKT_ACCOUNTING_UTILS::updateInvoiceAccountingStatusByRequestId UPDATE FAILED" +
-                            " requestId=" + safeRequestId +
-                            " invoiceId=" + invoiceIdToUpdate +
-                            " rc=" + updateInvoiceRc
-                        );
+                        // logger.info(
+                        //      "ESD_HTKT_ACCOUNTING_UTILS::updateInvoiceAccountingStatusByRequestId UPDATE FAILED" +
+                        //      " requestId=" + safeRequestId +
+                        //      " invoiceId=" + invoiceIdToUpdate +
+                        //      " rc=" + updateInvoiceRc
+                        // );
                     }
                 }
             }
         } catch (eUpdate) {
-            logger.info(
-                "ESD_HTKT_ACCOUNTING_UTILS::updateInvoiceAccountingStatusByRequestId UPDATE ERROR" +
-                " requestId=" + safeRequestId +
-                " invoiceId=" + invoiceIdToUpdate +
-                " error=" + eUpdate
-            );
+            // logger.info(
+            //      "ESD_HTKT_ACCOUNTING_UTILS::updateInvoiceAccountingStatusByRequestId UPDATE ERROR" +
+            //      " requestId=" + safeRequestId +
+            //      " invoiceId=" + invoiceIdToUpdate +
+            //      " error=" + eUpdate
+            // );
         } finally {
             try {
                 if (invoiceItem) {
@@ -605,12 +651,12 @@ function updateInvoiceAccountingStatusByRequestId(requestId) {
         }
     }
 
-    logger.info(
-        "ESD_HTKT_ACCOUNTING_UTILS::updateInvoiceAccountingStatusByRequestId DONE" +
-        " requestId=" + safeRequestId +
-        " matched=" + invoiceIds.length +
-        " updated=" + updatedCount
-    );
+    // logger.info(
+    //      "ESD_HTKT_ACCOUNTING_UTILS::updateInvoiceAccountingStatusByRequestId DONE" +
+    //      " requestId=" + safeRequestId +
+    //      " matched=" + invoiceIds.length +
+    //      " updated=" + updatedCount
+    // );
 }
 
 function updatePaymentAccountingCompletedStatus(prepaymentId, isPayment) {
@@ -664,16 +710,16 @@ function jobCallCheckAccoutingStatus() {
     if (arrCheck.length > 0) {
         arrCheck.forEach(requestId => checkAccountingInfo(requestId));
     } else {
-        logger.info('ESD_HTKT_ACCOUNTING_UTILS::jobCallCheckAccoutingStatus: no item for check');
+        // logger.info('ESD_HTKT_ACCOUNTING_UTILS::jobCallCheckAccoutingStatus: no item for check');
     }
 }
 
 //jobCallCheckAccoutingStatus();
 
 function jobCallIntegrateRecordInQueue() {
-    logger.info('ESD_HTKT_ACCOUNTING_UTILS::jobCallIntegrateRecordInQueue: ' + funcs.tod());
+    // logger.info('ESD_HTKT_ACCOUNTING_UTILS::jobCallIntegrateRecordInQueue: ' + funcs.tod());
     if (!checkOpenAccoutingTime()) {
-        logger.info('ESD_HTKT_ACCOUNTING_UTILS::jobCallIntegrateRecordInQueue: COT');
+        // logger.info('ESD_HTKT_ACCOUNTING_UTILS::jobCallIntegrateRecordInQueue: COT');
         return;
     }
     var accountingInfoItem = new SCFile('esdHTKTaccountingInformation');
@@ -695,7 +741,7 @@ function jobCallIntegrateRecordInQueue() {
     if (arrItem.length > 0) {
         arrItem.forEach(prepaymentId => processAccounting({ id: prepaymentId }));
     } else {
-        logger.info('ESD_HTKT_ACCOUNTING_UTILS::jobCallIntegrateRecordInQueue: no item for check');
+        // logger.info('ESD_HTKT_ACCOUNTING_UTILS::jobCallIntegrateRecordInQueue: no item for check');
     }
 }
 
@@ -708,7 +754,11 @@ function checkAccount(accountId, napasCode) {
             if (response.data.stat !== "0") {
                 return null;
             }
-            return response.data.acctName;
+            var data = {
+                acctName: response.data.acctName,
+                branchCode: response.data.branchCode
+            }
+            return data;
         }
     } else if (napasCode) { // kiem tra ngoai he thong
         var response = lib.ESD_HTKT_FUND_TRANSFER_INTEGRATION.checkNameAccountNapas(accountId, napasCode);
@@ -716,7 +766,7 @@ function checkAccount(accountId, napasCode) {
             var custInfo = response.data.custInfo;
             if (custInfo && custInfo.length > 0 && response.data.custInfo[0].depAcctIdTo &&
                 response.data.custInfo[0].depAcctIdTo.refVal) {
-                return response.data.custInfo[0].depAcctIdTo.refVal;
+                return {acctName: response.data.custInfo[0].depAcctIdTo.refVal};
             }
         }
     }
