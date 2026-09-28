@@ -11,6 +11,255 @@
  */
 
 // trưởng thêm
+function getPaymentApprovalFields() {
+    return ["user.checker.kttc", "user.checker.dmms", "user.approver.dmms",
+        "user.approver.kttc", "user.checker.final", "user.approver.final"];
+}
+
+// Gọi ở đầu Rule Set của nút Lưu/Workflow để form SM chọn lại chính record mới nhất.
+// Phải doSelect trên object record mà form đang giữ; copy field/sysmodtime từ một
+// SCFile khác không cập nhật optimistic-lock stamp nội bộ của record đó.
+function syncPaymentApprovalFromDatabase(payment) {
+    var paymentId = String(payment ? payment.id || "" : "").trim();
+    if (!paymentId) return payment;
+
+    if (typeof payment.doSelect === "function") {
+        // Nội dung giao dịch được nhập trực tiếp trên form, chưa có trong DB.
+        var description = payment.description;
+        if (description != null) description = String(description);
+        try {
+            var rc = payment.doSelect('id="' + escapeSmQueryValue(paymentId) + '"');
+            // Datum từ RAD trả boolean; SCFile trả mã RC. Không dùng == vì
+            // false có thể bị ép thành 0 (RC_SUCCESS).
+            var selected = typeof rc === "boolean" ? rc : rc === RC_SUCCESS;
+            if (!selected) {
+                throw new Error("Không tải lại được phiên bản mới nhất của phiếu thanh toán " +
+                    paymentId + ". doSelect=" + String(rc) + " (" + typeof rc + ").");
+            }
+        } finally {
+            payment.description = description;
+        }
+        return payment;
+    }
+
+    // Fallback cho nơi gọi không truyền SCFile (ví dụ unit test/script cũ).
+    var stored = null;
+    try {
+        stored = new SCFile("esdHTKTpayment", SCFILE_READONLY);
+        var fields = getPaymentApprovalFields().concat([
+            "require.check.level1", "require.check.level2", "sysmodtime"
+        ]);
+        stored.setFields(fields);
+        if (stored.doSelect('id="' + escapeSmQueryValue(paymentId) + '"') !== RC_SUCCESS) {
+            throw new Error("Không tải được thông tin phê duyệt đã lưu.");
+        }
+        for (var i = 0; i < fields.length; i++) payment[fields[i]] = stored[fields[i]];
+        return payment;
+    } finally {
+        if (stored) stored.doClose();
+    }
+}
+
+// Cùng quy tắc canUpdateApprovalInfo trong ESD_HTKT_PAYMENT_WF;
+// API dùng currentUser đã được addon xác thực từ ESS token, không dùng operator tích hợp.
+function getPaymentApprovalAccess(payment, currentUser) {
+    var phase = readPaymentApprovalValue(payment, "current.phase").toLowerCase();
+    var role = readPaymentApprovalValue(payment, "initial.role").toLowerCase();
+    var creator = readPaymentApprovalValue(payment, "created.by").toLowerCase();
+    var actor = String(currentUser == null ? "" : currentUser).trim().toLowerCase();
+    var checker = readPaymentApprovalValue(payment, "user.checker.kttc").toLowerCase();
+    var isDmmsCreator = !!actor && creator === actor && role === "dmms";
+    var closed = phase === "end" || readPaymentApprovalValue(payment, "status").toLowerCase() === "cancelled";
+    return {
+        isDmmsCreator: isDmmsCreator,
+        showLevel1: role === "dmms",
+        showLevel2: role === "kttc" || (role === "dmms" && !isDmmsCreator &&
+            ["initial_kttc", "check_dmms", "approval_dmms", "approval_kttc", "check_final", "approval_final", "end"].indexOf(phase) >= 0),
+        canEditLevel1: !closed && phase === "initial_dmms" && isDmmsCreator,
+        canEditLevel2: !closed && phase === "initial_kttc" && !!actor &&
+            ((creator === actor && role === "kttc") || checker === actor)
+    };
+}
+
+function readPaymentApprovalValue(payment, field) {
+    var value = payment[field];
+    if (value == null || String(value).trim() === "") value = payment[field.replace(/\./g, "_")];
+    return String(value == null ? "" : value).trim();
+}
+
+// ESS token có thể dùng chữ thường; tra mã gốc như $lo.contact.name của form SM
+// trước khi gọi hàm quyền dùng điều kiện contact.id so sánh nguyên chuỗi.
+function resolvePaymentApprovalContactId(currentUser) {
+    var actor = String(currentUser || "").trim().toLowerCase();
+    var contact = null;
+    try {
+        contact = new SCFile("contacts", SCFILE_READONLY);
+        contact.setFields(["contact.name"]);
+        if (!actor || contact.doSelect('tolower(contact.name)="' + escapeSmQueryValue(actor) + '"') !== RC_SUCCESS) {
+            throw new Error("Không tìm thấy contact của user đăng nhập để kiểm tra phân quyền dữ liệu.");
+        }
+        var contactId = String(contact["contact.name"] || "").trim();
+        if (!contactId || contact.getNext() === RC_SUCCESS) {
+            throw new Error("Không xác định được duy nhất contact của user đăng nhập.");
+        }
+        return contactId;
+    } finally {
+        if (contact) contact.doClose();
+    }
+}
+
+function getPaymentApprovalInitData(payment, currentUser) {
+    var fields = getPaymentApprovalFields();
+    var values = {};
+    var selectedOptions = {};
+    var conditions = [];
+    var seen = {};
+    for (var i = 0; i < fields.length; i++) {
+        var id = String(payment[fields[i]] || "").trim();
+        values[fields[i]] = id;
+        if (id && !seen[id]) {
+            seen[id] = true;
+            conditions.push('contact.name="' + escapeSmQueryValue(id) + '"');
+            selectedOptions[id] = { value: id, label: id };
+        }
+    }
+    // Một query cho tối đa 6 người đã lưu, không tải ứng viên khi mở tab.
+    var contacts = null;
+    try {
+        if (conditions.length) {
+            contacts = new SCFile("contacts", SCFILE_READONLY);
+            contacts.setFields(["contact.name", "full.name", "position"]);
+            var rc = contacts.doSelect("(" + conditions.join(" or ") + ")");
+            while (rc === RC_SUCCESS) {
+                var contactId = String(contacts["contact.name"] || "");
+                var fullName = String(contacts["full.name"] || contactId);
+                var position = String(contacts.position || "");
+                selectedOptions[contactId] = { value: contactId, label: fullName + (position ? " - " + position : "") };
+                rc = contacts.getNext();
+            }
+        }
+    } finally {
+        if (contacts) contacts.doClose();
+    }
+    values["require.check.level1"] = String(payment["require.check.level1"]) === "true";
+    values["require.check.level2"] = String(payment["require.check.level2"]) === "true";
+    return {
+        paymentId: String(payment.id || ""),
+        currentUser: currentUser,
+        initialRole: String(payment["initial.role"] || ""),
+        currentPhase: String(payment["current.phase"] || payment.current_phase || ""),
+        createdBy: String(payment["created.by"] || ""),
+        status: String(payment.status || ""),
+        approvalValues: values,
+        approvalSelectedOptions: selectedOptions,
+        approvalAccess: getPaymentApprovalAccess(payment, currentUser)
+    };
+}
+
+function paymentApprovalFieldEditable(payment, currentUser, field) {
+    var access = getPaymentApprovalAccess(payment, currentUser);
+    var level1 = ["require.check.level1", "user.checker.kttc", "user.checker.dmms", "user.approver.dmms"];
+    var level2 = ["require.check.level2", "user.approver.kttc", "user.checker.final", "user.approver.final"];
+    return (access.canEditLevel1 && level1.indexOf(field) >= 0) ||
+        (access.canEditLevel2 && level2.indexOf(field) >= 0);
+}
+
+function getPaymentApprovalOptions(details) {
+    return runPaymentApprovalApi(details, false);
+}
+
+function savePaymentApprovalField(details) {
+    return runPaymentApprovalApi(details, true);
+}
+
+function runPaymentApprovalApi(details, save) {
+    details = details || {};
+    var payment = null;
+    try {
+        var paymentId = String(details.paymentId || "").trim();
+        var currentUser = String(details.currentUser || "").trim();
+        var field = String(details.field || "").trim();
+        var fields = getPaymentApprovalFields();
+        var isCheckbox = field === "require.check.level1" || field === "require.check.level2";
+        if (!paymentId || !currentUser || (fields.indexOf(field) < 0 && !(save && isCheckbox))) {
+            throw new Error("Thông tin phê duyệt không hợp lệ.");
+        }
+        payment = save ? new SCFile("esdHTKTpayment") : new SCFile("esdHTKTpayment", SCFILE_READONLY);
+        if (payment.doSelect('id="' + escapeSmQueryValue(paymentId) + '"') !== RC_SUCCESS) {
+            throw new Error("Không tìm thấy phiếu thanh toán.");
+        }
+        if (!paymentApprovalFieldEditable(payment, currentUser, field)) {
+            return {
+                success: false,
+                code: "PAYMENT_APPROVAL_FORBIDDEN",
+                message: "Bạn không có quyền sửa thông tin phê duyệt tại bước hiện tại.",
+                accessContext: {
+                    paymentId: paymentId,
+                    field: field,
+                    currentUser: currentUser,
+                    createdBy: readPaymentApprovalValue(payment, "created.by"),
+                    initialRole: readPaymentApprovalValue(payment, "initial.role"),
+                    currentPhase: readPaymentApprovalValue(payment, "current.phase"),
+                    status: readPaymentApprovalValue(payment, "status"),
+                    userCheckerKttc: readPaymentApprovalValue(payment, "user.checker.kttc")
+                }
+            };
+        }
+        if ((field === "user.checker.dmms" && String(payment["require.check.level1"]) !== "true") ||
+                (field === "user.checker.final" && String(payment["require.check.level2"]) !== "true")) {
+            throw new Error("Chưa bật yêu cầu rà soát tương ứng.");
+        }
+        var value = isCheckbox ? details.value : String(details.value == null ? "" : details.value).trim();
+        if (isCheckbox && typeof value !== "boolean") throw new Error("Giá trị checkbox không hợp lệ.");
+        var page = Math.max(1, Math.floor(Number(details.page) || 1));
+        var pageSize = Math.max(1, Math.min(100, Math.floor(Number(details.pageSize) || 10)));
+        var result;
+        if (!save || (!isCheckbox && value)) {
+            var permissionContactId = resolvePaymentApprovalContactId(currentUser);
+            var loaded = loadPaymentApprovalComboBoxesInternal(payment, field, {
+                currentUser: permissionContactId,
+                page: save ? 1 : page,
+                pageSize: save ? 1 : pageSize,
+                keyword: save ? "" : String(details.keyword || "").trim(),
+                selectedId: save ? value : ""
+            });
+            if (!loaded.success) {
+                return {
+                    success: false,
+                    code: loaded.currentUserScope && !loaded.currentUserScope.canAccessTargetLv1
+                        ? "PAYMENT_APPROVAL_SCOPE_DENIED" : "PAYMENT_APPROVAL_OPTIONS_FAILED",
+                    message: loaded.message || "Không tải được danh sách cán bộ.",
+                    scopeContext: {
+                        tokenUser: currentUser,
+                        contactId: permissionContactId,
+                        targetLv1: loaded.targetLv1,
+                        targetLv1Source: loaded.targetLv1Source,
+                        permission: loaded.currentUserScope
+                    }
+                };
+            }
+            result = loaded[loaded.configs[0].key];
+            if (save && result.ids.indexOf(value) < 0) throw new Error("Cán bộ đã chọn không còn hợp lệ theo quyền và đơn vị.");
+        }
+        if (!save) {
+            var items = [];
+            for (var i = 0; i < result.ids.length; i++) items.push({ value: result.ids[i], label: result.names[i] });
+            return { success: true, data: { items: items, page: page, pageSize: pageSize, hasMore: result.hasMore === true } };
+        }
+        payment[field] = value;
+        if (isCheckbox && !value) {
+            payment[field === "require.check.level1" ? "user.checker.dmms" : "user.checker.final"] = "";
+        }
+        var savedData = getPaymentApprovalInitData(payment, currentUser);
+        if (payment.doUpdate() !== RC_SUCCESS) throw new Error("Không lưu được thông tin phê duyệt.");
+        return { success: true, data: savedData };
+    } catch (error) {
+        return { success: false, message: String(error.message || error) };
+    } finally {
+        if (payment) payment.doClose();
+    }
+}
+
 function getPaymentRoleByRights(contactId) {
     var RIGHT_VIEW_INVOICE = "0040040001000001";
     var RIGHT_VIEW_PAYMENT = "0040040003000001";
@@ -60,61 +309,228 @@ function getPaymentRoleByRights(contactId) {
     return rightMap[RIGHT_ACCOUNTING_INPUT] ? "kttc" : "dmms";
 }
 
-/*
- * Hàm dùng chung cho cả Thanh toán và Tạm ứng.
- * Lọc contact theo quyền và lv1 ngay từ truy vấn đầu tiên, sau đó xác minh
- * data permission 00401 theo toàn bộ unit thuộc target lv1 bằng batch query.
+/**
+ * Phân miền dữ liệu cho combobox phê duyệt Thanh toán.
+ *
+ * - Chi nhánh: target LV1 không bắt đầu 0999 -> chỉ đúng LV1 đó.
+ * - Trụ sở chính: target LV1 bắt đầu 0999, phải map ACTIVE trong esdDMentity
+ *   sang entity.code = 1010098 -> toàn bộ PS ACTIVE 0999* cùng entity là một miền.
+ * - Mapping không hợp lệ -> fail-closed (không trả candidate).
  */
+function normalizeHTKTApprovalUnitCode(code) {
+    var s = String(code == null ? "" : code).trim();
+    if (!s) return "";
+
+    s = s.replace(/\.0$/, "");
+    if (/^[0-9]+$/.test(s) && s.length === 8) {
+        s = "0" + s;
+    }
+
+    return s;
+}
+
+function getHTKTApprovalActiveEntityCodeByPsCode(psCode) {
+    var safePsCode = normalizeHTKTApprovalUnitCode(psCode);
+    var entityFile = null;
+    var entityCodes = [];
+    var seen = {};
+
+    if (!safePsCode) return "";
+
+    try {
+        entityFile = new SCFile("esdDMentity", SCFILE_READONLY);
+        entityFile.setFields(["entity.code", "ps.code", "status"]);
+
+        var rc = entityFile.doSelect(
+                'ps.code="' + escapeSmQueryValue(safePsCode) + '" and status="ACTIVE"'
+        );
+
+        while (rc === RC_SUCCESS) {
+            var entityCode = String(entityFile["entity.code"] || "").trim();
+            if (entityCode && !seen[entityCode]) {
+                seen[entityCode] = true;
+                entityCodes.push(entityCode);
+            }
+            rc = entityFile.getNext();
+        }
+    } catch (e) {
+        return "";
+    } finally {
+        try { if (entityFile) entityFile.doClose(); } catch (closeError) {}
+    }
+
+    return entityCodes.length === 1 ? entityCodes[0] : "";
+}
+
+function getHTKTApprovalActivePsCodesByEntityCode(entityCode, psPrefix) {
+    var safeEntityCode = String(entityCode == null ? "" : entityCode).trim();
+    var safePrefix = String(psPrefix == null ? "" : psPrefix).trim();
+    var result = [];
+    var seen = {};
+    var entityFile = null;
+
+    if (!safeEntityCode) return result;
+
+    try {
+        entityFile = new SCFile("esdDMentity", SCFILE_READONLY);
+        entityFile.setFields(["entity.code", "ps.code", "status"]);
+
+        var rc = entityFile.doSelect(
+                'entity.code="' + escapeSmQueryValue(safeEntityCode) + '" and status="ACTIVE"'
+        );
+
+        while (rc === RC_SUCCESS) {
+            var psCode = normalizeHTKTApprovalUnitCode(entityFile["ps.code"]);
+
+            if (
+                    psCode &&
+                    (!safePrefix || psCode.indexOf(safePrefix) === 0) &&
+                    !seen[psCode]
+            ) {
+                seen[psCode] = true;
+                result.push(psCode);
+            }
+
+            rc = entityFile.getNext();
+        }
+    } catch (e) {
+        return [];
+    } finally {
+        try { if (entityFile) entityFile.doClose(); } catch (closeError) {}
+    }
+
+    return result;
+}
+
+function resolveHTKTApprovalDataDomain(targetLv1) {
+    var HEAD_OFFICE_PS_PREFIX = "0999";
+    var HEAD_OFFICE_OGL_SEG1 = "1010098";
+    var normalizedLv1 = normalizeHTKTApprovalUnitCode(targetLv1);
+
+    var result = {
+        valid: false,
+        type: "",
+        targetLv1: normalizedLv1,
+        entityCode: "",
+        allowedLv1List: []
+    };
+
+    if (!normalizedLv1) return result;
+
+    // Chi nhánh: giữ nguyên exact LV1 như logic cũ.
+    if (normalizedLv1.indexOf(HEAD_OFFICE_PS_PREFIX) !== 0) {
+        result.valid = true;
+        result.type = "BRANCH";
+        result.allowedLv1List = [normalizedLv1];
+        return result;
+    }
+
+    // Trụ sở chính: bắt buộc PS 0999* map ACTIVE duy nhất sang 1010098.
+    var currentEntityCode = getHTKTApprovalActiveEntityCodeByPsCode(normalizedLv1);
+    if (currentEntityCode !== HEAD_OFFICE_OGL_SEG1) {
+        return result;
+    }
+
+    var headOfficePsCodes = getHTKTApprovalActivePsCodesByEntityCode(
+            HEAD_OFFICE_OGL_SEG1,
+            HEAD_OFFICE_PS_PREFIX
+    );
+
+    if (!headOfficePsCodes.length) {
+        return result;
+    }
+
+    // Target hiện tại phải nằm trong chính tập PS Trụ sở chính đã resolve.
+    if (headOfficePsCodes.indexOf(normalizedLv1) < 0) {
+        return result;
+    }
+
+    result.valid = true;
+    result.type = "HEAD_OFFICE";
+    result.entityCode = HEAD_OFFICE_OGL_SEG1;
+    result.allowedLv1List = uniqueStrings(headOfficePsCodes);
+    return result;
+}
+
+function getHTKTApprovalContactLv1(contactId) {
+    var safeContactId = String(contactId == null ? "" : contactId).trim();
+    var contactFile = null;
+
+    if (!safeContactId) return "";
+
+    try {
+        contactFile = new SCFile("contacts", SCFILE_READONLY);
+        contactFile.setFields(["contact.name", "lv1.id"]);
+
+        var rc = contactFile.doSelect(
+                'contact.name="' + escapeSmQueryValue(safeContactId) + '"'
+        );
+
+        if (rc !== RC_SUCCESS) return "";
+        return normalizeHTKTApprovalUnitCode(contactFile["lv1.id"]);
+    } catch (e) {
+        return "";
+    } finally {
+        try { if (contactFile) contactFile.doClose(); } catch (closeError) {}
+    }
+}
+
 function listContactsByRightsAndLv1(rightIds, targetLv1, subModuleId) {
-    var normalizedLv1 = String(targetLv1 == null ? "" : targetLv1).trim().replace(/\.0$/, "");
     var normalizedRights = rightIds || [];
+    var domain = resolveHTKTApprovalDataDomain(targetLv1);
+    var allowedLv1List = domain.allowedLv1List || [];
     var units = [];
     var seenUnits = {};
-    var orgFile = null;
 
-    if (!normalizedLv1 || !normalizedRights.length) {
+    if (!domain.valid || !allowedLv1List.length || !normalizedRights.length) {
         return [];
     }
 
     function addUnit(unitId) {
-        var value = String(unitId == null ? "" : unitId).trim().replace(/\.0$/, "");
+        var value = normalizeHTKTApprovalUnitCode(unitId);
         if (value && !seenUnits[value]) {
             seenUnits[value] = true;
             units.push(value);
         }
     }
 
-    addUnit(normalizedLv1);
+    // Dựng toàn bộ unit thuộc miền target.
+    // Với Chi nhánh: chỉ 1 LV1. Với Trụ sở chính: toàn bộ PS 0999* cùng entity 1010098.
+    for (var lv1Index = 0; lv1Index < allowedLv1List.length; lv1Index++) {
+        var allowedLv1 = normalizeHTKTApprovalUnitCode(allowedLv1List[lv1Index]);
+        if (!allowedLv1) continue;
 
-    try {
-        orgFile = new SCFile("esdQTorgUnit", SCFILE_READONLY);
-        orgFile.setFields(["unit.id", "lv1.id"]);
-        var orgRc = orgFile.doSelect(
-                'unit.id="' + normalizedLv1.replace(/\\/g, "\\\\").replace(/"/g, '\\"') +
-                '" or lv1.id="' + normalizedLv1.replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"'
-        );
+        addUnit(allowedLv1);
 
-        while (orgRc === RC_SUCCESS) {
-            addUnit(orgFile["unit.id"]);
-            orgRc = orgFile.getNext();
+        var orgFile = null;
+        try {
+            orgFile = new SCFile("esdQTorgUnit", SCFILE_READONLY);
+            orgFile.setFields(["unit.id", "lv1.id"]);
+
+            var orgRc = orgFile.doSelect(
+                    'unit.id="' + escapeSmQueryValue(allowedLv1) + '" or lv1.id="' +
+                    escapeSmQueryValue(allowedLv1) + '"'
+            );
+
+            while (orgRc === RC_SUCCESS) {
+                addUnit(orgFile["unit.id"]);
+                orgRc = orgFile.getNext();
+            }
+        } finally {
+            try { if (orgFile) orgFile.doClose(); } catch (closeError) {}
         }
-    } finally {
-        try { if (orgFile) orgFile.doClose(); } catch (closeError) {}
     }
 
     if (!lib.ESD_PERMS_RIGHTS || !lib.ESD_PERMS_RIGHTS.listContactsByRightsAndFilter) {
         return [];
     }
 
-    /*
-     * Không lấy toàn bộ người có quyền trên toàn hàng rồi mới lọc từng người.
-     * Hàm chung đã lọc group/contact active và hiệu lực ngày; bổ sung lv1.id
-     * tại chính query đó để chỉ trả người thuộc lv1 của hồ sơ.
-     */
+    // Functional Right + vị trí tổ chức phải nằm trong miền của hồ sơ.
     var contacts = lib.ESD_PERMS_RIGHTS.listContactsByRightsAndFilter(
             normalizedRights,
-            { "lv1.id": [normalizedLv1] }
+            { "lv1.id": allowedLv1List }
     ) || [];
+
     if (contacts.toArray) contacts = contacts.toArray();
     if (!contacts.length) return [];
 
@@ -126,24 +542,32 @@ function listContactsByRightsAndLv1(rightIds, targetLv1, subModuleId) {
 
     for (var contactIndex = 0; contactIndex < contacts.length; contactIndex++) {
         contactConditions.push(
-                'contact.id="' + String(contacts[contactIndex]).replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"'
+                'contact.id="' + escapeSmQueryValue(contacts[contactIndex]) + '"'
         );
     }
+
     for (var unitIndex = 0; unitIndex < units.length; unitIndex++) {
         unitConditions.push(
-                'unit.id="' + String(units[unitIndex]).replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"'
+                'unit.id="' + escapeSmQueryValue(units[unitIndex]) + '"'
         );
+    }
+
+    if (!contactConditions.length || !unitConditions.length) {
+        return [];
     }
 
     var permissionFile = null;
     try {
         permissionFile = new SCFile("esdQTdataPermissions", SCFILE_READONLY);
         permissionFile.setFields(["id", "contact.id", "permission.scope"]);
+
+        // Giữ nguyên việc loại scope cá nhân.
+        // QT_PQDL_06 chỉ được chấp nhận trực tiếp trong miền Trụ sở chính;
+        // các scope đơn vị vẫn phải map unit vào miền target như cũ.
         var permissionRc = permissionFile.doSelect(
                 "(" + contactConditions.join(" or ") + ")" +
-                ' and sub.module="' + String(subModuleId || "00401").replace(/"/g, '\\"') + '"' +
-                ' and permission.scope~="QT_PQDL_01"' +
-                ' and permission.scope~="QT_PQDL_06"'
+                ' and sub.module="' + escapeSmQueryValue(subModuleId || "00401") + '"' +
+                ' and permission.scope~="QT_PQDL_01"'
         );
 
         while (permissionRc === RC_SUCCESS) {
@@ -151,13 +575,17 @@ function listContactsByRightsAndLv1(rightIds, targetLv1, subModuleId) {
             var contactId = String(permissionFile["contact.id"] == null ? "" : permissionFile["contact.id"]).trim();
             var scope = String(permissionFile["permission.scope"] == null ? "" : permissionFile["permission.scope"]).trim();
 
-            /*
-             * QT_PQDL_01 = chỉ cá nhân; QT_PQDL_06 = toàn hàng nhưng đang bị
-             * chặn ở combobox. Hai scope này không được mở rộng sang lv1 hồ sơ.
-             */
-            if (permissionId && contactId && scope !== "QT_PQDL_01" && scope !== "QT_PQDL_06") {
-                permissionIds.push(permissionId);
-                contactByPermissionId[permissionId] = contactId;
+            if (permissionId && contactId && scope !== "QT_PQDL_01") {
+                if (scope === "QT_PQDL_06") {
+                    // Candidate đã được giới hạn bằng allowedLv1List ở trên.
+                    // Vì vậy QT_PQDL_06 chỉ mở cross-block khi target là Trụ sở chính.
+                    if (domain.type === "HEAD_OFFICE") {
+                        acceptedContacts[contactId] = true;
+                    }
+                } else {
+                    permissionIds.push(permissionId);
+                    contactByPermissionId[permissionId] = contactId;
+                }
             }
 
             permissionRc = permissionFile.getNext();
@@ -167,45 +595,55 @@ function listContactsByRightsAndLv1(rightIds, targetLv1, subModuleId) {
     }
 
     permissionIds = uniqueStrings(permissionIds);
-    if (!permissionIds.length) return [];
 
-    /* Một query theo batch thay cho countFile() lặp cho từng permission. */
-    var BATCH_SIZE = 100;
-    for (var offset = 0; offset < permissionIds.length; offset += BATCH_SIZE) {
-        var permissionConditions = [];
-        var permissionBatch = permissionIds.slice(offset, offset + BATCH_SIZE);
-        for (var permissionIndex = 0; permissionIndex < permissionBatch.length; permissionIndex++) {
-            permissionConditions.push(
-                    'data.permission.id="' + escapeSmQueryValue(permissionBatch[permissionIndex]) + '"'
-            );
-        }
+    // Scope đơn vị: candidate hợp lệ nếu ít nhất một unit phân quyền nằm trong miền target.
+    if (permissionIds.length) {
+        var BATCH_SIZE = 100;
 
-        var unitFile = null;
-        try {
-            unitFile = new SCFile("esdjoinDatapermissionUnits", SCFILE_READONLY);
-            unitFile.setFields(["data.permission.id", "unit.id", "status"]);
-            var unitRc = unitFile.doSelect(
-                    "(" + permissionConditions.join(" or ") + ') and status="Dang hoat dong" and (' +
-                    unitConditions.join(" or ") + ")"
-            );
-            while (unitRc === RC_SUCCESS) {
-                var mappedPermissionId = String(
-                        unitFile["data.permission.id"] || unitFile.data_permission_id || ""
-                ).trim();
-                var mappedContactId = contactByPermissionId[mappedPermissionId];
-                if (mappedContactId) acceptedContacts[mappedContactId] = true;
-                unitRc = unitFile.getNext();
+        for (var offset = 0; offset < permissionIds.length; offset += BATCH_SIZE) {
+            var permissionConditions = [];
+            var permissionBatch = permissionIds.slice(offset, offset + BATCH_SIZE);
+
+            for (var permissionIndex = 0; permissionIndex < permissionBatch.length; permissionIndex++) {
+                permissionConditions.push(
+                        'data.permission.id="' + escapeSmQueryValue(permissionBatch[permissionIndex]) + '"'
+                );
             }
-        } finally {
-            try { if (unitFile) unitFile.doClose(); } catch (unitCloseError) {}
+
+            var unitFile = null;
+            try {
+                unitFile = new SCFile("esdjoinDatapermissionUnits", SCFILE_READONLY);
+                unitFile.setFields(["data.permission.id", "unit.id", "status"]);
+
+                var unitRc = unitFile.doSelect(
+                        "(" + permissionConditions.join(" or ") + ') and status="Dang hoat dong" and (' +
+                        unitConditions.join(" or ") + ")"
+                );
+
+                while (unitRc === RC_SUCCESS) {
+                    var mappedPermissionId = String(
+                            unitFile["data.permission.id"] || unitFile.data_permission_id || ""
+                    ).trim();
+
+                    var mappedContactId = contactByPermissionId[mappedPermissionId];
+                    if (mappedContactId) acceptedContacts[mappedContactId] = true;
+
+                    unitRc = unitFile.getNext();
+                }
+            } finally {
+                try { if (unitFile) unitFile.doClose(); } catch (unitCloseError) {}
+            }
         }
     }
 
     var result = [];
     for (var resultIndex = 0; resultIndex < contacts.length; resultIndex++) {
         var resultContactId = String(contacts[resultIndex] == null ? "" : contacts[resultIndex]).trim();
-        if (resultContactId && acceptedContacts[resultContactId]) result.push(resultContactId);
+        if (resultContactId && acceptedContacts[resultContactId]) {
+            result.push(resultContactId);
+        }
     }
+
     return uniqueStrings(result);
 }
 
@@ -243,7 +681,9 @@ function loadPaymentFinalCheckerComboBox(paymentFile) {
     return loadPaymentApprovalComboBoxesInternal(paymentFile, "user.checker.final");
 }
 
-function loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField) {
+// apiOptions chỉ được truyền từ API addon. Caller SM/Tạm ứng cũ không truyền
+// tham số này: giữ nguyên user phiên SM, danh sách đầy đủ và các biến $L.*.
+function loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField, apiOptions) {
     var HTKT_SUB_MODULE = "00401";
 
     /*
@@ -462,7 +902,7 @@ function loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField) {
      * Nếu không có, clear toàn bộ combobox và dừng.
      */
     var currentUser = normalizeValue(
-            safeVarGet("$lo.contact.name", "")
+            apiOptions ? apiOptions.currentUser : safeVarGet("$lo.contact.name", "")
     );
 
     output.currentUser = currentUser;
@@ -489,7 +929,7 @@ function loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField) {
                 "User đăng nhập không có phân quyền dữ liệu " +
                 HTKT_SUB_MODULE +
                 " trong lv1 của hồ sơ: " +
-                output.targetLv1;
+                output.targetLv1 + (apiOptions ? ". " + currentUserScope.message : "");
         return output;
     }
 
@@ -533,6 +973,7 @@ function loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField) {
      * ========================================================= */
 
     function clearAllComboBoxes(configs) {
+        if (apiOptions) return;
         for (var i = 0; i < configs.length; i++) {
             vars[configs[i].valueList] = [];
             vars[configs[i].displayList] = [];
@@ -557,8 +998,10 @@ function loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField) {
             }
         };
 
-        vars[config.valueList] = [];
-        vars[config.displayList] = [];
+        if (!apiOptions) {
+            vars[config.valueList] = [];
+            vars[config.displayList] = [];
+        }
 
         try {
 
@@ -577,7 +1020,9 @@ function loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField) {
 
             // Tra chính xác contact.name đã lưu, không tìm lại pool ứng viên.
             // Người đã chọn vẫn được hiển thị nếu hiện đã ngừng hoạt động.
-            var comboData = readContactData(contactIds.ids, selectedOnly);
+            var comboData = apiOptions
+                    ? readContactPage(contactIds.ids, apiOptions)
+                    : readContactData(contactIds.ids, selectedOnly);
             if (selectedOnly && selectedId && !comboData.ids.length) {
                 comboData = { ids: [selectedId], names: [selectedId] };
             }
@@ -592,13 +1037,16 @@ function loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField) {
                 );
             }
 
-            vars[config.valueList] = comboData.ids;
-            vars[config.displayList] = comboData.names;
+            if (!apiOptions) {
+                vars[config.valueList] = comboData.ids;
+                vars[config.displayList] = comboData.names;
+            }
 
             result.success = true;
             result.count = comboData.ids.length;
             result.ids = comboData.ids;
             result.names = comboData.names;
+            if (apiOptions) result.hasMore = comboData.hasMore;
             result.debug.passedCount = comboData.ids.length;
 
             result.message = result.count > 0 ?
@@ -606,8 +1054,10 @@ function loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField) {
                     "Không tìm thấy cán bộ phù hợp.";
 
         } catch (e) {
-            vars[config.valueList] = [];
-            vars[config.displayList] = [];
+            if (!apiOptions) {
+                vars[config.valueList] = [];
+                vars[config.displayList] = [];
+            }
 
             result.success = false;
             result.message = String(e.message || e);
@@ -619,6 +1069,55 @@ function loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField) {
     function getContactsForRoleInLv1(config, targetLv1) {
         var ids = normalizeArray(listContactsByRightsAndLv1(config.seedRights, targetLv1, HTKT_SUB_MODULE));
         return { ids: ids, poolCount: ids.length, rejectedCount: 0 };
+    }
+
+    // Chỉ đọc tới pageSize + 1 kết quả hợp lệ, không dựng tên toàn bộ pool.
+    // Chia query theo batch ID, thứ tự contact.name ổn định giữa các trang.
+    function readContactPage(contactIds, options) {
+        var ids = normalizeArray(contactIds).sort();
+        if (options.selectedId) {
+            ids = ids.indexOf(options.selectedId) >= 0 ? [options.selectedId] : [];
+        }
+        var result = { ids: [], names: [], hasMore: false };
+        var skip = (options.page - 1) * options.pageSize;
+        var matched = 0;
+        var keyword = normalizeValue(options.keyword).toLowerCase();
+        for (var offset = 0; offset < ids.length; offset += 100) {
+            var conditions = [];
+            var batch = ids.slice(offset, offset + 100);
+            for (var i = 0; i < batch.length; i++) {
+                conditions.push('contact.name="' + escapeQueryValue(batch[i]) + '"');
+            }
+            var contactFile = null;
+            try {
+                contactFile = new SCFile("contacts", SCFILE_READONLY);
+                contactFile.setFields(["contact.name", "full.name", "position", "status"]);
+                contactFile.setOrderBy(["contact.name"], [SCFILE_ASC]);
+                var rc = contactFile.doSelect("(" + conditions.join(" or ") + ")");
+                while (rc === RC_SUCCESS) {
+                    var id = normalizeValue(contactFile["contact.name"]);
+                    var status = normalizeValue(contactFile["status"]);
+                    var name = normalizeValue(contactFile["full.name"]) || id;
+                    var position = normalizeValue(contactFile["position"]);
+                    var display = name + (position ? " - " + position : "");
+                    if (id && (!status || status === "Dang hoat dong") &&
+                            (!keyword || (id + " " + display).toLowerCase().indexOf(keyword) >= 0)) {
+                        if (matched++ >= skip) {
+                            if (result.ids.length === options.pageSize) {
+                                result.hasMore = true;
+                                return result;
+                            }
+                            result.ids.push(id);
+                            result.names.push(display);
+                        }
+                    }
+                    rc = contactFile.getNext();
+                }
+            } finally {
+                if (contactFile) contactFile.doClose();
+            }
+        }
+        return result;
     }
 
     /* =========================================================
@@ -641,7 +1140,6 @@ function loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField) {
     }
 
     function buildUserScopeContext(contactId, targetLv1) {
-
         targetLv1 = normalizeUnitCode(targetLv1);
 
         var result = {
@@ -656,7 +1154,12 @@ function loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField) {
 
         if (!contactId || !targetLv1) {
             result.message = "Thiếu contactId hoặc targetLv1.";
-            // print("[ERROR] " + result.message);
+            return result;
+        }
+
+        var targetDomain = resolveHTKTApprovalDataDomain(targetLv1);
+        if (!targetDomain.valid) {
+            result.message = "Không xác định được miền dữ liệu hợp lệ của lv1 hồ sơ.";
             return result;
         }
 
@@ -667,13 +1170,8 @@ function loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField) {
                     contactId,
                     HTKT_SUB_MODULE
             ) || {};
-
-
         } catch (e) {
             result.message = String(e.message || e);
-
-            // print("[EXCEPTION] " + result.message);
-
             return result;
         }
 
@@ -684,10 +1182,8 @@ function loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField) {
                 ""
         );
 
-
         if (!result.scope) {
             result.scope = "QT_PQDL_01";
-            // print("[SCOPE] Không có scope -> mặc định QT_PQDL_01");
         }
 
         result.rawUnits = normalizeArray(
@@ -697,51 +1193,58 @@ function loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField) {
                 []
         );
 
-
-        /*
-         * Scope toàn hàng
-         */
         if (result.scope === "QT_PQDL_06") {
+            /*
+             * Nghiệp vụ Trụ sở chính:
+             * - target phải thuộc miền HEAD_OFFICE (0999* + ACTIVE entity 1010098),
+             * - current user cũng phải thuộc chính miền Trụ sở chính,
+             * - khi đó được thao tác trên toàn bộ PS 0999* cùng entity.
+             *
+             * Với target Chi nhánh, giữ nguyên cơ chế cũ ALLOW_GLOBAL_SCOPE_IN_COMBO.
+             */
+            if (targetDomain.type === "HEAD_OFFICE") {
+                var currentUserLv1 = normalizeUnitCode(getHTKTApprovalContactLv1(contactId));
+                var currentUserDomain = resolveHTKTApprovalDataDomain(currentUserLv1);
 
-            result.canAccessTargetLv1 =
-                    ALLOW_GLOBAL_SCOPE_IN_COMBO === true;
+                if (currentUserDomain.valid && currentUserDomain.type === "HEAD_OFFICE") {
+                    result.canAccessTargetLv1 = true;
+                    result.resolvedLv1List = targetDomain.allowedLv1List.slice(0);
+                    result.message = "User scope toàn hàng thuộc Trụ sở chính, được thao tác trong toàn miền Trụ sở chính.";
+                    return result;
+                }
 
+                result.canAccessTargetLv1 = false;
+                result.message = "User scope toàn hàng không thuộc miền Trụ sở chính của hồ sơ.";
+                return result;
+            }
+
+            result.canAccessTargetLv1 = ALLOW_GLOBAL_SCOPE_IN_COMBO === true;
             result.message =
                     result.canAccessTargetLv1 ?
                             "User có scope toàn hàng và hệ thống cho phép dùng toàn hàng." :
                             "User có scope toàn hàng nhưng nghiệp vụ đang chặn mở dữ liệu khác lv1.";
-
             return result;
         }
 
-        /*
-         * Scope cá nhân
-         */
         if (result.scope === "QT_PQDL_01") {
-
             result.canAccessTargetLv1 = false;
-            result.message =
-                    "User chỉ có scope cá nhân, không được load combobox theo lv1.";
-
+            result.message = "User chỉ có scope cá nhân, không được load combobox theo lv1.";
             return result;
         }
 
         if (result.rawUnits.length === 0) {
-
             result.canAccessTargetLv1 = false;
-            result.message =
-                    "User có scope đơn vị nhưng không có unit phân quyền dữ liệu.";
-
+            result.message = "User có scope đơn vị nhưng không có unit phân quyền dữ liệu.";
             return result;
         }
 
-
-        /*
-         * Resolve từng unit và dừng ngay khi gặp đúng lv1 hồ sơ.
-         * Trước đây resolve toàn bộ danh sách trước khi so sánh, làm phát sinh
-         * nhiều SCFile.doSelect không cần thiết đối với mỗi ứng viên.
-         */
         var resolvedLv1Map = {};
+        var allowedLv1Map = {};
+
+        for (var allowedIndex = 0; allowedIndex < targetDomain.allowedLv1List.length; allowedIndex++) {
+            var allowedLv1 = normalizeUnitCode(targetDomain.allowedLv1List[allowedIndex]);
+            if (allowedLv1) allowedLv1Map[allowedLv1] = true;
+        }
 
         for (var i = 0; i < result.rawUnits.length; i++) {
             var rawUnit = normalizeUnitCode(result.rawUnits[i]);
@@ -752,25 +1255,23 @@ function loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField) {
                 result.resolvedLv1List.push(currentLv1);
             }
 
-            if (currentLv1 === targetLv1) {
+            // Chi nhánh: exact LV1. Trụ sở chính: bất kỳ LV1 nào trong cùng miền 0999*/1010098.
+            if (currentLv1 && allowedLv1Map[currentLv1]) {
                 result.canAccessTargetLv1 = true;
-                result.message =
+                result.message = targetDomain.type === "HEAD_OFFICE" ?
+                        "User có data permission 00401 trong miền Trụ sở chính của hồ sơ." :
                         "User có data permission 00401 trong lv1 của hồ sơ.";
-
                 return result;
             }
         }
 
         result.canAccessTargetLv1 = false;
-        result.message =
+        result.message = targetDomain.type === "HEAD_OFFICE" ?
+                "User không có data permission 00401 trong miền Trụ sở chính của hồ sơ." :
                 "User không có data permission 00401 trùng lv1 của hồ sơ.";
 
         return result;
     }
-
-    /* =========================================================
-     * TARGET LV1
-     * ========================================================= */
 
     function getPaymentTargetLv1(file) {
         var result = {
