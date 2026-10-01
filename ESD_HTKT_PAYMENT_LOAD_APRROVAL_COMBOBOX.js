@@ -247,12 +247,22 @@ function runPaymentApprovalApi(details, save) {
             return { success: true, data: { items: items, page: page, pageSize: pageSize, hasMore: result.hasMore === true } };
         }
         payment[field] = value;
+        var clearedField = "";
         if (isCheckbox && !value) {
-            payment[field === "require.check.level1" ? "user.checker.dmms" : "user.checker.final"] = "";
+            clearedField = field === "require.check.level1" ? "user.checker.dmms" : "user.checker.final";
+            payment[clearedField] = "";
         }
-        var savedData = getPaymentApprovalInitData(payment, currentUser);
         if (payment.doUpdate() !== RC_SUCCESS) throw new Error("Không lưu được thông tin phê duyệt.");
-        return { success: true, data: savedData };
+        // Frontend đã có toàn bộ init data và chỉ cần commit field vừa lưu.
+        // Không dựng lại tên/toàn bộ người duyệt sau mỗi lần update.
+        return {
+            success: true,
+            data: {
+                field: field,
+                value: value,
+                clearedField: clearedField
+            }
+        };
     } catch (error) {
         return { success: false, message: String(error.message || error) };
     } finally {
@@ -475,16 +485,40 @@ function getHTKTApprovalContactLv1(contactId) {
     }
 }
 
-function listContactsByRightsAndLv1(rightIds, targetLv1, subModuleId) {
+function listContactsByRightsAndLv1(rightIds, targetLv1, subModuleId, selectedContactId, resolvedDomain) {
     var normalizedRights = rightIds || [];
-    var domain = resolveHTKTApprovalDataDomain(targetLv1);
+    var normalizedSelectedContactId = String(selectedContactId == null ? "" : selectedContactId).trim();
+    var domain = resolvedDomain || resolveHTKTApprovalDataDomain(targetLv1);
     var allowedLv1List = domain.allowedLv1List || [];
-    var units = [];
-    var seenUnits = {};
 
     if (!domain.valid || !allowedLv1List.length || !normalizedRights.length) {
         return [];
     }
+
+    if (!lib.ESD_PERMS_RIGHTS || !lib.ESD_PERMS_RIGHTS.listContactsByRightsAndFilter) {
+        return [];
+    }
+
+    // Functional Right + vị trí tổ chức phải nằm trong miền của hồ sơ.
+    var contactFilter = { "lv1.id": allowedLv1List };
+    // Khi lưu chỉ cần xác thực đúng người được chọn. Đẩy contact.name xuống
+    // query quyền để không dựng toàn bộ candidate pool của LV1 như API options.
+    if (normalizedSelectedContactId) {
+        contactFilter["contact.name"] = [normalizedSelectedContactId];
+    }
+
+    var contacts = lib.ESD_PERMS_RIGHTS.listContactsByRightsAndFilter(
+            normalizedRights,
+            contactFilter
+    ) || [];
+
+    if (contacts.toArray) contacts = contacts.toArray();
+    if (!contacts.length) return [];
+
+    // Chỉ dựng miền unit sau khi đã xác nhận có candidate đúng functional
+    // right. Save user sai quyền sẽ dừng trước các query org/data permission.
+    var units = [];
+    var seenUnits = {};
 
     function addUnit(unitId) {
         var value = normalizeHTKTApprovalUnitCode(unitId);
@@ -494,7 +528,6 @@ function listContactsByRightsAndLv1(rightIds, targetLv1, subModuleId) {
         }
     }
 
-    // Dựng toàn bộ unit thuộc miền target.
     // Với Chi nhánh: chỉ 1 LV1. Với Trụ sở chính: toàn bộ PS 0999* cùng entity 1010098.
     for (var lv1Index = 0; lv1Index < allowedLv1List.length; lv1Index++) {
         var allowedLv1 = normalizeHTKTApprovalUnitCode(allowedLv1List[lv1Index]);
@@ -520,19 +553,6 @@ function listContactsByRightsAndLv1(rightIds, targetLv1, subModuleId) {
             try { if (orgFile) orgFile.doClose(); } catch (closeError) {}
         }
     }
-
-    if (!lib.ESD_PERMS_RIGHTS || !lib.ESD_PERMS_RIGHTS.listContactsByRightsAndFilter) {
-        return [];
-    }
-
-    // Functional Right + vị trí tổ chức phải nằm trong miền của hồ sơ.
-    var contacts = lib.ESD_PERMS_RIGHTS.listContactsByRightsAndFilter(
-            normalizedRights,
-            { "lv1.id": allowedLv1List }
-    ) || [];
-
-    if (contacts.toArray) contacts = contacts.toArray();
-    if (!contacts.length) return [];
 
     var contactConditions = [];
     var unitConditions = [];
@@ -843,6 +863,7 @@ function loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField, apiO
     var userScopeCache = {};
     var contactDataCache = {};
     var orgUnitCache = {};
+    var dataDomainCache = {};
 
     // Lọc trước mọi thao tác gán/xóa biến: gọi riêng không ảnh hưởng 5 ô còn lại.
     if (requestedField) {
@@ -1020,9 +1041,17 @@ function loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField, apiO
 
             // Tra chính xác contact.name đã lưu, không tìm lại pool ứng viên.
             // Người đã chọn vẫn được hiển thị nếu hiện đã ngừng hoạt động.
-            var comboData = apiOptions
-                    ? readContactPage(contactIds.ids, apiOptions)
-                    : readContactData(contactIds.ids, selectedOnly);
+            // Save đã validate selectedId qua functional right + data permission
+            // ở getContactsForRoleInLv1. Không query contacts thêm một lần chỉ
+            // để dựng label vì caller save chỉ kiểm tra result.ids.
+            var validatingSelectedContact = apiOptions && !!apiOptions.selectedId;
+            var comboData = validatingSelectedContact ? {
+                ids: contactIds.ids.slice(0),
+                names: contactIds.ids.slice(0),
+                hasMore: false
+            } : apiOptions ?
+                    readContactPage(contactIds.ids, apiOptions) :
+                    readContactData(contactIds.ids, selectedOnly);
             if (selectedOnly && selectedId && !comboData.ids.length) {
                 comboData = { ids: [selectedId], names: [selectedId] };
             }
@@ -1067,7 +1096,18 @@ function loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField, apiO
     }
 
     function getContactsForRoleInLv1(config, targetLv1) {
-        var ids = normalizeArray(listContactsByRightsAndLv1(config.seedRights, targetLv1, HTKT_SUB_MODULE));
+        // API save truyền selectedId: chỉ validate functional right + data
+        // permission của user đó. API options không truyền selectedId nên vẫn
+        // tải danh sách ứng viên như trước.
+        var selectedContactId = apiOptions && apiOptions.selectedId ?
+                normalizeValue(apiOptions.selectedId) : "";
+        var ids = normalizeArray(listContactsByRightsAndLv1(
+                config.seedRights,
+                targetLv1,
+                HTKT_SUB_MODULE,
+                selectedContactId,
+                getApprovalDataDomain(targetLv1)
+        ));
         return { ids: ids, poolCount: ids.length, rejectedCount: 0 };
     }
 
@@ -1157,7 +1197,7 @@ function loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField, apiO
             return result;
         }
 
-        var targetDomain = resolveHTKTApprovalDataDomain(targetLv1);
+        var targetDomain = getApprovalDataDomain(targetLv1);
         if (!targetDomain.valid) {
             result.message = "Không xác định được miền dữ liệu hợp lệ của lv1 hồ sơ.";
             return result;
@@ -1204,7 +1244,7 @@ function loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField, apiO
              */
             if (targetDomain.type === "HEAD_OFFICE") {
                 var currentUserLv1 = normalizeUnitCode(getHTKTApprovalContactLv1(contactId));
-                var currentUserDomain = resolveHTKTApprovalDataDomain(currentUserLv1);
+                var currentUserDomain = getApprovalDataDomain(currentUserLv1);
 
                 if (currentUserDomain.valid && currentUserDomain.type === "HEAD_OFFICE") {
                     result.canAccessTargetLv1 = true;
@@ -1271,6 +1311,14 @@ function loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField, apiO
                 "User không có data permission 00401 trùng lv1 của hồ sơ.";
 
         return result;
+    }
+
+    function getApprovalDataDomain(lv1) {
+        var normalizedLv1 = normalizeUnitCode(lv1);
+        if (!dataDomainCache.hasOwnProperty(normalizedLv1)) {
+            dataDomainCache[normalizedLv1] = resolveHTKTApprovalDataDomain(normalizedLv1);
+        }
+        return dataDomainCache[normalizedLv1];
     }
 
     function getPaymentTargetLv1(file) {
