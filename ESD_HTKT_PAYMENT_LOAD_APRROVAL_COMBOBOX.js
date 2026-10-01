@@ -216,12 +216,17 @@ function runPaymentApprovalApi(details, save) {
         var result;
         if (!save || (!isCheckbox && value)) {
             var permissionContactId = resolvePaymentApprovalContactId(currentUser);
-            var loaded = loadPaymentApprovalComboBoxesInternal(payment, field, {
+            var loaded = save ? validatePaymentApprovalAssignee(payment, field, value, {
                 currentUser: permissionContactId,
-                page: save ? 1 : page,
-                pageSize: save ? 1 : pageSize,
-                keyword: save ? "" : String(details.keyword || "").trim(),
-                selectedId: save ? value : ""
+                page: 1,
+                pageSize: 1,
+                keyword: ""
+            }) : loadPaymentApprovalComboBoxesInternal(payment, field, {
+                currentUser: permissionContactId,
+                page: page,
+                pageSize: pageSize,
+                keyword: String(details.keyword || "").trim(),
+                selectedId: ""
             });
             if (!loaded.success) {
                 return {
@@ -238,8 +243,12 @@ function runPaymentApprovalApi(details, save) {
                     }
                 };
             }
-            result = loaded[loaded.configs[0].key];
-            if (save && result.ids.indexOf(value) < 0) throw new Error("Cán bộ đã chọn không còn hợp lệ theo quyền và đơn vị.");
+            if (save) {
+                if (!loaded.valid) throw new Error("Cán bộ đã chọn không còn hợp lệ theo quyền và đơn vị.");
+            } else {
+                if (!loaded.configs.length) throw new Error("Không tìm thấy cấu hình trường phê duyệt.");
+                result = loaded[loaded.configs[0].key];
+            }
         }
         if (!save) {
             var items = [];
@@ -485,9 +494,8 @@ function getHTKTApprovalContactLv1(contactId) {
     }
 }
 
-function listContactsByRightsAndLv1(rightIds, targetLv1, subModuleId, selectedContactId, resolvedDomain) {
+function listContactsByRightsAndLv1(rightIds, targetLv1, subModuleId, resolvedDomain) {
     var normalizedRights = rightIds || [];
-    var normalizedSelectedContactId = String(selectedContactId == null ? "" : selectedContactId).trim();
     var domain = resolvedDomain || resolveHTKTApprovalDataDomain(targetLv1);
     var allowedLv1List = domain.allowedLv1List || [];
 
@@ -500,16 +508,9 @@ function listContactsByRightsAndLv1(rightIds, targetLv1, subModuleId, selectedCo
     }
 
     // Functional Right + vị trí tổ chức phải nằm trong miền của hồ sơ.
-    var contactFilter = { "lv1.id": allowedLv1List };
-    // Khi lưu chỉ cần xác thực đúng người được chọn. Đẩy contact.name xuống
-    // query quyền để không dựng toàn bộ candidate pool của LV1 như API options.
-    if (normalizedSelectedContactId) {
-        contactFilter["contact.name"] = [normalizedSelectedContactId];
-    }
-
     var contacts = lib.ESD_PERMS_RIGHTS.listContactsByRightsAndFilter(
             normalizedRights,
-            contactFilter
+            { "lv1.id": allowedLv1List }
     ) || [];
 
     if (contacts.toArray) contacts = contacts.toArray();
@@ -689,6 +690,14 @@ function escapeSmQueryValue(value) {
 
 function loadPaymentApprovalComboBoxes(paymentFile) {
     return loadPaymentApprovalComboBoxesInternal(paymentFile, "");
+}
+
+// Save chỉ xác thực đúng một người, không dựng dữ liệu combobox.
+function validatePaymentApprovalAssignee(paymentFile, requestedField, selectedId, apiOptions) {
+    apiOptions = apiOptions || {};
+    apiOptions.validationOnly = true;
+    apiOptions.selectedId = String(selectedId == null ? "" : selectedId).trim();
+    return loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField, apiOptions);
 }
 
 // Event checkbox Yêu cầu Rà soát 1: chỉ tải user.checker.dmms.
@@ -954,6 +963,17 @@ function loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField, apiO
         return output;
     }
 
+    // Nhánh save dừng ở validator riêng, không tải candidate/label/phân trang.
+    if (apiOptions && apiOptions.validationOnly) {
+        if (configs.length !== 1) {
+            output.success = false;
+            output.valid = false;
+            output.message = "Không tìm thấy cấu hình trường phê duyệt.";
+            return output;
+        }
+        return validateSelectedAssignee(configs[0], output.targetLv1, apiOptions.selectedId);
+    }
+
 
     /*
      * User đăng nhập hợp lệ thì mới load danh sách combobox.
@@ -988,6 +1008,128 @@ function loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField, apiO
             "Có combobox load không thành công.";
 
     return output;
+
+    function validateSelectedAssignee(config, targetLv1, selectedId) {
+        var validation = {
+            success: true,
+            valid: false,
+            message: "",
+            currentUserScope: currentUserScope,
+            targetLv1: output.targetLv1,
+            targetLv1Source: output.targetLv1Source
+        };
+        var normalizedSelectedId = normalizeValue(selectedId);
+        if (!normalizedSelectedId) {
+            validation.message = "Thiếu cán bộ cần kiểm tra.";
+            return validation;
+        }
+
+        try {
+            var domain = getApprovalDataDomain(targetLv1);
+            var allowedLv1List = domain.allowedLv1List || [];
+            if (!domain.valid || !allowedLv1List.length) {
+                validation.message = "Không xác định được miền dữ liệu hợp lệ của hồ sơ.";
+                return validation;
+            }
+            if (!lib.ESD_PERMS_RIGHTS || !lib.ESD_PERMS_RIGHTS.listContactsByRightsAndFilter) {
+                validation.message = "Không tải được thư viện phân quyền.";
+                return validation;
+            }
+
+            // Chỉ query người được chọn với functional right và LV1 yêu cầu.
+            var matchedContacts = lib.ESD_PERMS_RIGHTS.listContactsByRightsAndFilter(
+                    config.seedRights,
+                    {
+                        "lv1.id": allowedLv1List,
+                        "contact.name": [normalizedSelectedId]
+                    }
+            ) || [];
+            if (matchedContacts.toArray) matchedContacts = matchedContacts.toArray();
+            if (normalizeArray(matchedContacts).indexOf(normalizedSelectedId) < 0) {
+                validation.message = "Cán bộ không có đúng quyền hoặc không thuộc miền của hồ sơ.";
+                return validation;
+            }
+
+            var permissionIds = [];
+            var permissionFile = null;
+            try {
+                permissionFile = new SCFile("esdQTdataPermissions", SCFILE_READONLY);
+                permissionFile.setFields(["id", "permission.scope"]);
+                var permissionRc = permissionFile.doSelect(
+                        'contact.id="' + escapeQueryValue(normalizedSelectedId) + '"' +
+                        ' and sub.module="' + escapeQueryValue(HTKT_SUB_MODULE) + '"' +
+                        ' and permission.scope~="QT_PQDL_01"'
+                );
+                while (permissionRc === RC_SUCCESS) {
+                    var permissionId = normalizeValue(permissionFile["id"]);
+                    var scope = normalizeValue(permissionFile["permission.scope"]);
+                    if (scope === "QT_PQDL_06" && domain.type === "HEAD_OFFICE") {
+                        validation.valid = true;
+                        validation.message = "Cán bộ hợp lệ.";
+                        return validation;
+                    }
+                    if (permissionId && scope !== "QT_PQDL_01" && scope !== "QT_PQDL_06") {
+                        permissionIds.push(permissionId);
+                    }
+                    permissionRc = permissionFile.getNext();
+                }
+            } finally {
+                try { if (permissionFile) permissionFile.doClose(); } catch (permissionCloseError) {}
+            }
+
+            permissionIds = normalizeArray(permissionIds);
+            if (!permissionIds.length) {
+                validation.message = "Cán bộ không có phân quyền dữ liệu phù hợp.";
+                return validation;
+            }
+
+            var allowedLv1Map = {};
+            for (var allowedIndex = 0; allowedIndex < allowedLv1List.length; allowedIndex++) {
+                var allowedLv1 = normalizeUnitCode(allowedLv1List[allowedIndex]);
+                if (allowedLv1) allowedLv1Map[allowedLv1] = true;
+            }
+
+            // Chỉ đọc unit được gán cho permission của người cần validate.
+            var BATCH_SIZE = 100;
+            for (var offset = 0; offset < permissionIds.length; offset += BATCH_SIZE) {
+                var permissionConditions = [];
+                var permissionBatch = permissionIds.slice(offset, offset + BATCH_SIZE);
+                for (var permissionIndex = 0; permissionIndex < permissionBatch.length; permissionIndex++) {
+                    permissionConditions.push(
+                            'data.permission.id="' + escapeQueryValue(permissionBatch[permissionIndex]) + '"'
+                    );
+                }
+
+                var unitFile = null;
+                try {
+                    unitFile = new SCFile("esdjoinDatapermissionUnits", SCFILE_READONLY);
+                    unitFile.setFields(["unit.id", "status"]);
+                    var unitRc = unitFile.doSelect(
+                            "(" + permissionConditions.join(" or ") + ') and status="Dang hoat dong"'
+                    );
+                    while (unitRc === RC_SUCCESS) {
+                        var unitId = normalizeUnitCode(unitFile["unit.id"]);
+                        var unitLv1 = allowedLv1Map[unitId] ? unitId : resolveLv1FromUnit(unitId);
+                        if (unitLv1 && allowedLv1Map[unitLv1]) {
+                            validation.valid = true;
+                            validation.message = "Cán bộ hợp lệ.";
+                            return validation;
+                        }
+                        unitRc = unitFile.getNext();
+                    }
+                } finally {
+                    try { if (unitFile) unitFile.doClose(); } catch (unitCloseError) {}
+                }
+            }
+
+            validation.message = "Cán bộ không có unit phân quyền trong miền của hồ sơ.";
+            return validation;
+        } catch (e) {
+            validation.success = false;
+            validation.message = String(e.message || e);
+            return validation;
+        }
+    }
 
     /* =========================================================
      * LOAD COMBO
@@ -1041,17 +1183,9 @@ function loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField, apiO
 
             // Tra chính xác contact.name đã lưu, không tìm lại pool ứng viên.
             // Người đã chọn vẫn được hiển thị nếu hiện đã ngừng hoạt động.
-            // Save đã validate selectedId qua functional right + data permission
-            // ở getContactsForRoleInLv1. Không query contacts thêm một lần chỉ
-            // để dựng label vì caller save chỉ kiểm tra result.ids.
-            var validatingSelectedContact = apiOptions && !!apiOptions.selectedId;
-            var comboData = validatingSelectedContact ? {
-                ids: contactIds.ids.slice(0),
-                names: contactIds.ids.slice(0),
-                hasMore: false
-            } : apiOptions ?
-                    readContactPage(contactIds.ids, apiOptions) :
-                    readContactData(contactIds.ids, selectedOnly);
+            var comboData = apiOptions
+                    ? readContactPage(contactIds.ids, apiOptions)
+                    : readContactData(contactIds.ids, selectedOnly);
             if (selectedOnly && selectedId && !comboData.ids.length) {
                 comboData = { ids: [selectedId], names: [selectedId] };
             }
@@ -1096,16 +1230,10 @@ function loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField, apiO
     }
 
     function getContactsForRoleInLv1(config, targetLv1) {
-        // API save truyền selectedId: chỉ validate functional right + data
-        // permission của user đó. API options không truyền selectedId nên vẫn
-        // tải danh sách ứng viên như trước.
-        var selectedContactId = apiOptions && apiOptions.selectedId ?
-                normalizeValue(apiOptions.selectedId) : "";
         var ids = normalizeArray(listContactsByRightsAndLv1(
                 config.seedRights,
                 targetLv1,
                 HTKT_SUB_MODULE,
-                selectedContactId,
                 getApprovalDataDomain(targetLv1)
         ));
         return { ids: ids, poolCount: ids.length, rejectedCount: 0 };
