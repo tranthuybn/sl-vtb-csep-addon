@@ -1,4 +1,32 @@
-var logger = getLog("ESD_HTKT_INVOICE_VATIN_INTEGRATION");
+// Log bằng print để hiển thị trực tiếp trong Messages của Service Manager.
+
+function parseHttpResponse(operation, response) {
+    print(operation + '::httpStatus: ' + (response ? response.statusCode : null));
+    print(operation + '::response: ' + (response ? response.body : null));
+
+    if (!response) {
+        return null;
+    }
+
+    if (!response.body) {
+        return {
+            success: false,
+            httpStatus: response.statusCode,
+            message: response.error || "API returned empty response"
+        };
+    }
+
+    try {
+        return rteJSONParse(response.body);
+    } catch (e) {
+        print(operation + '::error: API return invalid JSON');
+        return {
+            success: false,
+            httpStatus: response.statusCode,
+            message: "Fail: " + response.body
+        };
+    }
+}
 /**
  * 1. Tải lên file hóa đơn (Upload Multipart)
  * Lưu ý: Đối với multipart/form-data phức tạp từ file nhị phân trong SM, 
@@ -50,20 +78,8 @@ function uploadInvoice(multipartBody) {
     // Kết thúc chuỗi Multipart bằng dấu -- ở cuối boundary
     body += "--" + boundary + "--\r\n";
 
-    var responseStr = lib.ESD_HTKT_BASE_API_INTEGRATION.postJson(url, body, headers);
-    logger.info('uploadInvoice: ' + responseStr);
-    if (responseStr) {
-        try {
-            return rteJSONParse(responseStr);
-        } catch (e) {
-            logger.info('uploadInvoice::error: API return invalid JSON');
-            return {
-                success: false,
-                message: "Fail: " + responseStr
-            };
-        }
-    }
-    return null;
+    var response = lib.ESD_HTKT_BASE_API_INTEGRATION.postJson(url, body, headers);
+    return parseHttpResponse('uploadInvoice', response);
 }
 
 /**
@@ -96,20 +112,8 @@ function deleteInvoice(id, userUpload, userDelete) {
     body += userDelete + "\r\n";
     body += "--" + boundary + "--\r\n";
 
-    var responseStr = lib.ESD_HTKT_BASE_API_INTEGRATION.postJson(url, body, headers);
-    logger.info('deleteInvoice: ' + responseStr);
-    if (responseStr) {
-        try {
-            return rteJSONParse(responseStr);
-        } catch (e) {
-            logger.info('deleteInvoice::error: API return invalid JSON');
-            return {
-                success: false,
-                message: "Fail: " + responseStr
-            };
-        }
-    }
-    return null;
+    var response = lib.ESD_HTKT_BASE_API_INTEGRATION.postJson(url, body, headers);
+    return parseHttpResponse('deleteInvoice', response);
 }
 
 

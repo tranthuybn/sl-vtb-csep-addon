@@ -1,4 +1,32 @@
-var logger = getLog("ESD_HTKT_INVOICE_OGL_INTEGRATION");
+// Log bằng print để hiển thị trực tiếp trong Messages của Service Manager.
+
+function parseHttpResponse(operation, response) {
+    print(operation + '::httpStatus: ' + (response ? response.statusCode : null));
+    print(operation + '::response: ' + (response ? response.body : null));
+
+    if (!response) {
+        return null;
+    }
+
+    if (!response.body) {
+        return {
+            success: false,
+            httpStatus: response.statusCode,
+            message: response.error || "API returned empty response"
+        };
+    }
+
+    try {
+        return rteJSONParse(response.body);
+    } catch (e) {
+        print(operation + '::error: API return invalid JSON');
+        return {
+            success: false,
+            httpStatus: response.statusCode,
+            message: "Fail: " + response.body
+        };
+    }
+}
 /**
  * Hàm tao activity
  */
@@ -19,21 +47,8 @@ function checkInvoice(invoiceData) {
         new Header("Authorization", "Bearer " + token)
     ];
 
-    var responseStr = lib.ESD_HTKT_BASE_API_INTEGRATION.postJson(url, rteJSONStringify(invoiceData), headers);
-    //    logger.info('ESD_HTKT_INVOICE_OGL_INTEGRATION::checkInvoice::response: ' + responseStr);
-    if (responseStr) {
-        try {
-            return rteJSONParse(responseStr);
-        } catch (e) {
-            logger.info('checkInvoice::error: API return invalid JSON');
-            return {
-                success: false,
-                message: "Fail: " + responseStr
-            };
-        }
-    }
-
-    return null;
+    var response = lib.ESD_HTKT_BASE_API_INTEGRATION.postJson(url, rteJSONStringify(invoiceData), headers);
+    return parseHttpResponse('checkInvoice', response);
 }
 
 //function checkInvoice(invoiceData) {
@@ -89,27 +104,15 @@ function checkAmount(checkAmountList) {
         new Header("Authorization", "Bearer " + token)
     ];
 
-    var responseStr = lib.ESD_HTKT_BASE_API_INTEGRATION.postJson(url, rteJSONStringify(checkAmountList), headers);
-    logger.info('ESD_HTKT_INVOICE_OGL_INTEGRATION::checkAmountList::response: ' + responseStr);
-    if (responseStr) {
-        try {
-            return rteJSONParse(responseStr);
-        } catch (e) {
-            logger.info('checkAmount::error: API return invalid JSON');
-            return {
-                success: false,
-                message: "Fail: " + responseStr
-            };
-        }
-    }
-    return null;
+    var response = lib.ESD_HTKT_BASE_API_INTEGRATION.postJson(url, rteJSONStringify(checkAmountList), headers);
+    return parseHttpResponse('checkAmount', response);
 }
 
 
 // Van tin site NCC
 function getVendorSiteInfo(vendorData) {
     if (!vendorData || !vendorData.vendorNumber) {
-        logger.info('ESD_HTKT_INVOICE_OGL_INTEGRATION::getVendorSiteInfo: Du lieu truy van khong hop le');
+        print('ESD_HTKT_INVOICE_OGL_INTEGRATION::getVendorSiteInfo: Du lieu truy van khong hop le');
         return null;
     }
     var token = lib.ESD_HTKT_BASE_API_INTEGRATION.getActiveToken('ogl');
@@ -127,21 +130,8 @@ function getVendorSiteInfo(vendorData) {
         new Header("Authorization", "Bearer " + token)
     ];
 
-    var responseStr = lib.ESD_HTKT_BASE_API_INTEGRATION.get(url, headers);
-    logger.info('ESD_HTKT_INVOICE_OGL_INTEGRATION::getVendorSiteInfo::response: ' + responseStr);
-    if (responseStr) {
-        try {
-            return rteJSONParse(responseStr);
-        } catch (e) {
-            logger.info('getVendorSiteInfo::error: API return invalid JSON');
-            return {
-                success: false,
-                message: "Fail: " + responseStr
-            };
-        }
-    }
-
-    return null;
+    var response = lib.ESD_HTKT_BASE_API_INTEGRATION.get(url, headers);
+    return parseHttpResponse('getVendorSiteInfo', response);
 }
 
 // Tao site/Ncc 
@@ -159,21 +149,8 @@ function createVendorSiteInfo(vendorData) {
     // tam thoi trong luc cho confirm
     //    vendorData.username = "VTB.HTKT.110";
 
-    var responseStr = lib.ESD_HTKT_BASE_API_INTEGRATION.postJson(url, rteJSONStringify(vendorData), headers);
-    logger.info('ESD_HTKT_INVOICE_OGL_INTEGRATION::createVendorSiteInfo::response: ' + responseStr);
-    if (responseStr) {
-        try {
-            return rteJSONParse(responseStr);
-        } catch (e) {
-            logger.info('createVendorSiteInfo::error: API return invalid JSON');
-            return {
-                success: false,
-                message: "Fail: " + responseStr
-            };
-        }
-    }
-
-    return null;
+    var response = lib.ESD_HTKT_BASE_API_INTEGRATION.postJson(url, rteJSONStringify(vendorData), headers);
+    return parseHttpResponse('createVendorSiteInfo', response);
 }
 
 // Kiem tra cong no
@@ -188,21 +165,8 @@ function checkVendorDebtReport(vendorData) {
         new Header("Authorization", "Bearer " + token)
     ];
 
-    var responseStr = lib.ESD_HTKT_BASE_API_INTEGRATION.postJson(url, rteJSONStringify(vendorData), headers);
-    logger.info('ESD_HTKT_INVOICE_OGL_INTEGRATION::checkVendorDebtReport::response: ' + responseStr);
-    if (responseStr) {
-        try {
-            return rteJSONParse(responseStr);
-        } catch (e) {
-            logger.info('checkVendorDebtReport::error: API return invalid JSON');
-            return {
-                success: false,
-                message: "Fail: " + responseStr
-            };
-        }
-    }
-
-    return null;
+    var response = lib.ESD_HTKT_BASE_API_INTEGRATION.postJson(url, rteJSONStringify(vendorData), headers);
+    return parseHttpResponse('checkVendorDebtReport', response);
 }
 
 // Thanh toan hoa don
@@ -221,21 +185,8 @@ function createApInvoice(invoiceData) {
     //    invoiceData.checker = "VTB.HTKT.110";
     //    invoiceData.maker = "VTB.HTKT.113";
 
-    var responseStr = lib.ESD_HTKT_BASE_API_INTEGRATION.postJson(url, rteJSONStringify(invoiceData), headers);
-    logger.info('ESD_HTKT_INVOICE_OGL_INTEGRATION::createApInvoice::response: ' + responseStr);
-    if (responseStr) {
-        try {
-            return rteJSONParse(responseStr);
-        } catch (e) {
-            logger.info('createApInvoice::error: API return invalid JSON');
-            return {
-                success: false,
-                message: "Fail: " + responseStr
-            };
-        }
-    }
-
-    return null;
+    var response = lib.ESD_HTKT_BASE_API_INTEGRATION.postJson(url, rteJSONStringify(invoiceData), headers);
+    return parseHttpResponse('createApInvoice', response);
 }
 
 // Kiem tra trang thai giao dich AP
@@ -251,21 +202,8 @@ function checkAP(apData) {
         new Header("Authorization", "Bearer " + token)
     ];
 
-    var responseStr = lib.ESD_HTKT_BASE_API_INTEGRATION.get(url, headers);
-    logger.info('checkAP::response: ' + responseStr);
-    if (responseStr) {
-        try {
-            return rteJSONParse(responseStr);
-        } catch (e) {
-            logger.info('checkAP::error: API return invalid JSON');
-            return {
-                success: false,
-                message: "Fail: " + responseStr
-            };
-        }
-    }
-
-    return null;
+    var response = lib.ESD_HTKT_BASE_API_INTEGRATION.get(url, headers);
+    return parseHttpResponse('checkAP', response);
 }
 
 // Hach toan batch phan he OGL
@@ -280,21 +218,8 @@ function createBatchGL(glData) {
         new Header("Authorization", "Bearer " + token)
     ];
 
-    var responseStr = lib.ESD_HTKT_BASE_API_INTEGRATION.postJson(url, rteJSONStringify(glData), headers);
-    logger.info('createBatchGL::response: ' + responseStr);
-    if (responseStr) {
-        try {
-            return rteJSONParse(responseStr);
-        } catch (e) {
-            logger.info('createBatchGL::error: API return invalid JSON');
-            return {
-                success: false,
-                message: "Fail: " + responseStr
-            };
-        }
-    }
-
-    return null;
+    var response = lib.ESD_HTKT_BASE_API_INTEGRATION.postJson(url, rteJSONStringify(glData), headers);
+    return parseHttpResponse('createBatchGL', response);
 }
 
 // Kiem tra trang thai batch
@@ -312,21 +237,8 @@ function checkBatchGl(transactionId) {
         new Header("Authorization", "Bearer " + token)
     ];
 
-    var responseStr = lib.ESD_HTKT_BASE_API_INTEGRATION.postJson(url, rteJSONStringify(checkData), headers);
-    logger.info('checkBatchGl::response: ' + responseStr);
-    if (responseStr) {
-        try {
-            return rteJSONParse(responseStr);
-        } catch (e) {
-            logger.info('checkBatchGl::error: API return invalid JSON');
-            return {
-                success: false,
-                message: "Fail: " + responseStr
-            };
-        }
-    }
-
-    return null;
+    var response = lib.ESD_HTKT_BASE_API_INTEGRATION.postJson(url, rteJSONStringify(checkData), headers);
+    return parseHttpResponse('checkBatchGl', response);
 }
 
 // Thanh toan yeu cau thanh toan da co tu truoc
@@ -343,19 +255,6 @@ function createApPayment(invoiceData) {
 
     rteJSONStringify("token " + token)
 
-    var responseStr = lib.ESD_HTKT_BASE_API_INTEGRATION.postJson(url, rteJSONStringify(invoiceData), headers);
-    logger.info('createApPayment::response: ' + responseStr);
-    if (responseStr) {
-        try {
-            return rteJSONParse(responseStr);
-        } catch (e) {
-            logger.info('createApPayment::error: API return invalid JSON');
-            return {
-                success: false,
-                message: "Fail: " + responseStr
-            };
-        }
-    }
-
-    return null;
+    var response = lib.ESD_HTKT_BASE_API_INTEGRATION.postJson(url, rteJSONStringify(invoiceData), headers);
+    return parseHttpResponse('createApPayment', response);
 }

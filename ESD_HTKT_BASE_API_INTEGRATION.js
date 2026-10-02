@@ -8,13 +8,15 @@ var SYSTEMS = ['ogl', 'vatin'];
  * Hàm gọi API dùng chung bằng doHTTPRequest của OpenText SM
  */
 function extractHttpStatus(responseHeaders, errorMessage) {
-    var statusPattern = /(?:HTTP\/\d(?:\.\d)?\s+|response code:\s*)([1-5]\d{2})/i;
+    var statusPattern = /(?:HTTP\/\d(?:\.\d)?\s+|(?:response|return)\s+code:\s*)([1-5]\d{2})/i;
     var statusHeaderNames = {
         ":status": true,
         "status": true,
         "status-code": true,
         "http-status": true,
-        "response-code": true
+        "response-code": true,
+        "returncode": true,
+        "return-code": true
     };
 
     if (responseHeaders) {
@@ -92,6 +94,25 @@ function postJson(url, body, headers) {
 function get(url, headers) {
 //    return lib.ESD_COMMON_HTTP.get(url, headers);
     return sendRequest('GET', url, headers, null);
+}
+
+/**
+ * Ham test kha nang bat HTTP status 400 cua sendRequest.
+ * Co the truyen endpoint noi bo neu SM Server khong duoc phep truy cap Internet.
+ * Endpoint mac dinh luon tra ve HTTP 400.
+ */
+function testHttpStatus400(testUrl) {
+    var url = testUrl || "https://httpbin.org/status/400";
+    var headers = [new Header("Accept", "application/json")];
+    var result = sendRequest("GET", url, headers, null);
+
+    print("testHttpStatus400::url=" + url);
+    print("testHttpStatus400::success=" + result.success);
+    print("testHttpStatus400::statusCode=" + result.statusCode);
+    print("testHttpStatus400::body=" + result.body);
+    print("testHttpStatus400::error=" + result.error);
+
+    return result;
 }
 
 /**

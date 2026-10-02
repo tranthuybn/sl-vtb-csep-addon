@@ -326,7 +326,7 @@ function callApiGl(esdHTKTacountingInfo) {
 //checkCompleteAccounting('TU.106.26.0000013')
 function callApiCore(esdHTKTacountingInfo) {
     // Đặt false để tắt giả lập và gọi lại CORE thật.
-    var USE_FAKE_CORE_RESPONSE = true;
+    var USE_FAKE_CORE_RESPONSE = false;
     var success = false;
     if (!esdHTKTacountingInfo || !esdHTKTacountingInfo['request.id'] || !esdHTKTacountingInfo.data) {
         // logger.info('ESD_HTKT_ACCOUNTING_UTILS::callApiCore: invalid payload');

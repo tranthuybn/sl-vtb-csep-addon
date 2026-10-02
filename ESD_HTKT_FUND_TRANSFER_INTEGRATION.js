@@ -1,10 +1,10 @@
-var logger = getLog("ESD_HTKT_FUND_TRANSFER_INTEGRATION");
+// Log bằng print để hiển thị trực tiếp trong Messages của Service Manager.
 
 //Van tin tai khoan trong he thong
 function checkNameAccount(acctId) {
     var requestId = lib.UUID.generateUUID().toLowerCase();
     if (!acctId) {
-        logger.info('ESD_HTKT_FUND_TRANSFER_INTEGRATION::checkNameAccount: Du lieu dau vao chua hop le');
+        print('ESD_HTKT_FUND_TRANSFER_INTEGRATION::checkNameAccount: Du lieu dau vao chua hop le');
         return;
     }
     var token = lib.ESD_HTKT_BASE_API_INTEGRATION.getActiveToken('core');
@@ -29,10 +29,10 @@ function checkNameAccount(acctId) {
             "acctId": acctId
         }
     };
-    logger.info('checkNameAccount::request: ' + rteJSONStringify(data));
+    print('checkNameAccount::request: ' + rteJSONStringify(data));
     var response = lib.ESD_HTKT_BASE_API_INTEGRATION.postJson(url, rteJSONStringify(data), headers);
-    logger.info('checkNameAccount::httpStatus: ' + (response ? response.statusCode : null));
-    logger.info('checkNameAccount::response: ' + (response ? response.body : null));
+    print('checkNameAccount::httpStatus: ' + (response ? response.statusCode : null));
+    print('checkNameAccount::response: ' + (response ? response.body : null));
     if (response && response.body) {
         try {
             var responseObj = rteJSONParse(response.body);
@@ -40,7 +40,7 @@ function checkNameAccount(acctId) {
                 return responseObj;
             }
         } catch (e) {
-            logger.info('checkNameAccount::error: API return invalid JSON');
+            print('checkNameAccount::error: API return invalid JSON');
             return {
                 status: {
                     code: "400",
@@ -59,7 +59,7 @@ function checkNameAccount(acctId) {
 function checkNameAccountNapas(acctId, napasCode) {
     var requestId = lib.UUID.generateUUID().toLowerCase();
     if (!acctId || !napasCode) {
-        logger.info('HTKT::checkNameAccount: Du lieu dau vao chua hop le');
+        print('HTKT::checkNameAccount: Du lieu dau vao chua hop le');
         return;
     }
     var token = lib.ESD_HTKT_BASE_API_INTEGRATION.getActiveToken('core');
@@ -96,10 +96,10 @@ function checkNameAccountNapas(acctId, napasCode) {
             "merchantType": "7399"
         }
     };
-    logger.info('checkNameAccount::request: ' + rteJSONStringify(checkData));
+    print('checkNameAccount::request: ' + rteJSONStringify(checkData));
     var response = lib.ESD_HTKT_BASE_API_INTEGRATION.postJson(url, rteJSONStringify(checkData), headers);
-    logger.info('checkNameAccountNapas::httpStatus: ' + (response ? response.statusCode : null));
-    logger.info('checkNameAccount::response: ' + (response ? response.body : null));
+    print('checkNameAccountNapas::httpStatus: ' + (response ? response.statusCode : null));
+    print('checkNameAccount::response: ' + (response ? response.body : null));
     if (response && response.body) {
         try {
             var responseObj = rteJSONParse(response.body);
@@ -107,7 +107,7 @@ function checkNameAccountNapas(acctId, napasCode) {
                 return responseObj;
             }
         } catch (e) {
-            logger.info('checkNameAccountNapas::error: API return invalid JSON');
+            print('checkNameAccountNapas::error: API return invalid JSON');
             return {
                 status: {
                     code: "400",
@@ -123,7 +123,7 @@ function checkNameAccountNapas(acctId, napasCode) {
 //Chuyen tien trong he thong
 function fundTranfer(transferData) {
     if (!transferData || !transferData["requestId"] || !transferData['data']) {
-        logger.info('HTKT::fundTranfer: Du lieu dau vao chua hop le');
+        print('HTKT::fundTranfer: Du lieu dau vao chua hop le');
         return null;
     }
     var requestId = transferData["requestId"];
@@ -149,7 +149,7 @@ function fundTranfer(transferData) {
     try {
         transferData.data.depAcctIdFrom.acctId = '224420600';
     } catch (e) {
-        logger.info('cannot set transfer account');
+        print('cannot set transfer account');
     }
     //    var data = {
     //        "requestId": requestId,
@@ -173,10 +173,10 @@ function fundTranfer(transferData) {
     //        }
     //    };
 
-    logger.info('fundTranfer::request: ' + rteJSONStringify(transferData));
+    print('fundTranfer::request: ' + rteJSONStringify(transferData));
     var response = lib.ESD_HTKT_BASE_API_INTEGRATION.postJson(url, rteJSONStringify(transferData), headers);
-    logger.info('fundTranfer::httpStatus: ' + (response ? response.statusCode : null));
-    logger.info('fundTranfer::response: ' + (response ? response.body : null));
+    print('fundTranfer::httpStatus: ' + (response ? response.statusCode : null));
+    print('fundTranfer::response: ' + (response ? response.body : null));
     if (response && response.body) {
         try {
             var responseObj = rteJSONParse(response.body);
@@ -184,7 +184,7 @@ function fundTranfer(transferData) {
                 return responseObj;
             }
         } catch (e) {
-            logger.info('fundTranfer::error: API return invalid JSON');
+            print('fundTranfer::error: API return invalid JSON');
             return {
                 status: {
                     code: "400",
@@ -200,7 +200,7 @@ function fundTranfer(transferData) {
 //Chuyen tien ngoai he thong
 function fundTranferOut(transferData) {
     if (!transferData || !transferData["requestId"] || !transferData['data']) {
-        logger.info('HTKT::fundTranfer: Du lieu dau vao chua hop le');
+        print('HTKT::fundTranfer: Du lieu dau vao chua hop le');
         return null;
     }
 
@@ -231,7 +231,7 @@ function fundTranferOut(transferData) {
         transferData['data']['fromAcctId'] = '224420600';
         transferData['data']['pmtMethod'] = 'GL Account';
     } catch (e) {
-        logger.info('cannot set transfer account');
+        print('cannot set transfer account');
     }
     //    var data = {
     //        "requestId": requestId,
@@ -265,10 +265,10 @@ function fundTranferOut(transferData) {
     //            "chanRefNum": requestId
     //        }
     //    };
-    logger.info('fundTranferOut::request: ' + rteJSONStringify(transferData));
+    print('fundTranferOut::request: ' + rteJSONStringify(transferData));
     var response = lib.ESD_HTKT_BASE_API_INTEGRATION.postJson(url, rteJSONStringify(transferData), headers);
-    logger.info('fundTranferOut::httpStatus: ' + (response ? response.statusCode : null));
-    logger.info('fundTranferOut::response: ' + (response ? response.body : null));
+    print('fundTranferOut::httpStatus: ' + (response ? response.statusCode : null));
+    print('fundTranferOut::response: ' + (response ? response.body : null));
     if (response && response.body) {
         try {
             var responseObj = rteJSONParse(response.body);
@@ -276,7 +276,7 @@ function fundTranferOut(transferData) {
                 return responseObj;
             }
         } catch (e) {
-            logger.info('fundTranferOut::error: API return invalid JSON');
+            print('fundTranferOut::error: API return invalid JSON');
             return {
                 status: {
                     code: "400",
