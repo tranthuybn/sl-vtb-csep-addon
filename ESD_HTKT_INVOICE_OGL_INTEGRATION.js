@@ -1,6 +1,6 @@
 // Log bằng print để hiển thị trực tiếp trong Messages của Service Manager.
 
-function parseHttpResponse(operation, response, includeHttpStatus) {
+function parseHttpResponse(operation, response) {
     print(operation + '::httpStatus: ' + (response ? response.statusCode : null));
     print(operation + '::response: ' + (response ? response.body : null));
 
@@ -17,11 +17,7 @@ function parseHttpResponse(operation, response, includeHttpStatus) {
     }
 
     try {
-        var responseObj = rteJSONParse(response.body);
-        if (includeHttpStatus && responseObj && typeof responseObj === "object") {
-            responseObj.httpStatus = response.statusCode;
-        }
-        return responseObj;
+        return rteJSONParse(response.body);
     } catch (e) {
         print(operation + '::error: API return invalid JSON');
         return {
@@ -30,6 +26,32 @@ function parseHttpResponse(operation, response, includeHttpStatus) {
             message: "Fail: " + response.body
         };
     }
+}
+
+// Giữ metadata HTTP tách biệt hoàn toàn với body do API trả về.
+function parseHttpResponseWithMeta(operation, response) {
+    print(operation + '::httpStatus: ' + (response ? response.statusCode : null));
+    print(operation + '::response: ' + (response ? response.body : null));
+
+    var result = {
+        body: null,
+        rawBody: response ? response.body : null,
+        httpStatus: response ? response.statusCode : null,
+        error: response ? response.error : "No response from API server"
+    };
+
+    if (!response || !response.body) {
+        return result;
+    }
+
+    try {
+        result.body = rteJSONParse(response.body);
+    } catch (e) {
+        result.error = "API return invalid JSON";
+        print(operation + '::error: ' + result.error);
+    }
+
+    return result;
 }
 /**
  * Hàm tao activity
@@ -190,7 +212,7 @@ function createApInvoice(invoiceData) {
     //    invoiceData.maker = "VTB.HTKT.113";
 
     var response = lib.ESD_HTKT_BASE_API_INTEGRATION.postJson(url, rteJSONStringify(invoiceData), headers);
-    return parseHttpResponse('createApInvoice', response, true);
+    return parseHttpResponseWithMeta('createApInvoice', response);
 }
 
 // Kiem tra trang thai giao dich AP
@@ -260,5 +282,5 @@ function createApPayment(invoiceData) {
     rteJSONStringify("token " + token)
 
     var response = lib.ESD_HTKT_BASE_API_INTEGRATION.postJson(url, rteJSONStringify(invoiceData), headers);
-    return parseHttpResponse('createApPayment', response, true);
+    return parseHttpResponseWithMeta('createApPayment', response);
 }

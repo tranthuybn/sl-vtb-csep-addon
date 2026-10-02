@@ -177,26 +177,23 @@ function fundTranfer(transferData) {
     var response = lib.ESD_HTKT_BASE_API_INTEGRATION.postJson(url, rteJSONStringify(transferData), headers);
     print('fundTranfer::httpStatus: ' + (response ? response.statusCode : null));
     print('fundTranfer::response: ' + (response ? response.body : null));
+    var result = {
+        body: null,
+        rawBody: response ? response.body : null,
+        httpStatus: response ? response.statusCode : null,
+        error: response ? response.error : "No response from CORE"
+    };
+
     if (response && response.body) {
         try {
-            var responseObj = rteJSONParse(response.body);
-            if (responseObj) {
-                responseObj.httpStatus = response.statusCode;
-                return responseObj;
-            }
+            result.body = rteJSONParse(response.body);
         } catch (e) {
-            print('fundTranfer::error: API return invalid JSON');
-            return {
-                status: {
-                    code: "400",
-                    detail: "Fail: " + response.body
-                },
-                httpStatus: response.statusCode
-            };
+            result.error = "CORE return invalid JSON";
+            print('fundTranfer::error: ' + result.error);
         }
     }
 
-    return null;
+    return result;
 }
 
 //Chuyen tien ngoai he thong
@@ -271,24 +268,21 @@ function fundTranferOut(transferData) {
     var response = lib.ESD_HTKT_BASE_API_INTEGRATION.postJson(url, rteJSONStringify(transferData), headers);
     print('fundTranferOut::httpStatus: ' + (response ? response.statusCode : null));
     print('fundTranferOut::response: ' + (response ? response.body : null));
+    var result = {
+        body: null,
+        rawBody: response ? response.body : null,
+        httpStatus: response ? response.statusCode : null,
+        error: response ? response.error : "No response from CORE"
+    };
+
     if (response && response.body) {
         try {
-            var responseObj = rteJSONParse(response.body);
-            if (responseObj) {
-                responseObj.httpStatus = response.statusCode;
-                return responseObj;
-            }
+            result.body = rteJSONParse(response.body);
         } catch (e) {
-            print('fundTranferOut::error: API return invalid JSON');
-            return {
-                status: {
-                    code: "400",
-                    detail: "Fail: " + response.body
-                },
-                httpStatus: response.statusCode
-            };
+            result.error = "CORE return invalid JSON";
+            print('fundTranferOut::error: ' + result.error);
         }
     }
 
-    return null;
+    return result;
 }

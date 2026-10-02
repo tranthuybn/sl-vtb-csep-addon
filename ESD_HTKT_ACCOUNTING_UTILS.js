@@ -252,25 +252,37 @@ function callApiAp(esdHTKTacountingInfo) {
     }
 
     if (payload) {
-        var response = null;
+        var apiResult = null;
         if (esdHTKTacountingInfo['sub.type'] == ACCOUNTING_SUB_TYPE.THANH_TOAN ||
             esdHTKTacountingInfo['sub.type'] == ACCOUNTING_SUB_TYPE.TAM_UNG ||
             esdHTKTacountingInfo['sub.type'] == ACCOUNTING_SUB_TYPE.THUE) {
-            response = lib.ESD_HTKT_INVOICE_OGL_INTEGRATION.createApInvoice(payload);
+            apiResult = lib.ESD_HTKT_INVOICE_OGL_INTEGRATION.createApInvoice(payload);
 //            response = { success: false }
         } else if (esdHTKTacountingInfo['sub.type'] == ACCOUNTING_SUB_TYPE.TAT_TOAN) {
-            response = lib.ESD_HTKT_INVOICE_OGL_INTEGRATION.createApPayment(payload);
+            apiResult = lib.ESD_HTKT_INVOICE_OGL_INTEGRATION.createApPayment(payload);
         } else {
             // logger.info("ESD_HTKT_ACCOUNTING_UTILS::callApiAp: sub.type không xác định");
         }
-        if (response) {
+        if (apiResult) {
+            var response = apiResult.body;
+            var httpStatus = apiResult.httpStatus;
+            var rawResponseBody = apiResult.rawBody;
+
+            if (!response) {
+                response = {
+                    success: false,
+                    message: apiResult.error || "API returned empty response"
+                };
+            }
+
             success = response.success;
             var itemAccounting = new SCFile('esdHTKTaccountingInformation');
             var result = itemAccounting.doSelect(`request.id = "${esdHTKTacountingInfo['request.id']}"`);
             if (result == RC_SUCCESS) {
                 itemAccounting.status = success ? ACCOUNTING_STATUS.NEW : ACCOUNTING_STATUS.ERROR;
-                itemAccounting.response = rteJSONStringify(response);
-                itemAccounting['response.http.status'] = response.httpStatus == null ? null : String(response.httpStatus);
+                // Chỉ lưu đúng raw body do API trả về, không chèn metadata HTTP vào JSON.
+                itemAccounting.response = rawResponseBody;
+                itemAccounting['response.http.status'] = httpStatus == null ? null : String(httpStatus);
                 
                 if (response.data && response.data.transactionId) {
                     itemAccounting['transaction.id'] = response.data.transactionId;
@@ -341,7 +353,10 @@ function callApiCore(esdHTKTacountingInfo) {
         // logger.info("ESD_HTKT_ACCOUNTING_UTILS::callApiCore: QLTS Cannot parse json payload");
     }
     if (payload) {
+        var apiResult = null;
         var response = null;
+        var rawResponseBody = null;
+        var httpStatus = null;
         var status = "UNKNOWN";
         var statusDetail = null;
         if (USE_FAKE_CORE_RESPONSE &&
@@ -361,12 +376,28 @@ function callApiCore(esdHTKTacountingInfo) {
                     detail: fakeStatus.detail + " (Giả lập)"
                 },
             };
+            rawResponseBody = rteJSONStringify(response);
         } else if (esdHTKTacountingInfo['sub.type'] == ACCOUNTING_SUB_TYPE.INHOUSE) {
-            response = lib.ESD_HTKT_FUND_TRANSFER_INTEGRATION.fundTranfer(payload);
+            apiResult = lib.ESD_HTKT_FUND_TRANSFER_INTEGRATION.fundTranfer(payload);
         } else if (esdHTKTacountingInfo['sub.type'] == ACCOUNTING_SUB_TYPE.CITAD) {
-            response = lib.ESD_HTKT_FUND_TRANSFER_INTEGRATION.fundTranferOut(payload);
+            apiResult = lib.ESD_HTKT_FUND_TRANSFER_INTEGRATION.fundTranferOut(payload);
         } else {
             // logger.info("ESD_HTKT_ACCOUNTING_UTILS::callApiCore: sub.type không xác định");
+        }
+
+        if (apiResult) {
+            response = apiResult.body;
+            rawResponseBody = apiResult.rawBody;
+            httpStatus = apiResult.httpStatus;
+
+            if (!response) {
+                response = {
+                    status: {
+                        code: "400",
+                        detail: apiResult.error || "CORE returned empty response"
+                    }
+                };
+            }
         }
 
         // Log duy nhất response trả về của call core
@@ -391,8 +422,8 @@ function callApiCore(esdHTKTacountingInfo) {
             if (result == RC_SUCCESS) {
                 itemAccounting['checked.time'] = funcs.tod();
                 itemAccounting.status = status;
-                itemAccounting.response = rteJSONStringify(response);
-                itemAccounting['response.http.status'] = response.httpStatus == null ? null : String(response.httpStatus);
+                itemAccounting.response = rawResponseBody;
+                itemAccounting['response.http.status'] = httpStatus == null ? null : String(httpStatus);
                 itemAccounting.message = statusDetail;
                 itemAccounting['host.res.num'] = hostRefNum;
                 itemAccounting.doUpdate();
