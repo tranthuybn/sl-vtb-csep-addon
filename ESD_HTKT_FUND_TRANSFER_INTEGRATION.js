@@ -30,11 +30,12 @@ function checkNameAccount(acctId) {
         }
     };
     logger.info('checkNameAccount::request: ' + rteJSONStringify(data));
-    var responseStr = lib.ESD_HTKT_BASE_API_INTEGRATION.postJson(url, rteJSONStringify(data), headers);
-    logger.info('checkNameAccount::response: ' + responseStr);
-    if (responseStr) {
+    var response = lib.ESD_HTKT_BASE_API_INTEGRATION.postJson(url, rteJSONStringify(data), headers);
+    logger.info('checkNameAccount::httpStatus: ' + (response ? response.statusCode : null));
+    logger.info('checkNameAccount::response: ' + (response ? response.body : null));
+    if (response && response.body) {
         try {
-            var responseObj = rteJSONParse(responseStr);
+            var responseObj = rteJSONParse(response.body);
             if (responseObj) {
                 return responseObj;
             }
@@ -43,7 +44,7 @@ function checkNameAccount(acctId) {
             return {
                 status: {
                     code: "400",
-                    detail: "Fail: " + responseStr
+                    detail: "Fail: " + response.body
                 }
             };
         }
@@ -96,11 +97,12 @@ function checkNameAccountNapas(acctId, napasCode) {
         }
     };
     logger.info('checkNameAccount::request: ' + rteJSONStringify(checkData));
-    var responseStr = lib.ESD_HTKT_BASE_API_INTEGRATION.postJson(url, rteJSONStringify(checkData), headers);
-    logger.info('checkNameAccount::response: ' + responseStr);
-    if (responseStr) {
+    var response = lib.ESD_HTKT_BASE_API_INTEGRATION.postJson(url, rteJSONStringify(checkData), headers);
+    logger.info('checkNameAccountNapas::httpStatus: ' + (response ? response.statusCode : null));
+    logger.info('checkNameAccount::response: ' + (response ? response.body : null));
+    if (response && response.body) {
         try {
-            var responseObj = rteJSONParse(responseStr);
+            var responseObj = rteJSONParse(response.body);
             if (responseObj) {
                 return responseObj;
             }
@@ -109,7 +111,7 @@ function checkNameAccountNapas(acctId, napasCode) {
             return {
                 status: {
                     code: "400",
-                    detail: "Fail: " + responseStr
+                    detail: "Fail: " + response.body
                 }
             };
         }
@@ -172,11 +174,12 @@ function fundTranfer(transferData) {
     //    };
 
     logger.info('fundTranfer::request: ' + rteJSONStringify(transferData));
-    var responseStr = lib.ESD_HTKT_BASE_API_INTEGRATION.postJson(url, rteJSONStringify(transferData), headers);
-    logger.info('fundTranfer::response: ' + responseStr);
-    if (responseStr) {
+    var response = lib.ESD_HTKT_BASE_API_INTEGRATION.postJson(url, rteJSONStringify(transferData), headers);
+    logger.info('fundTranfer::httpStatus: ' + (response ? response.statusCode : null));
+    logger.info('fundTranfer::response: ' + (response ? response.body : null));
+    if (response && response.body) {
         try {
-            var responseObj = rteJSONParse(responseStr);
+            var responseObj = rteJSONParse(response.body);
             if (responseObj) {
                 return responseObj;
             }
@@ -185,7 +188,7 @@ function fundTranfer(transferData) {
             return {
                 status: {
                     code: "400",
-                    detail: "Fail: " + responseStr
+                    detail: "Fail: " + response.body
                 }
             };
         }
@@ -263,11 +266,12 @@ function fundTranferOut(transferData) {
     //        }
     //    };
     logger.info('fundTranferOut::request: ' + rteJSONStringify(transferData));
-    var responseStr = lib.ESD_HTKT_BASE_API_INTEGRATION.postJson(url, rteJSONStringify(transferData), headers);
-    logger.info('fundTranferOut::response: ' + responseStr);
-    if (responseStr) {
+    var response = lib.ESD_HTKT_BASE_API_INTEGRATION.postJson(url, rteJSONStringify(transferData), headers);
+    logger.info('fundTranferOut::httpStatus: ' + (response ? response.statusCode : null));
+    logger.info('fundTranferOut::response: ' + (response ? response.body : null));
+    if (response && response.body) {
         try {
-            var responseObj = rteJSONParse(responseStr);
+            var responseObj = rteJSONParse(response.body);
             if (responseObj) {
                 return responseObj;
             }
@@ -276,7 +280,7 @@ function fundTranferOut(transferData) {
             return {
                 status: {
                     code: "400",
-                    detail: "Fail: " + responseStr
+                    detail: "Fail: " + response.body
                 }
             };
         }

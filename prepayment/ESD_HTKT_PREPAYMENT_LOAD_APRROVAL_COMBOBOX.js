@@ -1,6 +1,7 @@
 function getPrepaymentApprovalFields() {
     return ["user.checker.kttc", "user.checker.dmms", "user.approver.dmms",
-        "user.approver.kttc", "user.checker.final", "user.approver.final"];
+        "user.approver.kttc", "user.checker.final", "user.approver.final"
+    ];
 }
 
 // Gọi ở đầu Rule Set của nút Lưu/Workflow để form SM chọn lại chính record mới nhất.
@@ -43,22 +44,344 @@ function syncPrepaymentApprovalFromDatabase(prepayment) {
     }
 }
 
+/**
+ * Lấy Functional Rights của user dùng riêng cho logic tái phân công.
+ *
+ * LƯU Ý:
+ * - Fail-closed: không đọc được rights => không cấp thêm quyền lãnh đạo.
+ * - Không thay đổi quyền xử lý workflow hiện hữu.
+ * - RIGHT_APPROVE_1 (0005) đại diện Lãnh đạo ĐMMS / approval_dmms.
+ * - RIGHT_APPROVE_2 (0006) đại diện Lãnh đạo KTTC / approval_kttc.
+ */
+function getPrepaymentReassignmentRoleAccess(currentUser) {
+    var RIGHT_APPROVE_1 = "0040040002000005";
+    var RIGHT_APPROVE_2 = "0040040002000006";
+
+    var rightMap = {};
+    var contactName = String(currentUser == null ? "" : currentUser).trim();
+
+    if (!contactName) {
+        return {
+            isApprovalDmms: false,
+            isApprovalKttc: false
+        };
+    }
+
+    function addRights(source) {
+        if (!source) return;
+
+        try {
+            if (source.toArray) {
+                source = source.toArray();
+            }
+        } catch (eToArray) {}
+
+        if (!source || typeof source.length === "undefined") {
+            return;
+        }
+
+        for (var i = 0; i < source.length; i++) {
+            var rightId = String(source[i] == null ? "" : source[i]).trim();
+
+            if (rightId) {
+                rightMap[rightId] = true;
+            }
+        }
+    }
+
+    function addRightsByIdentity(identity) {
+        var safeIdentity = String(identity == null ? "" : identity).trim();
+
+        if (
+            !safeIdentity ||
+            !lib.ESD_PERMS_RIGHTS ||
+            !lib.ESD_PERMS_RIGHTS.permsRight
+        ) {
+            return;
+        }
+
+        try {
+            addRights(lib.ESD_PERMS_RIGHTS.permsRight(safeIdentity) || []);
+        } catch (ePermRights) {}
+    }
+
+    /*
+     * Nguồn 1 - Functional Rights của chính session SM.
+     *
+     * Chỉ merge $G.rights khi currentUser đúng là contact.name của session
+     * (so sánh không phân biệt hoa/thường), tránh dùng nhầm quyền session
+     * cho một user khác.
+     */
+    try {
+        var sessionContact = String(
+            vars["$lo.contact.name"] ||
+            (vars.$lo_operator ? vars.$lo_operator["contact.name"] : "") ||
+            ""
+        ).trim();
+
+        if (
+            sessionContact &&
+            sessionContact.toLowerCase() === contactName.toLowerCase() &&
+            vars["$G.rights"]
+        ) {
+            addRights(vars["$G.rights"]);
+        }
+    } catch (eSessionRights) {}
+
+    /*
+     * Nguồn 2 - giữ nguyên cách gọi cũ bằng identity nhận từ caller.
+     *
+     * Ví dụ caller REST có thể truyền "vtb.htkt.126".
+     * Nếu môi trường permsRight phân biệt hoa/thường thì nguồn này có thể
+     * không trả đủ quyền; vì vậy bên dưới luôn resolve canonical contact.name
+     * từ bảng contacts và merge thêm.
+     */
+    addRightsByIdentity(contactName);
+
+    /*
+     * Nguồn 3 - resolve canonical contact.name theo truy vấn case-insensitive.
+     *
+     * Đây là phần quan trọng cho REST/API context:
+     * - NextJS có thể gửi currentUser ở lowercase.
+     * - contacts lưu contact.name theo canonical case, ví dụ VTB.HTKT.126.
+     * - permsRight có thể phân biệt hoa/thường theo identity đầu vào.
+     *
+     * Vì vậy phải lấy lại chính contact.name đã lưu trong SM rồi gọi permsRight
+     * bằng canonical name đó. Vẫn giữ thêm contact.id làm fallback để tương thích
+     * với các môi trường ESD_PERMS_RIGHTS khác nhau.
+     */
+    var contactFile = null;
+
+    try {
+        contactFile = new SCFile("contacts", SCFILE_READONLY);
+        contactFile.setFields(["contact.id", "contact.name"]);
+
+        var contactRc = contactFile.doSelect(
+            'tolower(contact.name)="' +
+            escapeSmQueryValue(contactName.toLowerCase()) +
+            '"'
+        );
+
+        if (contactRc === RC_SUCCESS) {
+            var canonicalContactName = String(
+                contactFile["contact.name"] == null ?
+                "" :
+                contactFile["contact.name"]
+            ).trim();
+
+            var resolvedContactId = String(
+                contactFile["contact.id"] == null ?
+                "" :
+                contactFile["contact.id"]
+            ).trim();
+
+            /*
+             * Chỉ chấp nhận khi resolve duy nhất một contact.
+             * Fail-closed nếu dữ liệu contacts bị trùng.
+             */
+            var hasDuplicate = false;
+            try {
+                hasDuplicate = contactFile.getNext() === RC_SUCCESS;
+            } catch (eGetNextContact) {
+                hasDuplicate = true;
+            }
+
+            if (!hasDuplicate) {
+                if (canonicalContactName) {
+                    addRightsByIdentity(canonicalContactName);
+                }
+
+                if (
+                    resolvedContactId &&
+                    resolvedContactId !== canonicalContactName
+                ) {
+                    addRightsByIdentity(resolvedContactId);
+                }
+            }
+        }
+    } catch (eResolveContact) {
+        // Fail-closed: không resolve được canonical contact thì chỉ giữ các nguồn quyền đã merge.
+    } finally {
+        try {
+            if (contactFile) {
+                contactFile.doClose();
+            }
+        } catch (eCloseContact) {}
+    }
+
+    print(
+        "[PP_APR][ROLE] u=" + contactName +
+        " r5=" + String(rightMap[RIGHT_APPROVE_1] === true) +
+        " r6=" + String(rightMap[RIGHT_APPROVE_2] === true)
+    );
+
+    return {
+        isApprovalDmms: rightMap[RIGHT_APPROVE_1] === true,
+        isApprovalKttc: rightMap[RIGHT_APPROVE_2] === true
+    };
+}
+
 function getPrepaymentApprovalAccess(prepayment, currentUser) {
     var phase = readPrepaymentApprovalValue(prepayment, "current.phase").toLowerCase();
     var role = readPrepaymentApprovalValue(prepayment, "initial.role").toLowerCase();
     var creator = readPrepaymentApprovalValue(prepayment, "created.by").toLowerCase();
     var actor = String(currentUser == null ? "" : currentUser).trim().toLowerCase();
     var checker = readPrepaymentApprovalValue(prepayment, "user.checker.kttc").toLowerCase();
+    var approverDmms = readPrepaymentApprovalValue(prepayment, "user.approver.dmms").toLowerCase();
+    var approverKttc = readPrepaymentApprovalValue(prepayment, "user.approver.kttc").toLowerCase();
+    var status = readPrepaymentApprovalValue(prepayment, "status").toLowerCase();
     var isDmmsCreator = !!actor && creator === actor && role === "dmms";
-    var closed = phase === "end" || readPrepaymentApprovalValue(prepayment, "status").toLowerCase() === "cancelled";
+
+    // Giữ nguyên semantics quyền cũ cho người khởi tạo / KTTC tiếp nhận.
+    var legacyClosed = phase === "end" || status === "cancelled";
+    var canEditLevel1 = !legacyClosed && phase === "initial_dmms" && isDmmsCreator;
+    var canEditLevel2 = !legacyClosed && phase === "initial_kttc" && !!actor &&
+        ((creator === actor && role === "kttc") || checker === actor);
+
+    // Quyền tái phân công của lãnh đạo chỉ áp dụng khi hồ sơ còn trong luồng xử lý.
+    var reassignmentClosed =
+        phase === "end" ||
+        status === "cancelled" ||
+        status === "approved" ||
+        status === "accounted";
+
+    var leaderAccess = getPrepaymentReassignmentRoleAccess(currentUser);
+
+    /*
+     * Xác định quyền lãnh đạo theo 2 nguồn:
+     *
+     * 1. Functional Right hiện hành:
+     *    - 0040040002000005: Lãnh đạo ĐMMS / approval_dmms
+     *    - 0040040002000006: Lãnh đạo KTTC / approval_kttc
+     *
+     * 2. Actor đang được assign trực tiếp trên chính hồ sơ:
+     *    - user.approver.dmms
+     *    - user.approver.kttc
+     *
+     * Việc dùng actor của record làm fallback bảo đảm người đang giữ đúng
+     * vai trò phê duyệt trên hồ sơ có thể tái phân công chính role đó, kể cả
+     * khi Functional Rights trong context API không được resolve đầy đủ.
+     *
+     * Không mở thêm quyền cho user không liên quan vì actor phải khớp chính xác
+     * contact.name hiện tại với field approver tương ứng trên record.
+     */
+    var isApprovalDmms =
+        leaderAccess.isApprovalDmms === true ||
+        (!!actor && actor === approverDmms);
+
+    /*
+     * approval_kttc bắt buộc phải được xác định bằng Functional Right
+     * 0040040002000006.
+     *
+     * Không fallback theo user.approver.kttc trên record, vì nghiệp vụ đã chốt:
+     * user thuộc role approval_kttc phải có RIGHT_APPROVE_2 (0006).
+     */
+    var isApprovalKttc =
+        leaderAccess.isApprovalKttc === true;
+
+    /*
+     * Ma trận tái phân công mới:
+     *
+     * 1. Lãnh đạo ĐMMS (approval_dmms), chỉ với luồng initial.role = dmms:
+     *    - user.checker.dmms  : Rà soát 1
+     *    - user.approver.dmms : Phê duyệt ĐMMS
+     *
+     * 2. Lãnh đạo KTTC (approval_kttc):
+     *    - Với luồng dmms:
+     *      + user.checker.kttc  : KTTC tiếp nhận
+     *      + user.checker.final : Rà soát 2
+     *      + user.approver.kttc : Phê duyệt KTTC
+     *    - Với luồng kttc:
+     *      + user.checker.final : Rà soát 2
+     *      + user.approver.kttc : Phê duyệt KTTC
+     *
+     * 3. Không mở thêm quyền:
+     *    - require.check.level1 / require.check.level2
+     *    - user.approver.final
+     */
+    var canDmmsLeaderReassign = !reassignmentClosed &&
+        role === "dmms" &&
+        isApprovalDmms;
+
+    /*
+     * Quyền tái phân công của Lãnh đạo KTTC không phụ thuộc initial.role.
+     *
+     * Quyền theo từng field vẫn được giới hạn ở fieldAccess phía dưới:
+     * - user.checker.kttc chỉ mở thêm với luồng DMMS.
+     * - user.approver.kttc và user.checker.final mở cho approval_kttc.
+     * - user.approver.final không được mở thêm.
+     */
+    var canKttcLeaderReassign = !reassignmentClosed &&
+        isApprovalKttc;
+
+    var fieldAccess = {};
+
+    // Quyền cũ được giữ nguyên.
+    fieldAccess["require.check.level1"] = canEditLevel1;
+    fieldAccess["require.check.level2"] = canEditLevel2;
+    fieldAccess["user.approver.final"] =
+        canEditLevel2 ||
+        canKttcLeaderReassign;
+
+    // Quyền cũ + quyền tái phân công mới.
+    fieldAccess["user.checker.kttc"] =
+        canEditLevel1 ||
+        (canKttcLeaderReassign && role === "dmms");
+
+    fieldAccess["user.checker.dmms"] =
+        canEditLevel1 ||
+        canDmmsLeaderReassign;
+
+    fieldAccess["user.approver.dmms"] =
+        canEditLevel1 ||
+        canDmmsLeaderReassign;
+
+    fieldAccess["user.approver.kttc"] =
+        canEditLevel2 ||
+        canKttcLeaderReassign;
+
+    fieldAccess["user.checker.final"] =
+        canEditLevel2 ||
+        canKttcLeaderReassign;
+
+    //print(
+    //    "[PP_APR][ACCESS] u=" + currentUser +
+    //    " phase=" + phase +
+    //    " role=" + role +
+    //    " status=" + status +
+    //    " dmms=" + String(isApprovalDmms) +
+    //    " kttc=" + String(isApprovalKttc) +
+    //    " closed=" + String(reassignmentClosed) +
+    //    " dmmsReassign=" + String(canDmmsLeaderReassign) +
+    //    " kttcReassign=" + String(canKttcLeaderReassign) +
+    //    " checkerDmms=" + String(fieldAccess["user.checker.dmms"]) +
+    //    " approverDmms=" + String(fieldAccess["user.approver.dmms"]) +
+    //    " approverKttc=" + String(fieldAccess["user.approver.kttc"]) +
+    //    " checkerFinal=" + String(fieldAccess["user.checker.final"])
+    //);
     return {
         isDmmsCreator: isDmmsCreator,
+
+        // FE cũ vẫn có thể dùng hai cờ này.
         showLevel1: role === "dmms",
-        showLevel2: role === "kttc" || (role === "dmms" && !isDmmsCreator &&
-            ["initial_kttc", "check_dmms", "approval_dmms", "approval_kttc", "check_final", "approval_final", "end"].indexOf(phase) >= 0),
-        canEditLevel1: !closed && phase === "initial_dmms" && isDmmsCreator,
-        canEditLevel2: !closed && phase === "initial_kttc" && !!actor &&
-            ((creator === actor && role === "kttc") || checker === actor)
+        showLevel2: role === "kttc" ||
+            isApprovalKttc ||
+            (role === "dmms" && !isDmmsCreator && ["initial_kttc", "check_dmms", "approval_dmms", "approval_kttc", "check_final", "approval_final", "end"].indexOf(phase) >= 0),
+
+        // Giữ nguyên cờ legacy để không ảnh hưởng FE/code đang golive.
+        canEditLevel1: canEditLevel1,
+        canEditLevel2: canEditLevel2,
+
+        // Cờ role mới phục vụ FE và debug.
+        isApprovalDmms: isApprovalDmms,
+        isApprovalKttc: isApprovalKttc,
+
+        // Cờ tổng quát: role lãnh đạo có thể nhìn sớm dữ liệu thuộc luồng liên quan.
+        canViewEarly: (role === "dmms" && (isApprovalDmms || isApprovalKttc)) ||
+            (role === "kttc" && isApprovalKttc),
+
+        // Quyền edit chuẩn theo từng field.
+        fieldAccess: fieldAccess
     };
 }
 
@@ -134,8 +457,74 @@ function getPrepaymentApprovalInitData(prepayment, currentUser) {
     };
 }
 
+
+/**
+ * Đọc lại toàn bộ dữ liệu tab Thông tin phê duyệt từ DB.
+ *
+ * Dùng cho NextJS refresh lại approvalValues / approvalAccess sau khi
+ * người dùng thao tác workflow bên SM rồi quay lại iframe.
+ *
+ * Chỉ đọc dữ liệu, không ghi DB.
+ */
+function getPrepaymentApprovalData(details) {
+    details = details || {};
+
+    var prepaymentId = String(details.prepaymentId || "").trim();
+    var currentUser = String(details.currentUser || "").trim();
+    var prepayment = null;
+
+    try {
+        if (!prepaymentId || !currentUser) {
+            throw new Error("Thông tin tải dữ liệu phê duyệt không hợp lệ.");
+        }
+
+        prepayment = new SCFile(
+            "esdHTKTprepayment",
+            SCFILE_READONLY
+        );
+
+        if (
+            prepayment.doSelect(
+                'id="' + escapeSmQueryValue(prepaymentId) + '"'
+            ) !== RC_SUCCESS
+        ) {
+            throw new Error("Không tìm thấy phiếu tạm ứng.");
+        }
+
+        return {
+            success: true,
+            data: getPrepaymentApprovalInitData(
+                prepayment,
+                currentUser
+            )
+        };
+
+    } catch (error) {
+        return {
+            success: false,
+            message: error && error.message ?
+                error.message :
+                String(error)
+        };
+
+    } finally {
+        if (prepayment) {
+            try {
+                prepayment.doClose();
+            } catch (eClose) {}
+        }
+    }
+}
+
 function prepaymentApprovalFieldEditable(prepayment, currentUser, field) {
     var access = getPrepaymentApprovalAccess(prepayment, currentUser);
+
+    // Logic mới ưu tiên quyền chi tiết theo field.
+    // Fallback phía dưới giữ tương thích nếu access object của bản cũ được dùng ở đâu đó.
+    if (access.fieldAccess && typeof access.fieldAccess[field] !== "undefined") {
+        return access.fieldAccess[field] === true;
+    }
+
     var level1 = ["require.check.level1", "user.checker.kttc", "user.checker.dmms", "user.approver.dmms"];
     var level2 = ["require.check.level2", "user.approver.kttc", "user.checker.final", "user.approver.final"];
     return (access.canEditLevel1 && level1.indexOf(field) >= 0) ||
@@ -144,6 +533,200 @@ function prepaymentApprovalFieldEditable(prepayment, currentUser, field) {
 
 function getPrepaymentApprovalOptions(details) {
     return runPrepaymentApprovalApi(details, false);
+}
+
+
+/**
+ * Validate không cho cùng một cán bộ được phân công ở nhiều combobox
+ * với các vai trò xử lý khác nhau trên cùng một Đề nghị Tạm ứng.
+ *
+ * Quy tắc:
+ * - Chỉ áp dụng cho 6 field cán bộ phê duyệt.
+ * - Bỏ qua chính field đang thay đổi.
+ * - Không phân biệt hoa/thường khi so sánh contact.name.
+ * - Giá trị rỗng không bị coi là trùng.
+ * - Chỉ validate trước khi lưu, không thay đổi logic load candidate / quyền / workflow.
+ */
+function validateDuplicatePrepaymentApprovalUser(prepayment, currentField, newValue) {
+    var safeField = String(currentField == null ? "" : currentField).trim();
+    var safeValue = String(newValue == null ? "" : newValue).trim();
+
+    if (!safeField || !safeValue) {
+        return;
+    }
+
+    var fields = getPrepaymentApprovalFields();
+    var normalizedValue = safeValue.toLowerCase();
+
+    var fieldLabels = {
+        "user.checker.kttc": "KTTC tiếp nhận",
+        "user.checker.dmms": "Rà soát ĐMMS (Rà soát 1)",
+        "user.approver.dmms": "Phê duyệt ĐMMS",
+        "user.approver.kttc": "Phê duyệt KTTC",
+        "user.checker.final": "Rà soát KTTC (Rà soát 2)",
+        "user.approver.final": "Cấp có thẩm quyền"
+    };
+
+    for (var i = 0; i < fields.length; i++) {
+        var otherField = fields[i];
+
+        if (otherField === safeField) {
+            continue;
+        }
+
+        var otherValue = readPrepaymentApprovalValue(prepayment, otherField);
+
+        if (
+            otherValue &&
+            otherValue.toLowerCase() === normalizedValue
+        ) {
+            throw new Error(
+                'Cán bộ "' +
+                safeValue +
+                '" đã được phân công tại bước "' +
+                (fieldLabels[otherField] || otherField) +
+                '". Không được phân công cùng một cán bộ cho nhiều bước xử lý.'
+            );
+        }
+    }
+}
+
+
+/**
+ * Ghi lịch sử tái phân công cán bộ phê duyệt.
+ *
+ * Chỉ ghi khi:
+ * - field là một trong các field cán bộ phê duyệt;
+ * - giá trị cũ và mới đều có dữ liệu;
+ * - giá trị thực sự thay đổi.
+ *
+ * Lưu ý:
+ * - Không ghi khi phân công lần đầu từ rỗng -> có giá trị.
+ * - Không ghi cho checkbox require.check.level1 / require.check.level2.
+ * - Lỗi ghi activity không được làm rollback việc tái phân công đã lưu thành công.
+ */
+function createPrepaymentReassignmentHistory(prepaymentId, field, oldValue, newValue, reason, currentUser) {
+    var prepayment = null;
+
+    try {
+        var safePrepaymentId = String(prepaymentId == null ? "" : prepaymentId).trim();
+        var safeField = String(field == null ? "" : field).trim();
+        var safeOldValue = String(oldValue == null ? "" : oldValue).trim();
+        var safeNewValue = String(newValue == null ? "" : newValue).trim();
+        var safeReason = String(reason == null ? "" : reason).trim();
+        var safeCurrentUser = String(currentUser == null ? "" : currentUser).trim();
+
+        if (
+            !safePrepaymentId ||
+            !safeField ||
+            !safeOldValue ||
+            !safeNewValue ||
+            safeOldValue === safeNewValue ||
+            !safeCurrentUser
+        ) {
+            return;
+        }
+
+        var fieldLabels = {
+            "user.checker.kttc": "KTTC tiếp nhận",
+            "user.checker.dmms": "Rà soát ĐMMS (Rà soát 1)",
+            "user.approver.dmms": "Phê duyệt ĐMMS",
+            "user.approver.kttc": "Phê duyệt KTTC",
+            "user.checker.final": "Rà soát KTTC (Rà soát 2)",
+            "user.approver.final": "Cấp có thẩm quyền"
+        };
+
+        if (!fieldLabels[safeField]) {
+            return;
+        }
+
+        var leadership = getPrepaymentReassignmentRoleAccess(safeCurrentUser);
+
+        if (
+            !leadership ||
+            (
+                leadership.isApprovalDmms !== true &&
+                leadership.isApprovalKttc !== true
+            )
+        ) {
+            return;
+        }
+
+        prepayment = new SCFile("esdHTKTprepayment", SCFILE_READONLY);
+        prepayment.setFields(["id", "initial.role"]);
+
+        if (
+            prepayment.doSelect(
+                'id="' + escapeSmQueryValue(safePrepaymentId) + '"'
+            ) !== RC_SUCCESS
+        ) {
+            return;
+        }
+
+        var initialRole = String(
+            prepayment["initial.role"] == null ?
+            "" :
+            prepayment["initial.role"]
+        ).trim().toLowerCase();
+
+        var canWriteReassignmentHistory = false;
+
+        if (
+            leadership.isApprovalDmms === true &&
+            initialRole === "dmms" &&
+            (
+                safeField === "user.checker.dmms" ||
+                safeField === "user.approver.dmms"
+            )
+        ) {
+            canWriteReassignmentHistory = true;
+        }
+
+        if (
+            leadership.isApprovalKttc === true &&
+            (
+                safeField === "user.approver.kttc" ||
+                safeField === "user.checker.final" ||
+                safeField === "user.approver.final" ||
+                (
+                    initialRole === "dmms" &&
+                    safeField === "user.checker.kttc"
+                )
+            )
+        ) {
+            canWriteReassignmentHistory = true;
+        }
+
+        if (!canWriteReassignmentHistory) {
+            return;
+        }
+
+        var activityDescription =
+            'Tái phân công Đề nghị Tạm ứng: Mã đề nghị: "' + safePrepaymentId + '"' +
+            '\nVai trò: "' + fieldLabels[safeField] + '"' +
+            '\nTừ: "' + safeOldValue + '"' +
+            '\nĐến: "' + safeNewValue + '"' +
+            (safeReason ? '\nLý do: "' + safeReason + '"' : "");
+
+        lib.ESD_Utils.createActivity(
+            "activityHTKTprepayment",
+            activityDescription,
+            safePrepaymentId,
+            "Tái phân công",
+            safeCurrentUser
+        );
+    } catch (e) {
+        print(
+            "[PP_APR][REASSIGN_HISTORY] Không thể ghi activity: " +
+            String(e && e.message ? e.message : e)
+        );
+    } finally {
+        try {
+            if (prepayment) {
+                prepayment.doClose();
+            }
+        } catch (eClosePrepayment) {}
+    }
 }
 
 function savePrepaymentApprovalField(details) {
@@ -166,7 +749,20 @@ function runPrepaymentApprovalApi(details, save) {
         if (prepayment.doSelect('id="' + escapeSmQueryValue(prepaymentId) + '"') !== RC_SUCCESS) {
             throw new Error("Không tìm thấy phiếu tạm ứng.");
         }
-        if (!prepaymentApprovalFieldEditable(prepayment, currentUser, field)) {
+        var apiAccess = getPrepaymentApprovalAccess(prepayment, currentUser);
+        var apiEditable =
+            apiAccess &&
+            apiAccess.fieldAccess &&
+            apiAccess.fieldAccess[field] === true;
+
+        print(
+            "[PP_APR][API] u=" + currentUser +
+            " field=" + field +
+            " kttc=" + String(apiAccess && apiAccess.isApprovalKttc === true) +
+            " editable=" + String(apiEditable)
+        );
+
+        if (!apiEditable) {
             return {
                 success: false,
                 code: "PREPAYMENT_APPROVAL_FORBIDDEN",
@@ -184,7 +780,7 @@ function runPrepaymentApprovalApi(details, save) {
             };
         }
         if ((field === "user.checker.dmms" && String(prepayment["require.check.level1"]) !== "true") ||
-                (field === "user.checker.final" && String(prepayment["require.check.level2"]) !== "true")) {
+            (field === "user.checker.final" && String(prepayment["require.check.level2"]) !== "true")) {
             throw new Error("Chưa bật yêu cầu rà soát tương ứng.");
         }
         var value = isCheckbox ? details.value : String(details.value == null ? "" : details.value).trim();
@@ -204,8 +800,8 @@ function runPrepaymentApprovalApi(details, save) {
             if (!loaded.success) {
                 return {
                     success: false,
-                    code: loaded.currentUserScope && !loaded.currentUserScope.canAccessTargetLv1
-                        ? "PREPAYMENT_APPROVAL_SCOPE_DENIED" : "PREPAYMENT_APPROVAL_OPTIONS_FAILED",
+                    code: loaded.currentUserScope && !loaded.currentUserScope.canAccessTargetLv1 ?
+                        "PREPAYMENT_APPROVAL_SCOPE_DENIED" : "PREPAYMENT_APPROVAL_OPTIONS_FAILED",
                     message: loaded.message || "Không tải được danh sách cán bộ.",
                     scopeContext: {
                         tokenUser: currentUser,
@@ -224,12 +820,37 @@ function runPrepaymentApprovalApi(details, save) {
             for (var i = 0; i < result.ids.length; i++) items.push({ value: result.ids[i], label: result.names[i] });
             return { success: true, data: { items: items, page: page, pageSize: pageSize, hasMore: result.hasMore === true } };
         }
+
+        if (!isCheckbox) {
+            validateDuplicatePrepaymentApprovalUser(
+                prepayment,
+                field,
+                value
+            );
+        }
+
+        var previousApprovalValue = isCheckbox ?
+            "" :
+            readPrepaymentApprovalValue(prepayment, field);
+
         prepayment[field] = value;
         if (isCheckbox && !value) {
             prepayment[field === "require.check.level1" ? "user.checker.dmms" : "user.checker.final"] = "";
         }
         var savedData = getPrepaymentApprovalInitData(prepayment, currentUser);
         if (prepayment.doUpdate() !== RC_SUCCESS) throw new Error("Không lưu được thông tin phê duyệt.");
+
+        if (!isCheckbox) {
+            createPrepaymentReassignmentHistory(
+                prepaymentId,
+                field,
+                previousApprovalValue,
+                value,
+                details.reason,
+                currentUser
+            );
+        }
+
         return { success: true, data: savedData };
     } catch (error) {
         return { success: false, message: String(error.message || error) };
@@ -276,9 +897,9 @@ function getPrepaymentRoleByRights(contactId) {
     }
 
     var canCreatePrepayment =
-            rightMap[RIGHT_VIEW_INVOICE] &&
-            rightMap[RIGHT_VIEW_PREPAYMENT] &&
-            rightMap[RIGHT_CREATE_PREPAYMENT];
+        rightMap[RIGHT_VIEW_INVOICE] &&
+        rightMap[RIGHT_VIEW_PREPAYMENT] &&
+        rightMap[RIGHT_CREATE_PREPAYMENT];
 
     if (!canCreatePrepayment) {
         return "";
@@ -320,7 +941,7 @@ function getHTKTApprovalActiveEntityCodeByPsCode(psCode) {
         entityFile.setFields(["entity.code", "ps.code", "status"]);
 
         var rc = entityFile.doSelect(
-                'ps.code="' + escapeSmQueryValue(safePsCode) + '" and status="ACTIVE"'
+            'ps.code="' + escapeSmQueryValue(safePsCode) + '" and status="ACTIVE"'
         );
 
         while (rc === RC_SUCCESS) {
@@ -354,16 +975,16 @@ function getHTKTApprovalActivePsCodesByEntityCode(entityCode, psPrefix) {
         entityFile.setFields(["entity.code", "ps.code", "status"]);
 
         var rc = entityFile.doSelect(
-                'entity.code="' + escapeSmQueryValue(safeEntityCode) + '" and status="ACTIVE"'
+            'entity.code="' + escapeSmQueryValue(safeEntityCode) + '" and status="ACTIVE"'
         );
 
         while (rc === RC_SUCCESS) {
             var psCode = normalizeHTKTApprovalUnitCode(entityFile["ps.code"]);
 
             if (
-                    psCode &&
-                    (!safePrefix || psCode.indexOf(safePrefix) === 0) &&
-                    !seen[psCode]
+                psCode &&
+                (!safePrefix || psCode.indexOf(safePrefix) === 0) &&
+                !seen[psCode]
             ) {
                 seen[psCode] = true;
                 result.push(psCode);
@@ -410,8 +1031,8 @@ function resolveHTKTApprovalDataDomain(targetLv1) {
     }
 
     var headOfficePsCodes = getHTKTApprovalActivePsCodesByEntityCode(
-            HEAD_OFFICE_OGL_SEG1,
-            HEAD_OFFICE_PS_PREFIX
+        HEAD_OFFICE_OGL_SEG1,
+        HEAD_OFFICE_PS_PREFIX
     );
 
     if (!headOfficePsCodes.length) {
@@ -441,7 +1062,7 @@ function getHTKTApprovalContactLv1(contactId) {
         contactFile.setFields(["contact.name", "lv1.id"]);
 
         var rc = contactFile.doSelect(
-                'contact.name="' + escapeSmQueryValue(safeContactId) + '"'
+            'contact.name="' + escapeSmQueryValue(safeContactId) + '"'
         );
 
         if (rc !== RC_SUCCESS) return "";
@@ -486,8 +1107,8 @@ function listContactsByRightsAndLv1(rightIds, targetLv1, subModuleId) {
             orgFile.setFields(["unit.id", "lv1.id"]);
 
             var orgRc = orgFile.doSelect(
-                    'unit.id="' + escapeSmQueryValue(allowedLv1) + '" or lv1.id="' +
-                    escapeSmQueryValue(allowedLv1) + '"'
+                'unit.id="' + escapeSmQueryValue(allowedLv1) + '" or lv1.id="' +
+                escapeSmQueryValue(allowedLv1) + '"'
             );
 
             while (orgRc === RC_SUCCESS) {
@@ -505,8 +1126,7 @@ function listContactsByRightsAndLv1(rightIds, targetLv1, subModuleId) {
 
     // Functional Right + vị trí tổ chức phải nằm trong miền của hồ sơ.
     var contacts = lib.ESD_PERMS_RIGHTS.listContactsByRightsAndFilter(
-            normalizedRights,
-            { "lv1.id": allowedLv1List }
+        normalizedRights, { "lv1.id": allowedLv1List }
     ) || [];
 
     if (contacts.toArray) contacts = contacts.toArray();
@@ -520,13 +1140,13 @@ function listContactsByRightsAndLv1(rightIds, targetLv1, subModuleId) {
 
     for (var contactIndex = 0; contactIndex < contacts.length; contactIndex++) {
         contactConditions.push(
-                'contact.id="' + escapeSmQueryValue(contacts[contactIndex]) + '"'
+            'contact.id="' + escapeSmQueryValue(contacts[contactIndex]) + '"'
         );
     }
 
     for (var unitIndex = 0; unitIndex < units.length; unitIndex++) {
         unitConditions.push(
-                'unit.id="' + escapeSmQueryValue(units[unitIndex]) + '"'
+            'unit.id="' + escapeSmQueryValue(units[unitIndex]) + '"'
         );
     }
 
@@ -543,9 +1163,9 @@ function listContactsByRightsAndLv1(rightIds, targetLv1, subModuleId) {
         // QT_PQDL_06 chỉ được chấp nhận trực tiếp trong miền Trụ sở chính;
         // các scope đơn vị vẫn phải map unit vào miền target như cũ.
         var permissionRc = permissionFile.doSelect(
-                "(" + contactConditions.join(" or ") + ")" +
-                ' and sub.module="' + escapeSmQueryValue(subModuleId || "00401") + '"' +
-                ' and permission.scope~="QT_PQDL_01"'
+            "(" + contactConditions.join(" or ") + ")" +
+            ' and sub.module="' + escapeSmQueryValue(subModuleId || "00401") + '"' +
+            ' and permission.scope~="QT_PQDL_01"'
         );
 
         while (permissionRc === RC_SUCCESS) {
@@ -584,7 +1204,7 @@ function listContactsByRightsAndLv1(rightIds, targetLv1, subModuleId) {
 
             for (var permissionIndex = 0; permissionIndex < permissionBatch.length; permissionIndex++) {
                 permissionConditions.push(
-                        'data.permission.id="' + escapeSmQueryValue(permissionBatch[permissionIndex]) + '"'
+                    'data.permission.id="' + escapeSmQueryValue(permissionBatch[permissionIndex]) + '"'
                 );
             }
 
@@ -594,13 +1214,13 @@ function listContactsByRightsAndLv1(rightIds, targetLv1, subModuleId) {
                 unitFile.setFields(["data.permission.id", "unit.id", "status"]);
 
                 var unitRc = unitFile.doSelect(
-                        "(" + permissionConditions.join(" or ") + ') and status="Dang hoat dong" and (' +
-                        unitConditions.join(" or ") + ")"
+                    "(" + permissionConditions.join(" or ") + ') and status="Dang hoat dong" and (' +
+                    unitConditions.join(" or ") + ")"
                 );
 
                 while (unitRc === RC_SUCCESS) {
                     var mappedPermissionId = String(
-                            unitFile["data.permission.id"] || unitFile.data_permission_id || ""
+                        unitFile["data.permission.id"] || unitFile.data_permission_id || ""
                     ).trim();
 
                     var mappedContactId = contactByPermissionId[mappedPermissionId];
@@ -640,8 +1260,8 @@ function uniqueStrings(source) {
 
 function escapeSmQueryValue(value) {
     return String(value == null ? "" : value)
-            .replace(/\\/g, "\\\\")
-            .replace(/"/g, '\\"');
+        .replace(/\\/g, "\\\\")
+        .replace(/"/g, '\\"');
 }
 
 function loadPrepaymentApprovalComboBoxes(prepaymentFile) {
@@ -665,56 +1285,57 @@ function loadPrepaymentApprovalComboBoxesInternal(prepaymentFile, requestedField
     var RIGHT_APPROVE_1 = "0040040002000005";
     var RIGHT_APPROVE_2 = "0040040002000006";
     var RIGHT_CHECK_2 = "0040040002000007";
-    var RIGHT_APPROVE_3 = "0040040002000008";       // Phê duyệt đề nghị tạm ứng cấp 3
+    var RIGHT_APPROVE_3 = "0040040002000008"; // Phê duyệt đề nghị tạm ứng cấp 3
 
     var configs = [{
-        key: "kttc",
-        label: "KTTC tiếp nhận",
-        saveField: "user.checker.kttc",
-        seedRights: [RIGHT_ACCOUNTING_INPUT],
-        valueList: "$L.kttc.ids",
-        displayList: "$L.kttc.names"
-    },
-    {
-        key: "dmmsRs1",
-        label: "DMMS rà soát 1",
-        saveField: "user.checker.dmms",
-        seedRights: [RIGHT_CHECK_1],
-        valueList: "$L.dmms.ids",
-        displayList: "$L.dmms.rs1"
-    },
-    {
-        key: "dmmsApproval1",
-        label: "DMMS phê duyệt cấp 1",
-        saveField: "user.approver.dmms",
-        seedRights: [RIGHT_APPROVE_1],
-        valueList: "$L.dmms.approval1.ids",
-        displayList: "$L.dmms.approval1"
-    },
-    {
-        key: "kttcApprove2",
-        label: "KTTC phê duyệt cấp 2",
-        saveField: "user.approver.kttc",
-        seedRights: [RIGHT_APPROVE_2],
-        valueList: "$L.kttc.approve2.ids",
-        displayList: "$L.kttc.approve2"
-    },
-    {
-        key: "kttcCheck2",
-        label: "KTTC rà soát 2",
-        saveField: "user.checker.final",
-        seedRights: [RIGHT_CHECK_2],
-        valueList: "$L.kttc.check2.ids",
-        displayList: "$L.kttc.check2"
-    },
-    {
-        key: "approveAll",
-        label: "Phê duyệt cấp có thẩm quyền",
-        saveField: "user.approver.final",
-        seedRights: [RIGHT_APPROVE_3],
-        valueList: "$L.approve.all.ids",
-        displayList: "$L.approve.all"
-    }];
+            key: "kttc",
+            label: "KTTC tiếp nhận",
+            saveField: "user.checker.kttc",
+            seedRights: [RIGHT_ACCOUNTING_INPUT],
+            valueList: "$L.kttc.ids",
+            displayList: "$L.kttc.names"
+        },
+        {
+            key: "dmmsRs1",
+            label: "DMMS rà soát 1",
+            saveField: "user.checker.dmms",
+            seedRights: [RIGHT_CHECK_1],
+            valueList: "$L.dmms.ids",
+            displayList: "$L.dmms.rs1"
+        },
+        {
+            key: "dmmsApproval1",
+            label: "DMMS phê duyệt cấp 1",
+            saveField: "user.approver.dmms",
+            seedRights: [RIGHT_APPROVE_1],
+            valueList: "$L.dmms.approval1.ids",
+            displayList: "$L.dmms.approval1"
+        },
+        {
+            key: "kttcApprove2",
+            label: "KTTC phê duyệt cấp 2",
+            saveField: "user.approver.kttc",
+            seedRights: [RIGHT_APPROVE_2],
+            valueList: "$L.kttc.approve2.ids",
+            displayList: "$L.kttc.approve2"
+        },
+        {
+            key: "kttcCheck2",
+            label: "KTTC rà soát 2",
+            saveField: "user.checker.final",
+            seedRights: [RIGHT_CHECK_2],
+            valueList: "$L.kttc.check2.ids",
+            displayList: "$L.kttc.check2"
+        },
+        {
+            key: "approveAll",
+            label: "Phê duyệt cấp có thẩm quyền",
+            saveField: "user.approver.final",
+            seedRights: [RIGHT_APPROVE_3],
+            valueList: "$L.approve.all.ids",
+            displayList: "$L.approve.all"
+        }
+    ];
 
     var output = {
         success: true,
@@ -749,13 +1370,13 @@ function loadPrepaymentApprovalComboBoxesInternal(prepaymentFile, requestedField
     for (var configIndex = 0; configIndex < configs.length; configIndex++) {
         var phaseConfig = configs[configIndex];
         var dmmsGroup = phaseConfig.saveField === "user.checker.kttc" ||
-                (phaseConfig.saveField === "user.checker.dmms" &&
-                    safeFileGet(file, ["require.check.level1"]) === "true") ||
-                phaseConfig.saveField === "user.approver.dmms";
+            (phaseConfig.saveField === "user.checker.dmms" &&
+                safeFileGet(file, ["require.check.level1"]) === "true") ||
+            phaseConfig.saveField === "user.approver.dmms";
         var kttcGroup = phaseConfig.saveField === "user.approver.kttc" ||
-                (phaseConfig.saveField === "user.checker.final" &&
-                    safeFileGet(file, ["require.check.level2"]) === "true") ||
-                phaseConfig.saveField === "user.approver.final";
+            (phaseConfig.saveField === "user.checker.final" &&
+                safeFileGet(file, ["require.check.level2"]) === "true") ||
+            phaseConfig.saveField === "user.approver.final";
         phaseConfig.mode = ((dmmsGroup && loadDmmsGroup) || (kttcGroup && loadKttcGroup)) ? "candidates" : "selected";
         if (phase === "approval_kttc" && phaseConfig.saveField === "user.checker.kttc") {
             phaseConfig.mode = "candidates";
@@ -777,7 +1398,7 @@ function loadPrepaymentApprovalComboBoxesInternal(prepaymentFile, requestedField
     }
 
     var currentUser = normalizeValue(
-            apiOptions ? apiOptions.currentUser : safeVarGet("$lo.contact.name", "")
+        apiOptions ? apiOptions.currentUser : safeVarGet("$lo.contact.name", "")
     );
 
     output.currentUser = currentUser;
@@ -797,10 +1418,10 @@ function loadPrepaymentApprovalComboBoxesInternal(prepaymentFile, requestedField
         clearAllComboBoxes(configs);
         output.success = false;
         output.message =
-                "User đăng nhập không có phân quyền dữ liệu " +
-                HTKT_SUB_MODULE +
-                " trong lv1 của hồ sơ: " +
-                output.targetLv1 + (apiOptions ? ". " + currentUserScope.message : "");
+            "User đăng nhập không có phân quyền dữ liệu " +
+            HTKT_SUB_MODULE +
+            " trong lv1 của hồ sơ: " +
+            output.targetLv1 + (apiOptions ? ". " + currentUserScope.message : "");
         return output;
     }
 
@@ -825,8 +1446,8 @@ function loadPrepaymentApprovalComboBoxesInternal(prepaymentFile, requestedField
     }
 
     output.message = output.success ?
-            "Load danh sách combobox thành công." :
-            "Có combobox load không thành công.";
+        "Load danh sách combobox thành công." :
+        "Có combobox load không thành công.";
 
     return output;
 
@@ -875,19 +1496,19 @@ function loadPrepaymentApprovalComboBoxesInternal(prepaymentFile, requestedField
             result.debug.poolCount = contactIds.poolCount;
             result.debug.rejectedCount = contactIds.rejectedCount;
 
-            var comboData = apiOptions
-                    ? readContactPage(contactIds.ids, apiOptions)
-                    : readContactData(contactIds.ids, selectedOnly);
+            var comboData = apiOptions ?
+                readContactPage(contactIds.ids, apiOptions) :
+                readContactData(contactIds.ids, selectedOnly);
             if (selectedOnly && selectedId && !comboData.ids.length) {
                 comboData = { ids: [selectedId], names: [selectedId] };
             }
 
             if (comboData.ids.length !== comboData.names.length) {
                 throw new Error(
-                        config.valueList +
-                        " và " +
-                        config.displayList +
-                        " không cùng số phần tử."
+                    config.valueList +
+                    " và " +
+                    config.displayList +
+                    " không cùng số phần tử."
                 );
             }
 
@@ -904,8 +1525,8 @@ function loadPrepaymentApprovalComboBoxesInternal(prepaymentFile, requestedField
             result.debug.passedCount = comboData.ids.length;
 
             result.message = result.count > 0 ?
-                    "Load danh sách thành công." :
-                    "Không tìm thấy cán bộ phù hợp.";
+                "Load danh sách thành công." :
+                "Không tìm thấy cán bộ phù hợp.";
 
         } catch (e) {
             if (!apiOptions) {
@@ -953,7 +1574,7 @@ function loadPrepaymentApprovalComboBoxesInternal(prepaymentFile, requestedField
                     var position = normalizeValue(contactFile["position"]);
                     var display = name + (position ? " - " + position : "");
                     if (id && (!status || status === "Dang hoat dong") &&
-                            (!keyword || (id + " " + display).toLowerCase().indexOf(keyword) >= 0)) {
+                        (!keyword || (id + " " + display).toLowerCase().indexOf(keyword) >= 0)) {
                         if (matched++ >= skip) {
                             if (result.ids.length === options.pageSize) {
                                 result.hasMore = true;
@@ -979,8 +1600,8 @@ function loadPrepaymentApprovalComboBoxesInternal(prepaymentFile, requestedField
 
         if (!userScopeCache.hasOwnProperty(cacheKey)) {
             userScopeCache[cacheKey] = buildUserScopeContext(
-                    normalizedContactId,
-                    normalizedTargetLv1
+                normalizedContactId,
+                normalizedTargetLv1
             );
         }
 
@@ -1015,8 +1636,8 @@ function loadPrepaymentApprovalComboBoxesInternal(prepaymentFile, requestedField
 
         try {
             dp = lib.ESD_PERMS_RIGHTS.getUnitByDataPermissions(
-                    contactId,
-                    HTKT_SUB_MODULE
+                contactId,
+                HTKT_SUB_MODULE
             ) || {};
         } catch (e) {
             result.message = String(e.message || e);
@@ -1024,10 +1645,10 @@ function loadPrepaymentApprovalComboBoxesInternal(prepaymentFile, requestedField
         }
 
         result.scope = normalizeValue(
-                dp.scope ||
-                dp.dataScopeList ||
-                dp["permission.scope"] ||
-                ""
+            dp.scope ||
+            dp.dataScopeList ||
+            dp["permission.scope"] ||
+            ""
         );
 
         if (!result.scope) {
@@ -1035,10 +1656,9 @@ function loadPrepaymentApprovalComboBoxesInternal(prepaymentFile, requestedField
         }
 
         result.rawUnits = normalizeArray(
-                dp.unit ||
-                dp.arrUnitRights ||
-                dp.units ||
-                []
+            dp.unit ||
+            dp.arrUnitRights ||
+            dp.units || []
         );
 
         if (result.scope === "QT_PQDL_06") {
@@ -1068,9 +1688,9 @@ function loadPrepaymentApprovalComboBoxesInternal(prepaymentFile, requestedField
 
             result.canAccessTargetLv1 = ALLOW_GLOBAL_SCOPE_IN_COMBO === true;
             result.message =
-                    result.canAccessTargetLv1 ?
-                            "User có scope toàn hàng và hệ thống cho phép dùng toàn hàng." :
-                            "User có scope toàn hàng nhưng nghiệp vụ đang chặn mở dữ liệu khác lv1.";
+                result.canAccessTargetLv1 ?
+                "User có scope toàn hàng và hệ thống cho phép dùng toàn hàng." :
+                "User có scope toàn hàng nhưng nghiệp vụ đang chặn mở dữ liệu khác lv1.";
             return result;
         }
 
@@ -1107,16 +1727,16 @@ function loadPrepaymentApprovalComboBoxesInternal(prepaymentFile, requestedField
             if (currentLv1 && allowedLv1Map[currentLv1]) {
                 result.canAccessTargetLv1 = true;
                 result.message = targetDomain.type === "HEAD_OFFICE" ?
-                        "User có data permission 00401 trong miền Trụ sở chính của hồ sơ." :
-                        "User có data permission 00401 trong lv1 của hồ sơ.";
+                    "User có data permission 00401 trong miền Trụ sở chính của hồ sơ." :
+                    "User có data permission 00401 trong lv1 của hồ sơ.";
                 return result;
             }
         }
 
         result.canAccessTargetLv1 = false;
         result.message = targetDomain.type === "HEAD_OFFICE" ?
-                "User không có data permission 00401 trong miền Trụ sở chính của hồ sơ." :
-                "User không có data permission 00401 trùng lv1 của hồ sơ.";
+            "User không có data permission 00401 trong miền Trụ sở chính của hồ sơ." :
+            "User không có data permission 00401 trùng lv1 của hồ sơ.";
 
         return result;
     }
@@ -1128,12 +1748,12 @@ function loadPrepaymentApprovalComboBoxesInternal(prepaymentFile, requestedField
         };
 
         var lv1 = normalizeUnitCode(
-                safeFileGet(file, [
-                    "unit.lv1",
-                    "unit_lv1",
-                    "lv1.id",
-                    "lv1_id"
-                ])
+            safeFileGet(file, [
+                "unit.lv1",
+                "unit_lv1",
+                "lv1.id",
+                "lv1_id"
+            ])
         );
 
         if (lv1) {
@@ -1143,11 +1763,11 @@ function loadPrepaymentApprovalComboBoxesInternal(prepaymentFile, requestedField
         }
 
         var unitId = normalizeUnitCode(
-                safeFileGet(file, [
-                    "unit.id",
-                    "unit_id",
-                    "unit"
-                ])
+            safeFileGet(file, [
+                "unit.id",
+                "unit_id",
+                "unit"
+            ])
         );
 
         if (unitId) {
@@ -1157,7 +1777,7 @@ function loadPrepaymentApprovalComboBoxesInternal(prepaymentFile, requestedField
         }
 
         var currentContactLv1 = normalizeUnitCode(
-                safeVarGet("$G.contacts.lv1", "")
+            safeVarGet("$G.contacts.lv1", "")
         );
 
         if (currentContactLv1) {
@@ -1167,7 +1787,7 @@ function loadPrepaymentApprovalComboBoxesInternal(prepaymentFile, requestedField
         }
 
         var currentUnit = normalizeUnitCode(
-                safeVarGet("$unit", "")
+            safeVarGet("$unit", "")
         );
 
         if (currentUnit) {
@@ -1253,7 +1873,7 @@ function loadPrepaymentApprovalComboBoxesInternal(prepaymentFile, requestedField
         try {
             f = new SCFile("esdQTorgUnit", SCFILE_READONLY);
             var rc = f.doSelect(
-                    'unit.id="' + escapeQueryValue(unitCode) + '"'
+                'unit.id="' + escapeQueryValue(unitCode) + '"'
             );
 
             if (rc === RC_SUCCESS) {
@@ -1311,9 +1931,9 @@ function loadPrepaymentApprovalComboBoxesInternal(prepaymentFile, requestedField
 
         for (var i = 0; i < ids.length; i++) {
             conditions.push(
-                    'contact.name="' +
-                    escapeQueryValue(ids[i]) +
-                    '"'
+                'contact.name="' +
+                escapeQueryValue(ids[i]) +
+                '"'
             );
         }
 
@@ -1332,31 +1952,31 @@ function loadPrepaymentApprovalComboBoxesInternal(prepaymentFile, requestedField
             ]);
 
             var rc = contactFile.doSelect(
-                    "(" + conditions.join(" or ") + ")"
+                "(" + conditions.join(" or ") + ")"
             );
 
             while (rc === RC_SUCCESS) {
                 var contactId = normalizeValue(
-                        contactFile["contact.name"]
+                    contactFile["contact.name"]
                 );
 
                 var status = normalizeValue(
-                        contactFile["status"]
+                    contactFile["status"]
                 );
 
                 if (
-                        contactId &&
-                        !seen[contactId] &&
-                        (includeInactive || !status || status === "Dang hoat dong")
+                    contactId &&
+                    !seen[contactId] &&
+                    (includeInactive || !status || status === "Dang hoat dong")
                 ) {
                     seen[contactId] = true;
 
                     var fullName = normalizeValue(
-                            contactFile["full.name"]
+                        contactFile["full.name"]
                     );
 
                     var position = normalizeValue(
-                            contactFile["position"]
+                        contactFile["position"]
                     );
 
                     var display = "";
@@ -1458,8 +2078,8 @@ function loadPrepaymentApprovalComboBoxesInternal(prepaymentFile, requestedField
 
     function escapeQueryValue(value) {
         return normalizeValue(value)
-                .replace(/\\/g, "\\\\")
-                .replace(/"/g, '\\"');
+            .replace(/\\/g, "\\\\")
+            .replace(/"/g, '\\"');
     }
 
     function safeFileGet(file, fields) {

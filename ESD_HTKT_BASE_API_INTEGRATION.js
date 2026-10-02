@@ -7,13 +7,80 @@ var SYSTEMS = ['ogl', 'vatin'];
 /**
  * Hàm gọi API dùng chung bằng doHTTPRequest của OpenText SM
  */
+function extractHttpStatus(responseHeaders, errorMessage) {
+    var statusPattern = /(?:HTTP\/\d(?:\.\d)?\s+|response code:\s*)([1-5]\d{2})/i;
+    var statusHeaderNames = {
+        ":status": true,
+        "status": true,
+        "status-code": true,
+        "http-status": true,
+        "response-code": true
+    };
+
+    if (responseHeaders) {
+        for (var name in responseHeaders) {
+            var headerName = String(name).toLowerCase();
+            var headerValue = String(responseHeaders[name]);
+
+            if (statusHeaderNames[headerName]) {
+                var directStatus = /([1-5]\d{2})/.exec(headerValue);
+                if (directStatus) {
+                    return parseInt(directStatus[1], 10);
+                }
+            }
+
+            var statusLine = statusPattern.exec(headerValue);
+            if (statusLine) {
+                return parseInt(statusLine[1], 10);
+            }
+        }
+    }
+
+    if (errorMessage) {
+        var errorStatus = statusPattern.exec(String(errorMessage));
+        if (errorStatus) {
+            return parseInt(errorStatus[1], 10);
+        }
+    }
+
+    return null;
+}
+
 function sendRequest(method, url, headers, body) {
+    var responseHeaders = {};
+
     try {
-        var response = doHTTPRequest(method, url, headers, body, COMMON_CONNECT_TIMEOUT, COMMON_READ_TIMEOUT);
-        return response;
+        var responseBody = doHTTPRequest(
+            method,
+            url,
+            headers,
+            body,
+            COMMON_CONNECT_TIMEOUT,
+            COMMON_READ_TIMEOUT,
+            COMMON_RECEIVE_TIMEOUT,
+            responseHeaders
+        );
+        var statusCode = extractHttpStatus(responseHeaders, null);
+
+        return {
+            success: statusCode === null || (statusCode >= 200 && statusCode < 300),
+            statusCode: statusCode,
+            body: responseBody === null || responseBody === undefined ? null : String(responseBody),
+            headers: responseHeaders,
+            error: null
+        };
     } catch (e) {
-        print('error: ' + e);
-        return null;
+        var errorMessage = String(e);
+        var errorStatusCode = extractHttpStatus(responseHeaders, errorMessage);
+        print('HTTP error. status=' + errorStatusCode + ', message=' + errorMessage);
+
+        return {
+            success: false,
+            statusCode: errorStatusCode,
+            body: null,
+            headers: responseHeaders,
+            error: errorMessage
+        };
     }
 }
 
@@ -36,10 +103,10 @@ function getAccessToken(system, baseUrl, username, apiKey) {
     var payload = { "username": username, "apiKey": apiKey };
 
     var jsonStr = rteJSONStringify(payload);
-    var responseStr = sendRequest("POST", url, headers, jsonStr);
+    var response = sendRequest("POST", url, headers, jsonStr);
 
-    if (responseStr) {
-        var responseObj = rteJSONParse(responseStr);
+    if (response && response.body) {
+        var responseObj = rteJSONParse(response.body);
         if (responseObj && responseObj.success === true && responseObj.data) {
             var currentTime = getUnixTimestamp();
             var config = new Map();
@@ -64,10 +131,10 @@ function getCoreAccessToken(url, clientId, clientSecret) {
         new Header("Accept", "application/json")
     ];
     var httpBody = "client_id=" + encodeURIComponent(clientId) + "&client_secret=" + encodeURIComponent(clientSecret) + "&grant_type=client_credentials";
-    var responseStr = sendRequest("POST", url, headers, httpBody);
+    var response = sendRequest("POST", url, headers, httpBody);
 
-    if (responseStr) {
-        var responseObj = rteJSONParse(responseStr);
+    if (response && response.body) {
+        var responseObj = rteJSONParse(response.body);
         if (responseObj) {
             var currentTime = getUnixTimestamp();
             var config = new Map();
@@ -98,9 +165,9 @@ function refreshAccessToken(system, baseUrl, currentRefreshToken) {
     };
 
     var jsonStr = rteJSONStringify(payload);
-    var responseStr = sendRequest("POST", url, headers, jsonStr);
-    if (responseStr) {
-        var responseObj = rteJSONParse(responseStr);
+    var response = sendRequest("POST", url, headers, jsonStr);
+    if (response && response.body) {
+        var responseObj = rteJSONParse(response.body);
         if (responseObj && responseObj.success === true && responseObj.data) {
             var currentTime = getUnixTimestamp();
             var config = new Map();
@@ -134,10 +201,10 @@ function reissueApiKey(system, baseUrl, token, username, apiKey) {
     };
 
     var jsonStr = rteJSONStringify(payload);
-    var responseStr = sendRequest("POST", url, headers, jsonStr);
+    var response = sendRequest("POST", url, headers, jsonStr);
 
-    if (responseStr) {
-        var responseObj = rteJSONParse(responseStr);
+    if (response && response.body) {
+        var responseObj = rteJSONParse(response.body);
         if (responseObj && responseObj.success === true && responseObj.data) {
             var currentTime = getUnixTimestamp();
             var config = new Map();
