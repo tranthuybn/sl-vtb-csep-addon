@@ -181,6 +181,7 @@ function fundTranfer(transferData) {
         try {
             var responseObj = rteJSONParse(response.body);
             if (responseObj) {
+                responseObj.httpStatus = response.statusCode;
                 return responseObj;
             }
         } catch (e) {
@@ -189,7 +190,8 @@ function fundTranfer(transferData) {
                 status: {
                     code: "400",
                     detail: "Fail: " + response.body
-                }
+                },
+                httpStatus: response.statusCode
             };
         }
     }
@@ -273,6 +275,7 @@ function fundTranferOut(transferData) {
         try {
             var responseObj = rteJSONParse(response.body);
             if (responseObj) {
+                responseObj.httpStatus = response.statusCode;
                 return responseObj;
             }
         } catch (e) {
@@ -281,7 +284,8 @@ function fundTranferOut(transferData) {
                 status: {
                     code: "400",
                     detail: "Fail: " + response.body
-                }
+                },
+                httpStatus: response.statusCode
             };
         }
     }

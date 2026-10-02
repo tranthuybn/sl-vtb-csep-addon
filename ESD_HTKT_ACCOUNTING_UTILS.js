@@ -271,6 +271,7 @@ function callApiAp(esdHTKTacountingInfo) {
                 itemAccounting.status = success ? ACCOUNTING_STATUS.NEW : ACCOUNTING_STATUS.ERROR;
                 itemAccounting.response = rteJSONStringify(response);
                 itemAccounting['response.http.status'] = response.httpStatus == null ? null : String(response.httpStatus);
+                
                 if (response.data && response.data.transactionId) {
                     itemAccounting['transaction.id'] = response.data.transactionId;
                 }
@@ -391,6 +392,7 @@ function callApiCore(esdHTKTacountingInfo) {
                 itemAccounting['checked.time'] = funcs.tod();
                 itemAccounting.status = status;
                 itemAccounting.response = rteJSONStringify(response);
+                itemAccounting['response.http.status'] = response.httpStatus == null ? null : String(response.httpStatus);
                 itemAccounting.message = statusDetail;
                 itemAccounting['host.res.num'] = hostRefNum;
                 itemAccounting.doUpdate();
@@ -402,6 +404,7 @@ function callApiCore(esdHTKTacountingInfo) {
             if (result == RC_SUCCESS) {
                 itemAccounting['checked.time'] = funcs.tod();
                 itemAccounting.status = ACCOUNTING_STATUS.ERROR;
+                itemAccounting['response.http.status'] = null;
                 itemAccounting.message = "Không nhận được phản hồi từ hệ thống CORE";
                 itemAccounting.doUpdate();
             }
