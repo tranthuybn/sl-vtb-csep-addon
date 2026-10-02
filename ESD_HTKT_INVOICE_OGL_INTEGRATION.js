@@ -1,6 +1,6 @@
 // Log bằng print để hiển thị trực tiếp trong Messages của Service Manager.
 
-function parseHttpResponse(operation, response) {
+function parseHttpResponse(operation, response, includeHttpStatus) {
     print(operation + '::httpStatus: ' + (response ? response.statusCode : null));
     print(operation + '::response: ' + (response ? response.body : null));
 
@@ -17,7 +17,11 @@ function parseHttpResponse(operation, response) {
     }
 
     try {
-        return rteJSONParse(response.body);
+        var responseObj = rteJSONParse(response.body);
+        if (includeHttpStatus && responseObj && typeof responseObj === "object") {
+            responseObj.httpStatus = response.statusCode;
+        }
+        return responseObj;
     } catch (e) {
         print(operation + '::error: API return invalid JSON');
         return {
@@ -186,7 +190,7 @@ function createApInvoice(invoiceData) {
     //    invoiceData.maker = "VTB.HTKT.113";
 
     var response = lib.ESD_HTKT_BASE_API_INTEGRATION.postJson(url, rteJSONStringify(invoiceData), headers);
-    return parseHttpResponse('createApInvoice', response);
+    return parseHttpResponse('createApInvoice', response, true);
 }
 
 // Kiem tra trang thai giao dich AP
@@ -256,5 +260,5 @@ function createApPayment(invoiceData) {
     rteJSONStringify("token " + token)
 
     var response = lib.ESD_HTKT_BASE_API_INTEGRATION.postJson(url, rteJSONStringify(invoiceData), headers);
-    return parseHttpResponse('createApPayment', response);
+    return parseHttpResponse('createApPayment', response, true);
 }

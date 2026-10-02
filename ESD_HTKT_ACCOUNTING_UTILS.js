@@ -270,6 +270,7 @@ function callApiAp(esdHTKTacountingInfo) {
             if (result == RC_SUCCESS) {
                 itemAccounting.status = success ? ACCOUNTING_STATUS.NEW : ACCOUNTING_STATUS.ERROR;
                 itemAccounting.response = rteJSONStringify(response);
+                itemAccounting['response.http.status'] = response.httpStatus == null ? null : String(response.httpStatus);
                 if (response.data && response.data.transactionId) {
                     itemAccounting['transaction.id'] = response.data.transactionId;
                 }
