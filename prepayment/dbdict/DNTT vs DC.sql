@@ -1,24 +1,18 @@
 
 // Bảng đề nghị thanh toán/dự chi
 Table esdHTKTpayment {
-  // thông tin chung phiếu
+  // logic record
+  "id" varchar [pk] // Mã đề nghị thanh toán/dự chi
+  "id.activity.vj" varchar // Mã activity trên VJ
+  "status" varchar // trạng thái phiếu
+  "current.phase" varchar // phase/step in workflow
+  "created.by" varchar // Người tạo đề nghị
+  "created.at" datetime // Ngày tạo đề nghị
   "transaction.type" varchar // Loại giao dịch (Thanh toán/Dự chi)
   "department" varchar // Phòng ban thực hiện
   "description" text // Nội dung thực hiện/giao dịch
-  "created.at" datetime // Ngày tạo đề nghị
-  "created.by" varchar // Người tạo đề nghị
-  "completed.date" datetime // Ngày hoàn thành
 
-  // thông tin bên hợp đồng : get data bên hđ set vào filed phiếu . logic giống bên Tạm ứng
-  "currency" varchar // loại tiền
-
-  // logic record
-  "contract.id" varchar // mã Hợp đồng/KMS
-  "contract.name" varchar // Tên mã Hợp đồng/KMS
-  "status" varchar // trạng thái phiếu
-  "id" varchar [pk] // Mã đề nghị thanh toán/dự chi
-  "current.phase" varchar // phase/step in workflow 
-   // Tab thông tin người duyệt
+  // Tab thông tin người duyệt
   "initial.role" varchar // role khởi tạo (dmms/kttc)
   "require.check.level1" bool // Yêu cầu rà soát 1
   "require.check.level2" bool // Yêu cầu rà soát 2
@@ -27,14 +21,31 @@ Table esdHTKTpayment {
   "user.approver.dmms" varchar // user DMMS phê duyệt
   "user.approver.kttc" varchar // user KTTC phê duyệt
   "user.checker.final" varchar // user rà soát cấp có thẩm quyền
-  "user.approver.final" varchar // user phê duyệt cấp có thẩm quyền 
+  "user.approver.final" varchar // user phê duyệt cấp có thẩm quyền
+  "return.reason" text // Lý do trả lại
+  "completed.date" datetime // Ngày hoàn thành
+
+  // thông tin bên hợp đồng: lấy dữ liệu hợp đồng vào phiếu, logic giống bên Tạm ứng
+  "currency" varchar // loại tiền
+  "contract.id" varchar // mã Hợp đồng/KMS
   "unit.lv1" varchar // Mã đơn vị Khối/CN/DVSN
   "unit.lv2" varchar // Mã đơn vị PB thuộc Khối/CN/ĐVSN
-  "executor.payment" varchar // Người đang xử lý
-
+  "contract.name" varchar // Tên mã Hợp đồng/KMS
+  "total.advance.amount" decimal // Tổng số tiền tạm ứng
+  "total.amount.paid" decimal // Tổng số tiền thanh toán/dự chi
+  "total.transaction" decimal // Thanh toán: tổng số nhà cung cấp; Dự chi: tổng số món dự chi
   "approved.invoice.amount" decimal // Tổng số tiền hóa đơn chấp nhận
-  "total.prepayment.amount" decimal  // Tổng Số tiền tạm ứng
-  "total.amount.paid" decimal  // Tổng Số tiền thanh toán/dự chi
+  "total.contract.amount" decimal // Tổng giá trị hợp đồng
+  "executor.payment" varchar // Người đang xử lý
+}
+
+// Bảng liên kết hợp đồng của phiếu
+// Thanh toán sử dụng contract.id trên esdHTKTpayment; dự chi sử dụng bảng này để liên kết nhiều hợp đồng
+Ref: esdHTKTpaymentContract."payment.id" > esdHTKTpayment.id
+Table esdHTKTpaymentContract {
+  "id" varchar [pk] // Mã bản ghi liên kết
+  "payment.id" varchar // Mã đề nghị thanh toán/dự chi
+  "contract.id" varchar // Mã hợp đồng/KMS
 }
 
 
@@ -78,6 +89,11 @@ Table esdHTKTpaymentAttachment {
   size number // Kích thước
   "doc.code" varchar // Mã tập tin
   "group.code" varchar // mã nhóm
+  "uploaded.at" datetime // Ngày tải lên
+  "status" varchar // Trạng thái
+  "version.no" number // Số phiên bản
+  "type" varchar // Loại tài liệu
+  "transaction.id" varchar // Mã giao dịch
 }
 
 
@@ -88,6 +104,7 @@ Table esdHTKTpaymentInvoice {
   "deduction.amount" decimal // số tiền khấu trừ
   "deduction.rate" decimal // tỷ lệ khấu trừ
   "deduction.type" varchar // loại khấu trừ
+  "vendor.id" varchar // Mã nhà cung cấp
 }
 
 
@@ -112,27 +129,33 @@ Ref: esdHTKTpaymentVendor."vendor.id" > esdHTKTVendor.id
 
 // Bảng nhà cung cấp - thanh toán
 Table esdHTKTpaymentVendor {
-  // logic record
-  id varchar // id bảng
   "payment.id" varchar // Mã đề nghị thanh toán
   "vendor.id" varchar  // Mã nhà cung cấp
   "vendor.site.id" varchar // Mã site nhà cung cấp
-  "vendor.type" varchar // Loại nhà CC (DN/CN)
-  amount decimal // Số tiền thanh toán
-  "approved.invoice.amount" decimal // Số tiền hóa đơn chấp nhận
-  "refund.amount" decimal // Số tiền hoàn ứng lần này
-  currency varchar // Loại tiền (VND, USD…)
   "payment.method" varchar // Phương thức thanh toán (chuyển khoản, tiền mặt…)
   "beneficiary.account" varchar // Số tài khoản thụ hưởng
+  "exchange.rate" decimal // Tỷ giá
   "beneficiary.name" varchar // Tên tài khoản thụ hưởng/Họ tên người thụ hưởng
-  "beneficiary.bank" varchar // Ngân hàng thụ hưởng
   "transaction.des" varchar // Nội dung giao dịch
   "identity.number" varchar // Số giấy tờ tùy thân
   "issued.date" date // ngày cấp
-  "issued.place" varchar // nơi cấp
   phone varchar // số điện thoại
-  // Thông tin giá trị 
-  // remaining.contract.amount varchar // số tiền còn lại HĐ
+  id varchar // id bảng
+  "check.name.success" bool // Trạng thái kiểm tra tên người thụ hưởng
+  currency varchar // Loại tiền (VND, USD…)
+  "payment.rate" decimal // Tỷ lệ thanh toán
+  "beneficiary.bank" varchar // Ngân hàng thụ hưởng
+  "issued.place" varchar // nơi cấp
+  "vendor.type" varchar // Loại nhà CC (DN/CN)
+  "bank.name" varchar // Tên ngân hàng
+  "ogl.sync.status" bool // Trạng thái đồng bộ OGL
+  "approved.invoice.amount" decimal // Số tiền hóa đơn chấp nhận
+  "refund.amount" decimal // Số tiền hoàn ứng lần này
+  amount decimal // Số tiền thanh toán
+  "contract.amount" decimal // Giá trị hợp đồng
+  "payable.amount" decimal // Số tiền phải trả
+  "bank.branch.code" varchar // Mã chi nhánh ngân hàng
+  "debt.amount" decimal // Số tiền công nợ
 }
 
 Ref: esdHTKTpaymentInvoice."payment.id" > esdHTKTpayment.id
@@ -155,15 +178,16 @@ Table esdHTKTpaymentEntry {
   "account.name" varchar // Tên tài khoản
   branch varchar // Phòng giao dịch
   department varchar // Phòng ban liên quan
-  amount decimal // Số tiền hạch toán
+  "order" number // số thứ tự
   currency varchar // Loại tiền
   "description" text // Diễn giải chi tiết
   "vendor.id" varchar  // Mã nhà cung cấp liên quan
-  "vendor.site.code" varchar // mã site nhà cung cấp
   "type" varchar // loại bút toán (AP, GL)
-  "order" number // số thứ tự
-  "ref.id" varchar // mã tham chiếu (VD:  Nếu entry.type là TƯ thì ref.id là mã ĐNTƯ, ...)
   "accounting.request.id" varchar // mã request Hạch toán
+  "transaction.code" varchar // Mã giao dịch
+  "ref.id" varchar // mã tham chiếu (VD: Nếu entry.type là TƯ thì ref.id là mã ĐNTƯ, ...)
+  "ap.code" varchar // Mã AP
+  amount decimal // Số tiền hạch toán
 }
 
 Ref: esdHTKTaccountingInformation."payment.id" > esdHTKTpayment.id
@@ -176,18 +200,19 @@ Ref: esdHTKTpaymentEntry."accounting.request.id" > esdHTKTaccountingInformation.
 Table esdHTKTpaymentCostDivision {
   "id" varchar [pk] // mã
   "payment.id" varchar  // Mã đề nghị thanh toán
-  "type" varchar  // Loại chi phí
+  "entry.type" varchar  // Loại chi phí
   "account.type" varchar // Loại tài khoản (tài sản, nợ phải trả…)
   "account.number" varchar // Số tài khoản
   "account.name" varchar // Tên tài khoản
-  "department" varchar // Mãphòng ban liên quan
-  "department.name" varchar //Tên phòng ban liên quan
-  "amount.before.tax" decimal // Số tiền trước thuế
-  "amount.after.tax" decimal // Số tiền sau thuế
-  "description" text // Diễn giải chi tiết
+  "department" varchar // Mã phòng ban liên quan
+  "department.name" varchar // Tên phòng ban liên quan
   "vendor.id" varchar  // Mã nhà cung cấp liên quan
+  "unit.id" varchar // Mã đơn vị
+  "unit.name" varchar // Tên đơn vị
+  "transaction.code" varchar // Mã giao dịch
+  "transaction.name" varchar // Tên giao dịch
+  "amount" decimal // Số tiền
 }
-
 
 
 
