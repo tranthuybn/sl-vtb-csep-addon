@@ -9,6 +9,10 @@ try {
 } catch (e) { }
 
 vars.$canEditSite = false;
+vars.$approvedInvoiceAmount = 0;
+vars.$amount = 0;
+vars.$refundAmount = 0;
+vars.$payableAmount = 0;
 
 // Chỉ gán false nếu biến này CHƯA TỪNG ĐƯỢC TẠO (lần đầu vào màn hình)
 if (vars.$isSupplierDisabled === undefined || vars.$isSupplierDisabled === null || vars.$isSupplierDisabled === "null") {
@@ -18,9 +22,9 @@ if (vars.$isSupplierDisabled === undefined || vars.$isSupplierDisabled === null 
 vars.$L_mode = (vars.$isSupplierDisabled === true || vars.$isSupplierDisabled === "true") ? "view" : "add";
 
 // Nếu lần đầu vào màn này và user chưa chọn Phương thức thanh toán thì để mặc định là "CHUYENKHOAN"
-if (!vars.$L_file['payment.method']) {
-  vars.$L_file['payment.method'] = 'CHUYENKHOAN';
-}
+//if (!vars.$L_file['payment.method']) {
+//  vars.$L_file['payment.method'] = 'CHUYENKHOAN';
+//}
 
 
 // 1. Lấy payment.id từ biến $G.payment.id (hoặc fallback về $L.file nếu cần)
@@ -74,7 +78,7 @@ if (paymentId || vars.$L_file['payment.id']) {
     `"`;
 
   var rcItem = itemFile.doSelect(itemQuery);
-
+    
   while (rcItem == RC_SUCCESS) {
     var currentSupplierId = itemFile["supplier.id"];
     var currentContractId = itemFile['contract.id'];
@@ -97,11 +101,14 @@ if (paymentId || vars.$L_file['payment.id']) {
         "bank": itemFile["bank"],
         "expire.date": itemFile["expire.date"],
         "address": itemFile["address"],
-        "type": itemFile["type"]
+        "type": itemFile["type"],
+        "transaction.des": itemFile["description"]
       });
       usedSupplierIds[currentSupplierId] = true;
     }
     rcItem = itemFile.getNext();
+    vars.$L_file["transaction.des"] = arrVendors[0]["transaction.des"]
+    vars.$G_description = arrVendors[0]["transaction.des"]
   }
   try {
     if (itemFile) itemFile.doClose();
