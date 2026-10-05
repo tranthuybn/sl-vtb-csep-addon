@@ -46,6 +46,8 @@ Table esdHTKTpaymentContract {
   "id" varchar [pk] // Mã bản ghi liên kết
   "payment.id" varchar // Mã đề nghị thanh toán/dự chi
   "contract.id" varchar // Mã hợp đồng/KMS
+  "currency" varchar // loại tiền
+  "contract.name" varchar // Tên mã Hợp đồng/KMS
 }
 
 
@@ -132,6 +134,7 @@ Table esdHTKTpaymentVendor {
   "payment.id" varchar // Mã đề nghị thanh toán
   "vendor.id" varchar  // Mã nhà cung cấp
   "vendor.site.id" varchar // Mã site nhà cung cấp
+  "contract.id" varchar  // Mã hợp đồng
   "payment.method" varchar // Phương thức thanh toán (chuyển khoản, tiền mặt…)
   "beneficiary.account" varchar // Số tài khoản thụ hưởng
   "exchange.rate" decimal // Tỷ giá
@@ -151,7 +154,7 @@ Table esdHTKTpaymentVendor {
   "ogl.sync.status" bool // Trạng thái đồng bộ OGL
   "approved.invoice.amount" decimal // Số tiền hóa đơn chấp nhận
   "refund.amount" decimal // Số tiền hoàn ứng lần này
-  amount decimal // Số tiền thanh toán
+  amount decimal // Số tiền thanh toán/dự chi
   "contract.amount" decimal // Giá trị hợp đồng
   "payable.amount" decimal // Số tiền phải trả
   "bank.branch.code" varchar // Mã chi nhánh ngân hàng
