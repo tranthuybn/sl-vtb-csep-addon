@@ -232,9 +232,24 @@ function updateNextStatus(record, previousRecord) {
         record.status = NEXT_PHASE_MAP[currentPhase];
     }
 
-//    if (currentPhase === "approval_final") {
+    if (currentPhase === "approval_final") {
 //        record["completed.date"] = system.functions.tod();
-//    }
+        
+        var contractId = record["contract.id"];
+        if (contractId) {
+            var docInfoFile = new SCFile("esdHDcontractDocInfo", SCFILE_READONLY);
+            var docQuery = 'contract.id="' + contractId + '" and doc.type="BAOLANHTU" and status="Co hieu luc"';
+
+            if (docInfoFile.doSelect(docQuery) == RC_SUCCESS) {
+                // Gán trực tiếp vào record -> Workflow sẽ tự động lưu xuống DB cùng phiếu này
+                record["guarantee.no"] = docInfoFile["doc.no"];
+                record["issuing.bank"] = docInfoFile["issuing.bank"];
+                record["guarantee.amount"] = Number(docInfoFile["guarantee.amount"]) || 0;
+                record["guarantee.expiry.date"] = docInfoFile["expire.date"];
+            }
+            try { docInfoFile.doClose(); } catch (e) {}
+        }
+    }
 
     try {
         if (currentPhase == "initial_dmms") {
@@ -329,7 +344,20 @@ function cancelRequest(record) {
     }
 }
 
+function getReturnToUpdatePhase(record) {
+    var initialRole = String(record && record["initial.role"] || "").trim().toLowerCase();
+
+    if (initialRole === "dmms") return HTKT_WF_PHASE.INITIAL_DMMS;
+    if (initialRole === "kttc") return HTKT_WF_PHASE.INITIAL_KTTC;
+    return "";
+}
+
 function returnToUpdate(record, documentsAlreadyDeleted) {
+    var returnPhase = getReturnToUpdatePhase(record);
+    if (!returnPhase) {
+        throw new Error("Không xác định được initial.role để trả phiếu về chỉnh sửa.");
+    }
+
     if (documentsAlreadyDeleted !== true) {
         var deleteResult = deleteDocumentsBeforeReturn(record);
         if (!deleteResult || deleteResult.success !== true) {
@@ -341,6 +369,7 @@ function returnToUpdate(record, documentsAlreadyDeleted) {
         }
     }
 
+    record["current.phase"] = returnPhase;
     record.status = "request_edit";
 
     try {
@@ -419,7 +448,7 @@ function validateDataInPhase(record) {
             phaseErrors = validateFromRsCapThamQuyenToPdCapThamQuyen();
             break;
         case "approval_final":
-            phaseErrors = validateFromPdCapThamQuyenToEnd();
+            phaseErrors = validateFromPdCapThamQuyenToEnd(record);
             break;
     }
 
@@ -527,8 +556,69 @@ function validateFromRsDmmsToPdDmms() { return null; }
 function validateFromPdDmmsToPdKttc() { return null; }
 function validateFromPdKttcToRsCapThamQuyen() { return null; }
 function validateFromRsCapThamQuyenToPdCapThamQuyen() { return null; }
-function validateFromPdCapThamQuyenToEnd() { return null; }
+//function validateFromPdCapThamQuyenToEnd() { return null; }
+// THÊM THAM SỐ record VÀO ĐÂY
+function validateFromPdCapThamQuyenToEnd(record) {
+    var errorMss = [];
 
+    try {
+        var contractId = record["contract.id"];
+        var currentRecordId = record["id"];
+        var guaranteeAmountStr = null;
+
+        // 1. Lấy giá trị bảo lãnh từ Database (bảng esdHDcontractDocInfo)
+        if (contractId) {
+            var docInfoFile = new SCFile("esdHDcontractDocInfo", SCFILE_READONLY);
+            var docQuery = 'contract.id="' + contractId + '" and doc.type="BAOLANHTU" and status="Co hieu luc"';
+            
+            if (docInfoFile.doSelect(docQuery) == RC_SUCCESS) {
+                guaranteeAmountStr = docInfoFile["guarantee.amount"];
+            }
+            try { docInfoFile.doClose(); } catch(e) {}
+        }
+
+        // Làm sạch chuỗi bảo lãnh để kiểm tra xem có hợp lệ và > 0 không
+        var cleanGuaranteeStr = String(guaranteeAmountStr || "").replace(/,/g, '').trim();
+
+        // Chỉ tiếp tục check nếu lấy được giá trị bảo lãnh hợp lệ từ DB và lớn hơn 0
+        if (cleanGuaranteeStr !== "" && cleanGuaranteeStr !== "null" && lib.ESD_HTKT_Utils.compareMoneyStrings(cleanGuaranteeStr, "0") === 1) {
+            
+            // 2. Lấy số tiền đề nghị tạm ứng của phiếu hiện tại
+            var currentAmountStr = String(record["amount"] || "0").trim();
+            var totalAccountedAmountStr = "0";
+
+            // 3. Truy vấn các phiếu Tạm ứng ĐÃ HẠCH TOÁN của cùng Hợp đồng này
+            if (contractId) {
+                var prepFile = new SCFile("esdHTKTprepayment", SCFILE_READONLY);
+                var query = 'contract.id="' + contractId + '" and (status="approved" or status="accounted")';
+                var rc = prepFile.doSelect(query);
+
+                while (rc == RC_SUCCESS) {
+                    if (prepFile["id"] !== currentRecordId) {
+                        var accountedAmtStr = String(prepFile["amount"] || "0").trim();
+                        totalAccountedAmountStr = lib.ESD_HTKT_Utils.addStringsManual(totalAccountedAmountStr, accountedAmtStr);
+                    }
+                    rc = prepFile.getNext();
+                }
+                try { prepFile.doClose(); } catch(e) {}
+            }
+
+            // 4. Cộng tổng số tiền và so sánh bằng thư viện chuẩn của hệ thống
+            var totalAmountStr = lib.ESD_HTKT_Utils.addStringsManual(totalAccountedAmountStr, currentAmountStr);
+            var finalGuaranteeStr = String(guaranteeAmountStr).trim();
+
+            if (lib.ESD_HTKT_Utils.compareMoneyStrings(totalAmountStr, finalGuaranteeStr) === 1) {
+                errorMss.push(
+                    "Tổng số tiền tạm ứng hiện tại vượt quá Giá trị bảo lãnh."
+                );
+            }
+        }
+    } catch (e) {
+        print("[ESD_HTKT_PREPAYMENT_WF] Lỗi validate approval_final: " + e.toString());
+    }
+
+    return errorMss.length > 0 ? errorMss : null;
+}
 function validateRequiredEsdHTKTprepaymentEntry(prepaymentId) {
     if (!prepaymentId) {
         return { success: false, error: "Không tìm thấy mã đề nghị tạm ứng." };
@@ -637,20 +727,126 @@ function validateVendorAndPaymentDetails(record) {
         checkMaxLength(taxCode, 255, "Thông tin Mã số thuế");
     }
 
-    var amountField = vars.$isAmount;
-    var proposedAmount = parseFloat(amountField);
-    var remainingAmount = parseFloat(vars.$remainingAmt || 0);
+   var amountField = vars.$isAmount;
     var currency = vars.$currency;
-
-    if (amountField === undefined || amountField === null || amountField === "") {
+    
+    if (
+        amountField === undefined ||
+        amountField === null ||
+        String(amountField).trim() === ""
+    ) {
         errorMss.push("Số tiền đề nghị tạm ứng là bắt buộc.");
-    } else if (isNaN(proposedAmount) || proposedAmount <= 0) {
+    
+    } else if (
+        lib.ESD_HTKT_Utils.compareMoneyStrings(
+            String(amountField),
+            "0"
+        ) <= 0
+    ) {
         errorMss.push("Số tiền đề nghị tạm ứng phải lớn hơn 0.");
-    } else if (proposedAmount > remainingAmount) {
-        errorMss.push("Số tiền đề nghị tạm ứng phải nhỏ hơn hoặc bằng Số tiền còn lại.");
-    } 
-    else if (currency === "VND" && proposedAmount % 1 !== 0) {
-        errorMss.push("Số tiền đề nghị tạm ứng không được nhập số thập phân đối với loại tiền VND.");
+    
+    } else {
+    
+        // 1. Kiểm tra số tiền tạm ứng <= số tiền còn lại
+        var remainingAmount = String(vars.$remainingAmt || "0");
+    
+        if (
+            lib.ESD_HTKT_Utils.compareMoneyStrings(
+                String(amountField),
+                remainingAmount
+            ) === 1
+        ) {
+            errorMss.push(
+                "Số tiền đề nghị tạm ứng phải nhỏ hơn hoặc bằng Số tiền còn lại."
+            );
+        }
+    
+        // =================================================================================
+            // 2. Kiểm tra tổng tiền tạm ứng và các phiếu đã hạch toán <= giá trị bảo lãnh
+            // =================================================================================
+            var currentRecordId = record["id"]; 
+            var prepaymentId = record["prepayment.id"] || record["prepayment_id"];
+            var contractId = record["contract.id"];
+        
+            if (!contractId && prepaymentId) {
+                var parentPrep = new SCFile("esdHTKTprepayment", SCFILE_READONLY);
+                if (parentPrep.doSelect('id="' + prepaymentId + '"') == RC_SUCCESS) {
+                    contractId = parentPrep["contract.id"];
+                }
+                try { parentPrep.doClose(); } catch(e) {}
+            }
+        
+            if (contractId) {
+                var guaranteeAmountStr = null;
+        
+                // 2.1 Lấy giá trị bảo lãnh trực tiếp từ DB
+                var docInfoFile = new SCFile("esdHDcontractDocInfo", SCFILE_READONLY);
+                var docQuery = 'contract.id="' + contractId + '" and doc.type="BAOLANHTU" and status="Co hieu luc"';
+                
+                if (docInfoFile.doSelect(docQuery) == RC_SUCCESS) {
+                    guaranteeAmountStr = docInfoFile["guarantee.amount"];
+                }
+                try { docInfoFile.doClose(); } catch(e) {}
+        
+                // Làm sạch chuỗi bảo lãnh để kiểm tra có giá trị hợp lệ (> 0) hay không
+                var cleanGuaranteeStr = String(guaranteeAmountStr || "").replace(/,/g, '').trim();
+        
+                // Chỉ validate khi có giá trị bảo lãnh thực tế lớn hơn 0
+                if (cleanGuaranteeStr !== "" && cleanGuaranteeStr !== "null" && Number(cleanGuaranteeStr) > 0) {
+                    
+                    var currentAmountStr = String(amountField).trim() || "0";
+                    var totalAccountedAmountStr = "0";
+        
+                    // 2.2 Truy vấn các phiếu Tạm ứng ĐÃ HẠCH TOÁN (của hợp đồng này)
+                    var prepFile = new SCFile("esdHTKTprepayment", SCFILE_READONLY);
+                    var query = 'contract.id="' + contractId + '" and (status="approved" or status="accounted")';
+                    
+                    var rc = prepFile.doSelect(query);
+        
+                    while (rc == RC_SUCCESS) {
+                        // Loại trừ phiếu hiện tại bằng ID phiếu cha
+                        if (prepFile["id"] !== prepaymentId) {
+                            var accountedAmtStr = String(prepFile["amount"]).trim() || "0";
+                            totalAccountedAmountStr = lib.ESD_HTKT_Utils.addStringsManual(totalAccountedAmountStr, accountedAmtStr);
+                        }
+                        rc = prepFile.getNext();
+                    }
+                    try { prepFile.doClose(); } catch(e) {}
+        
+                    // 2.3 Cộng tổng số tiền (Phiếu hiện tại + Các phiếu cũ)
+                    var totalAmountStr = lib.ESD_HTKT_Utils.addStringsManual(totalAccountedAmountStr, currentAmountStr);
+                    var finalGuaranteeStr = String(guaranteeAmountStr).trim();
+        
+                    // 2.4 So sánh
+                    if (lib.ESD_HTKT_Utils.compareMoneyStrings(totalAmountStr, finalGuaranteeStr) === 1) {
+                        errorMss.push(
+                            "Tổng số tiền tạm ứng hiện tại vượt quá Giá trị bảo lãnh."
+                        );
+                    }
+                }
+            }
+            // =================================================================================
+    
+        // 3. VND không được có số thập phân
+        if (
+            currency === "VND" &&
+            String(amountField).indexOf(".") !== -1
+        ) {
+            var normalizedAmount = lib.ESD_HTKT_Utils.normalizeMoneyString(
+                String(amountField)
+            );
+    
+            var amountParts = normalizedAmount.split(".");
+    
+            if (
+                amountParts.length > 1 &&
+                amountParts[1].replace(/0/g, "") !== ""
+            ) {
+                errorMss.push(
+                    "Số tiền đề nghị tạm ứng không được nhập số thập phân đối với loại tiền VND."
+                );
+            }
+        }
     }
 
     var paymentMethod = record["payment.method"];
@@ -728,18 +924,18 @@ function validateVendorAndPaymentDetails(record) {
             }
 
          if (!record["issued.date"]) { 
-			    errorMss.push("Ngày cấp giấy tờ tùy thân không được để trống."); 
-			} else {
-			    var issuedDate = new Date(record["issued.date"]);
-			    var today = new Date();
-			
-			    issuedDate.setHours(0, 0, 0, 0);
-			    today.setHours(0, 0, 0, 0);
-			
-			   if (issuedDate > today) {
-			        errorMss.push("Ngày cấp giấy tờ tùy thân không được vượt quá ngày hiện tại.");
-			    }
-			}
+                errorMss.push("Ngày cấp giấy tờ tùy thân không được để trống."); 
+            } else {
+                var issuedDate = new Date(record["issued.date"]);
+                var today = new Date();
+            
+                issuedDate.setHours(0, 0, 0, 0);
+                today.setHours(0, 0, 0, 0);
+            
+               if (issuedDate > today) {
+                    errorMss.push("Ngày cấp giấy tờ tùy thân không được vượt quá ngày hiện tại.");
+                }
+            }
 
             if (!record["issued.place"]) {
                 errorMss.push("Nơi cấp giấy tờ tùy thân không được để trống.");
@@ -747,20 +943,27 @@ function validateVendorAndPaymentDetails(record) {
                 checkMaxLength(record["issued.place"], 255, "Nơi cấp giấy tờ tùy thân");
             }
 
+            // --- BẮT ĐẦU: Logic validate số điện thoại mới ---
             if (!record["phone"]) {
                 errorMss.push("Số điện thoại người thụ hưởng không được để trống.");
             } else {
                 var phone = String(record["phone"]).trim();
-                if (!/^\d+$/.test(phone)) {
-                    errorMss.push("Số điện thoại chỉ được chứa các chữ số.");
-                }
-                if (phone.length !== 10) {
-                    errorMss.push("Số điện thoại phải gồm đúng 10 số.");
-                }
+                
+                // Điều kiện tiên quyết: Bắt đầu bằng số 0
                 if (phone.charAt(0) !== "0") {
                     errorMss.push("Số điện thoại phải bắt đầu bằng số 0.");
+                } else {
+                    // Cờ kiểm tra regex
+                    var isValidMobile = /^0[35789][0-9]{8}$/.test(phone);
+                    var isValidLandline = /^02[0-9]{9}$/.test(phone);
+                    
+                    // Nếu không khớp cả 2 trường hợp -> Sai định dạng
+                    if (!isValidMobile && !isValidLandline) {
+                        errorMss.push("Số điện thoại sai định dạng.");
+                    }
                 }
             }
+            // --- KẾT THÚC: Logic validate số điện thoại mới ---
 
             if (!record["transaction.des"]) {
                 errorMss.push("Nội dung giao dịch không được để trống.");
@@ -776,7 +979,10 @@ function validateVendorAndPaymentDetails(record) {
 function validateVendorAndPaymentDetailsOnWorkflow(record) {
     var prepaymentId = String(record.id || "");
     var vendor = new SCFile("esdHTKTprepaymentVendor", SCFILE_READONLY);
+    var prepayment = new SCFile("esdHTKTprepayment", SCFILE_READONLY);
+
     var rc = vendor.doSelect('prepayment.id="' + prepaymentId + '"');
+    var errors = []; // Khai báo mảng chứa danh sách lỗi
 
     try {
         // 1. Kiểm tra đã chọn nhà cung cấp chưa
@@ -784,14 +990,139 @@ function validateVendorAndPaymentDetailsOnWorkflow(record) {
             return ["Vui lòng chọn nhà cung cấp."];
         }
 
-        // 2. Lấy số tiền theo NCC và số tiền tạm ứng dưới dạng chuỗi (String)
-        var contractAmount = String(vendor["contract_amount"] || "0");
-        var prepaymentAmount = String(vendor["amount"] || "0");
+        // Lấy thông tin phiếu tạm ứng (để lấy contractId phục vụ check bảo lãnh)
+        var rcPrepayment = prepayment.doSelect('id="' + prepaymentId + '"');
+        var contractId = "";
+        if (rcPrepayment == RC_SUCCESS) {
+            contractId = String(prepayment["contract.id"] || "");
+        }
 
-        if (lib.ESD_HTKT_Utils.compareMoneyStrings(prepaymentAmount, contractAmount) === 1) {
-            return [
-                "Số tiền đề nghị tạm ứng phải nhỏ hơn hoặc bằng Số tiền còn lại."
-            ];
+        var currentTotalAmount = "0"; // Biến cộng dồn tổng tiền phiếu hiện tại
+
+        // Dùng vòng lặp while để validate TẤT CẢ nhà cung cấp có trong phiếu
+        while (rc == RC_SUCCESS) {
+            
+            // 2. Kiểm tra bắt buộc nhập số tiền tạm ứng
+            var rawAmount = vendor["amount"];
+            var strAmount = String(rawAmount || "0").trim();
+
+            if (
+                rawAmount === null ||
+                rawAmount === undefined ||
+                strAmount === "" ||
+                lib.ESD_HTKT_Utils.compareMoneyStrings(strAmount, "0") <= 0
+            ) {
+                errors.push("Vui lòng nhập số tiền tạm ứng lớn hơn 0.");
+            }
+
+            // CỘNG DỒN tổng tiền phiếu hiện tại
+            currentTotalAmount = lib.ESD_HTKT_Utils.addStringsManual(currentTotalAmount, strAmount);
+
+            // 3. Lấy số tiền theo NCC và số tiền tạm ứng
+            var contractAmount = String(vendor["contract.amount"] || "0");
+            var prepaymentAmount = strAmount;
+
+            // Kiểm tra số tiền tạm ứng <= số tiền còn lại
+            if (lib.ESD_HTKT_Utils.compareMoneyStrings(prepaymentAmount, contractAmount) === 1) {
+                errors.push("Số tiền đề nghị tạm ứng phải nhỏ hơn hoặc bằng Số tiền còn lại.");
+            }
+
+            // Đã lược bỏ Bước 4 (check bảo lãnh lẻ từng vendor) ở đây
+
+            // =========================================================================
+            // 5. VALIDATE THÔNG TIN PHƯƠNG THỨC THANH TOÁN
+            // =========================================================================
+            var paymentMethod = vendor["payment.method"];
+            
+            if (!paymentMethod || String(paymentMethod).trim() === "") {
+                errors.push("Vui lòng chọn Phương thức thanh toán.");
+            } 
+            else if (paymentMethod === "CHUYENKHOAN") {
+                // Kiểm tra các trường khi thanh toán Chuyển khoản
+                if (!vendor["beneficiary.account"] || String(vendor["beneficiary.account"]).trim() === "") {
+                    errors.push("Vui lòng nhập 'Số tài khoản thụ hưởng'");
+                }
+                if (!vendor["beneficiary.bank"] || String(vendor["beneficiary.bank"]).trim() === "") {
+                    errors.push("Vui lòng chọn 'Ngân hàng thụ hưởng'.");
+                }
+                if (!vendor["beneficiary.name"] || String(vendor["beneficiary.name"]).trim() === "") {
+                    errors.push("Vui lòng nhập 'Tên tài khoản thụ hưởng'.");
+                }
+            } 
+            else if (paymentMethod === "TIENMAT") {
+                // Kiểm tra các trường khi thanh toán Tiền mặt
+                if (!vendor["beneficiary.name"] || String(vendor["beneficiary.name"]).trim() === "") {
+                    errors.push("Vui lòng nhập 'Họ tên người thụ hưởng'.");
+                }
+                if (!vendor["identity.number"] || String(vendor["identity.number"]).trim() === "") {
+                    errors.push("Vui lòng nhập 'Số giấy tờ tùy thân'.");
+                }
+                if (!vendor["issued.date"]) {
+                    errors.push("Vui lòng nhập 'Ngày cấp' giấy tờ tùy thân.");
+                }
+                if (!vendor["issued.place"] || String(vendor["issued.place"]).trim() === "") {
+                    errors.push("Vui lòng nhập 'Nơi cấp' giấy tờ tùy thân.");
+                }
+            }
+            // =========================================================================
+
+            rc = vendor.getNext();
+        }
+
+        // =========================================================================
+        // 6. KIỂM TRA TỔNG TIỀN TẠM ỨNG (PHIẾU HIỆN TẠI + ĐÃ DUYỆT/HẠCH TOÁN) <= BẢO LÃNH
+        // =========================================================================
+        if (contractId) {
+            var guaranteeAmountStr = null;
+            var docInfoFile = new SCFile("esdHDcontractDocInfo", SCFILE_READONLY);
+            // Dùng BAOLANHBH chuẩn giống hệt các function khác
+            var docQuery = 'contract.id="' + contractId + '" and doc.type="BAOLANHTU" and status="Co hieu luc"';
+            
+            if (docInfoFile.doSelect(docQuery) == RC_SUCCESS) {
+                guaranteeAmountStr = docInfoFile["guarantee.amount"];
+            }
+            try { docInfoFile.doClose(); } catch(e) {}
+
+            var cleanGuaranteeStr = String(guaranteeAmountStr || "").replace(/,/g, '').trim();
+
+            if (cleanGuaranteeStr !== "" && cleanGuaranteeStr !== "null" && lib.ESD_HTKT_Utils.compareMoneyStrings(cleanGuaranteeStr, "0") === 1) {
+                
+                var totalAccountedAmountStr = "0";
+                var prepFile = new SCFile("esdHTKTprepayment", SCFILE_READONLY);
+                var query = 'contract.id="' + contractId + '" and (status="approved" or status="accounted")';
+                var rcPrep = prepFile.doSelect(query);
+
+                while (rcPrep == RC_SUCCESS) {
+                    // Loại trừ phiếu hiện tại đang validate
+                    if (prepFile["id"] !== prepaymentId) {
+                        var accountedAmtStr = String(prepFile["amount"] || "0").trim();
+                        totalAccountedAmountStr = lib.ESD_HTKT_Utils.addStringsManual(totalAccountedAmountStr, accountedAmtStr);
+                    }
+                    rcPrep = prepFile.getNext();
+                }
+                try { prepFile.doClose(); } catch(e) {}
+
+                // TỔNG = Tổng các phiếu cũ + Tổng tiền phiếu hiện tại
+                var totalAmountStr = lib.ESD_HTKT_Utils.addStringsManual(totalAccountedAmountStr, currentTotalAmount);
+                var finalGuaranteeStr = String(guaranteeAmountStr).trim();
+
+                // So sánh tổng cuối cùng với Hạn mức bảo lãnh
+                if (lib.ESD_HTKT_Utils.compareMoneyStrings(totalAmountStr, finalGuaranteeStr) === 1) {
+                    errors.push("Tổng số tiền tạm ứng hiện tại và các khoản đã duyệt/hạch toán vượt quá Giá trị bảo lãnh.");
+                }
+            }
+        }
+        // =========================================================================
+
+        // Lọc các thông báo lỗi trùng lặp (nếu nhiều NCC mắc cùng 1 lỗi)
+        if (errors.length > 0) {
+            var uniqueErrors = [];
+            for (var i = 0; i < errors.length; i++) {
+                if (uniqueErrors.indexOf(errors[i]) === -1) {
+                    uniqueErrors.push(errors[i]);
+                }
+            }
+            return uniqueErrors;
         }
 
         return null;
@@ -800,10 +1131,117 @@ function validateVendorAndPaymentDetailsOnWorkflow(record) {
         try {
             vendor.doClose();
         } catch (e) {}
+
+        try {
+            prepayment.doClose();
+        } catch (e) {}
     }
 }
+//function validatePrepaymentVendors(record) {
+//    var prepaymentId = String(record.prepayment_id || "");
+//    var vendor = new SCFile("esdHTKTprepaymentVendor", SCFILE_READONLY);
+//    var rc = vendor.doSelect('prepayment.id="' + prepaymentId + '"');
+//
+//    try {
+//        // 1. Kiểm tra đã chọn nhà cung cấp chưa
+//        if (rc != RC_SUCCESS) {
+//            return ["Vui lòng chọn nhà cung cấp."];
+//        }
+//
+//        // Kiểm tra bắt buộc nhập số tiền tạm ứng
+//        var rawAmount = vendor["amount"];
+//        if (rawAmount === null || rawAmount === undefined || String(rawAmount).trim() === "" || lib.ESD_HTKT_Utils.compareMoneyStrings(String(rawAmount), "0") <= 0) {
+//            return ["Vui lòng nhập hoặc lưu số tiền tạm ứng."];
+//        }
+//        return null;
+//
+//    } finally {
+//        try {
+//            vendor.doClose();
+//        } catch (e) {}
+//    }
+//}
+function validatePrepaymentVendors(record) {
+    var prepaymentId = String(record.prepayment_id || record.id || ""); 
+    var vendor = new SCFile("esdHTKTprepaymentVendor", SCFILE_READONLY);
+    var rc = vendor.doSelect('prepayment.id="' + prepaymentId + '"');
+    
+    // Mảng chứa các lỗi để gom lại thông báo 1 lần
+    var errorMessages = [];
 
+    try {
+        // 1. Kiểm tra đã chọn nhà cung cấp chưa
+        if (rc != RC_SUCCESS) {
+            return ["Vui lòng chọn nhà cung cấp."];
+        }
 
+        // Duyệt qua tất cả các nhà cung cấp thuộc phiếu tạm ứng này
+        while (rc == RC_SUCCESS) {
+            
+            // 2. Kiểm tra bắt buộc nhập số tiền tạm ứng
+            var rawAmount = vendor["amount"];
+            if (rawAmount === null || rawAmount === undefined || String(rawAmount).trim() === "" || lib.ESD_HTKT_Utils.compareMoneyStrings(String(rawAmount), "0") <= 0) {
+                errorMessages.push("Vui lòng nhập hoặc lưu số tiền tạm ứng hợp lệ.");
+            }
+
+            // 3. Lấy Phương thức thanh toán
+            var paymentMethod = vendor["payment.method"]; 
+            
+            if (!paymentMethod || String(paymentMethod).trim() === "") {
+                errorMessages.push("Vui lòng chọn Phương thức thanh toán.");
+            } 
+            else if (paymentMethod === "CHUYENKHOAN") {
+                // =========================================================
+                // VALIDATE CHO CHUYỂN KHOẢN
+                // =========================================================
+                if (!vendor["beneficiary.account"] || String(vendor["beneficiary.account"]).trim() === "") {
+                    errorMessages.push("Vui lòng nhập 'Số tài khoản thụ hưởng'.");
+                }
+                if (!vendor["beneficiary.bank"] || String(vendor["beneficiary.bank"]).trim() === "") {
+                    errorMessages.push("Vui lòng chọn 'Ngân hàng thụ hưởng'.");
+                }
+                if (!vendor["beneficiary.name"] || String(vendor["beneficiary.name"]).trim() === "") {
+                    errorMessages.push("Vui lòng nhập 'Tên tài khoản thụ hưởng'.");
+                }
+            } 
+            else if (paymentMethod === "TIENMAT") {
+                // =========================================================
+                // VALIDATE CHO TIỀN MẶT
+                // =========================================================
+                if (!vendor["beneficiary.name"] || String(vendor["beneficiary.name"]).trim() === "") {
+                    errorMessages.push("Vui lòng nhập 'Họ tên người thụ hưởng'.");
+                }
+                if (!vendor["identity.number"] || String(vendor["identity.number"]).trim() === "") {
+                    errorMessages.push("Vui lòng nhập 'Số giấy tờ tùy thân'.");
+                }
+                if (!vendor["issued.date"]) {
+                    errorMessages.push("Vui lòng nhập 'Ngày cấp' giấy tờ tùy thân.");
+                }
+                if (!vendor["issued.place"] || String(vendor["issued.place"]).trim() === "") {
+                    errorMessages.push("Vui lòng nhập 'Nơi cấp' giấy tờ tùy thân.");
+                }
+            }
+            
+            rc = vendor.getNext();
+        }
+
+        // Trả về danh sách lỗi nếu có (lọc các câu lỗi trùng lặp)
+        if (errorMessages.length > 0) {
+            var uniqueErrors = errorMessages.filter(function(item, pos) {
+                return errorMessages.indexOf(item) == pos;
+            });
+            return uniqueErrors;
+        }
+
+        // Nếu không có lỗi nào, trả về null (Hợp lệ)
+        return null;
+
+    } finally {
+        try {
+            vendor.doClose();
+        } catch (e) {}
+    }
+}
 /**
  * BR-002-16: Kiểm tra lại trạng thái hóa đơn trước khi trình phiếu
  * @param {String} prepaymentId - ID của phiếu đề nghị tạm ứng
@@ -1025,6 +1463,64 @@ function validateCurrentActor(record) {
     }
 
     return htktWfFail("INVALID_CURRENT_ACTOR", "Người dùng hiện tại không được phép xử lý bước này.", "currentUser=" + context.currentUser, context);
+}
+
+/**
+ * Tải lại thông tin phân công mới nhất từ DB trước khi kiểm tra actor workflow.
+ *
+ * Mục đích:
+ * - NextJS có thể vừa tái phân công user xử lý và lưu trực tiếp xuống DB.
+ * - Record đang mở trên SM có thể vẫn giữ actor cũ.
+ * - Rule Set của các nút chuyển phase gọi hàm này trước validateDataInPhase/updateNextStatus.
+ *
+ * Lưu ý:
+ * - Không thay đổi phase/status.
+ * - Không thay đổi quyền workflow hiện hữu.
+ * - Chỉ đồng bộ lại thông tin approval và dùng validateCurrentActor() hiện có.
+ */
+function validateLatestWorkflowActor(record) {
+    try {
+        if (
+            !lib ||
+            !lib.ESD_HTKT_PREPAYMENT_LOAD_APRROVAL_COMBOBOX ||
+            typeof lib.ESD_HTKT_PREPAYMENT_LOAD_APRROVAL_COMBOBOX.syncPrepaymentApprovalFromDatabase !== "function"
+        ) {
+            return htktWfFail(
+                "WORKFLOW_ACTOR_REFRESH_DEPENDENCY_MISSING",
+                "Không kiểm tra được người xử lý mới nhất của hồ sơ. Vui lòng tải lại hồ sơ.",
+                "Thiếu ESD_HTKT_PREPAYMENT_LOAD_APRROVAL_COMBOBOX.syncPrepaymentApprovalFromDatabase()."
+            );
+        }
+
+        lib.ESD_HTKT_PREPAYMENT_LOAD_APRROVAL_COMBOBOX
+            .syncPrepaymentApprovalFromDatabase(record);
+
+        var actorResult = validateCurrentActor(record);
+
+        if (!actorResult || actorResult.success !== true) {
+            if (actorResult && actorResult.code === "INVALID_CURRENT_ACTOR") {
+                return htktWfFail(
+                    "PREPAYMENT_REASSIGNED",
+                    "Hồ sơ đã được tái phân công cho cán bộ khác. Vui lòng tải lại hồ sơ.",
+                    actorResult.detail || "",
+                    actorResult.data || null
+                );
+            }
+
+            return actorResult || htktWfFail(
+                "WORKFLOW_ACTOR_VALIDATION_FAILED",
+                "Không kiểm tra được người xử lý hiện tại của hồ sơ. Vui lòng tải lại hồ sơ."
+            );
+        }
+
+        return actorResult;
+    } catch (error) {
+        return htktWfFailException(
+            "WORKFLOW_ACTOR_REFRESH_EXCEPTION",
+            "Không kiểm tra được người xử lý mới nhất của hồ sơ. Vui lòng tải lại hồ sơ.",
+            error
+        );
+    }
 }
 
 // trưởng thêm: Kiểm tra quyền hiển thị Workflow Action Test ký.
@@ -1412,6 +1908,13 @@ function requestCorrection(record) {
             "RETURN_PERMISSION_CHECK_EXCEPTION",
             "Không kiểm tra được quyền yêu cầu chỉnh sửa.",
             errorPermission
+        );
+    }
+
+    if (!getReturnToUpdatePhase(record)) {
+        return htktWfFail(
+            "INVALID_INITIAL_ROLE",
+            "Không xác định được initial.role để trả phiếu về chỉnh sửa."
         );
     }
 

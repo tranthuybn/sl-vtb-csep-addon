@@ -57,7 +57,7 @@ if (prepaymentId) {
     var itemFile = new SCFile("esdHTKTprepayment");
     
 var itemQuery = `select htktPrepayment.contract.id as contract.id, hdVendor.supplier.id as supplier.id, hdVendor.supplier.name as supplier.name,` +
-        ` hdVendor.payment.method as payment.method, hdVendor.remaining.amount as remaining.amount,` +
+        ` hdVendor.payment.method as payment.method, hdVendor.unpaid.amount as remaining.amount,` +
         ` dmVendor.tax.code as tax.code,htktPrepayment.description as description, dmVendor.address as address, dmVendor.type as type,` +
         ` g.doc.no as guarantee.no, g.issuing.bank as bank, g.guarantee.amount as guarantee.amount, g.expire.date as expire.date` +
         ` from esdHTKTprepayment htktPrepayment` +
@@ -98,16 +98,9 @@ if (!isGuaranteeFilled) {
         var currentContractId = itemFile['contract.id'];
 
         if (!usedSupplierIds[currentSupplierId]) {
-				    // ================================================================
-				// TÍNH SỐ TIỀN CÒN LẠI CỦA NHÀ CUNG CẤP
-				// ================================================================
-				
-				var initialRemainingAmount =
-				    String(itemFile['remaining.amount'] || "0");
-				
-				var finalRemainingAmount =
-				    initialRemainingAmount;
-				
+				/*
+				// Không tính lại số tiền còn lại tại đây vì remaining.amount
+				// đã lấy trực tiếp từ hdVendor.unpaid.amount.
 				// Tổng tiền đã tạm ứng của NCC trong các phiếu
 				// approved / accounted
 				var totalApprovedAmount = "0";
@@ -203,6 +196,7 @@ if (!isGuaranteeFilled) {
                     totalPaidAmount
                 );
             }
+				*/
             arrVendors.push({
                 "supplier.id": currentSupplierId, 
                 "supplier.name": itemFile['supplier.name'],
@@ -210,7 +204,7 @@ if (!isGuaranteeFilled) {
 //              "payment.method": firstPaymentMethod
 //              ? firstPaymentMethod
 //              : itemFile["payment.method"],
-                "remaining.amount": finalRemainingAmount,
+                "remaining.amount": itemFile['remaining.amount'],
                 "tax.code": itemFile['tax.code'],
 //                "guarantee.no": itemFile['guarantee.no'],
 //                "bank": itemFile['bank'],
