@@ -86,17 +86,17 @@ if (paymentId || vars.$L_file['payment.id']) {
     // Lấy thông tin bảo lãnh từ kết quả query
     // Lưu ý: Tên field trong itemFile sẽ tương ứng với các alias đã đặt trong SELECT
     if (!usedSupplierIds[currentSupplierId]) {
-      var finalRemainingAmount = lib.ESD_HTKT_PAYMENT_VENDOR.calculateVendorRemainingAmount(
-        currentContractId,
-        currentSupplierId,
-        itemFile['remaining.amount']
-      );
+      // var finalRemainingAmount = lib.ESD_HTKT_PAYMENT_VENDOR.calculateVendorRemainingAmount(
+      //   currentContractId,
+      //   currentSupplierId,
+      //   itemFile['remaining.amount']
+      // );
 
       arrVendors.push({
         "supplier.id": currentSupplierId,
         "supplier.name": itemFile["supplier.name"],
         "payment.method": itemFile["payment.method"],
-        "remaining.amount": finalRemainingAmount,
+        "remaining.amount": itemFile['unpaid.amount'],
         "tax.code": itemFile["tax.code"],
         "bank": itemFile["bank"],
         "expire.date": itemFile["expire.date"],
