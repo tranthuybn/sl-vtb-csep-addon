@@ -98,56 +98,56 @@ if (!isGuaranteeFilled) {
         var currentContractId = itemFile['contract.id'];
 
         if (!usedSupplierIds[currentSupplierId]) {
-				/*
-				// Không tính lại số tiền còn lại tại đây vì remaining.amount
-				// đã lấy trực tiếp từ hdVendor.unpaid.amount.
-				// Tổng tiền đã tạm ứng của NCC trong các phiếu
-				// approved / accounted
-				var totalApprovedAmount = "0";
-				
-				var hasApprovedTicket = false;
-				
-				var checkFile =
-				    new SCFile("esdHTKTprepaymentVendor");
-				
-				var checkQuery =
-				    `select pv.amount as amount ` +
-				    `from esdHTKTprepaymentVendor pv ` +
-				    `join esdHTKTprepayment p ` +
-				    `on (pv.prepayment.id = p.id) ` +
-				    `join esdHTKTvendor v ` +
-				    `on (pv.vendor.id = v.id) ` +
-				    `where p.contract.id = "` +
-				    currentContractId +
-				    `" and v.supplier.id = "` +
-				    currentSupplierId +
-				    `" and (p.status = "approved" or p.status = "accounted")`;
-				
-				var rcCheck =
-				    checkFile.doSelect(checkQuery);
-				
-				while (rcCheck == RC_SUCCESS) {
-				
-				    hasApprovedTicket = true;
-				
-				    totalApprovedAmount =
-				        lib.ESD_HTKT_Utils.addStringsManual(
-				            totalApprovedAmount,
-				            String(checkFile["amount"] || "0")
-				        );
-				
-				    rcCheck =
-				        checkFile.getNext();
-				}
-				
-				try {
-				    if (checkFile) {
-				        checkFile.doClose();
-				    }
-				} catch (e) {}
-				
-				
-			// ----------------------------------------------------------------
+                /*
+                // Không tính lại số tiền còn lại tại đây vì remaining.amount
+                // đã lấy trực tiếp từ hdVendor.unpaid.amount.
+                // Tổng tiền đã tạm ứng của NCC trong các phiếu
+                // approved / accounted
+                var totalApprovedAmount = "0";
+                
+                var hasApprovedTicket = false;
+                
+                var checkFile =
+                    new SCFile("esdHTKTprepaymentVendor");
+                
+                var checkQuery =
+                    `select pv.amount as amount ` +
+                    `from esdHTKTprepaymentVendor pv ` +
+                    `join esdHTKTprepayment p ` +
+                    `on (pv.prepayment.id = p.id) ` +
+                    `join esdHTKTvendor v ` +
+                    `on (pv.vendor.id = v.id) ` +
+                    `where p.contract.id = "` +
+                    currentContractId +
+                    `" and v.supplier.id = "` +
+                    currentSupplierId +
+                    `" and (p.status = "approved" or p.status = "accounted")`;
+                
+                var rcCheck =
+                    checkFile.doSelect(checkQuery);
+                
+                while (rcCheck == RC_SUCCESS) {
+                
+                    hasApprovedTicket = true;
+                
+                    totalApprovedAmount =
+                        lib.ESD_HTKT_Utils.addStringsManual(
+                            totalApprovedAmount,
+                            String(checkFile["amount"] || "0")
+                        );
+                
+                    rcCheck =
+                        checkFile.getNext();
+                }
+                
+                try {
+                    if (checkFile) {
+                        checkFile.doClose();
+                    }
+                } catch (e) {}
+                
+                
+            // ----------------------------------------------------------------
             // 2. TỔNG TIỀN ĐÃ THANH TOÁN (THÊM MỚI Ở ĐÂY)
             // ----------------------------------------------------------------
             var totalPaidAmount = "0";
@@ -196,7 +196,7 @@ if (!isGuaranteeFilled) {
                     totalPaidAmount
                 );
             }
-				*/
+                */
             arrVendors.push({
                 "supplier.id": currentSupplierId, 
                 "supplier.name": itemFile['supplier.name'],
