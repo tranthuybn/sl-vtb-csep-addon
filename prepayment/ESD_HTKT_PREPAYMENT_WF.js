@@ -749,8 +749,7 @@ function validateVendorAndPaymentDetails(record) {
     
         // 1. Kiểm tra số tiền tạm ứng <= số tiền còn lại
         var remainingAmount = String(vars.$remainingAmt || "0");
-    
-        if (
+        if (vars.$remainingAmt &&
             lib.ESD_HTKT_Utils.compareMoneyStrings(
                 String(amountField),
                 remainingAmount
