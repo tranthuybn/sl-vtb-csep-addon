@@ -1,8 +1,356 @@
 /**
- * Dự chi
+ * ScriptLibrary : ESD_HTKT_EXPENSE_VIEW
+ * Module        : HTKT - De nghi du chi
+ *
+ * Khoi tao context cho man hinh danh sach Du chi theo cung contract initData
+ * voi man hinh Thanh toan, bao gom ca pham vi du lieu cua role Hau kiem.
  */
- 
+
+function htktExpenseView_escapeQueryValue(value) {
+    return (value == null ? "" : String(value))
+        .replace(/\\/g, "\\\\")
+        .replace(/"/g, '\\"');
+}
+
+function htktExpenseView_uniqueArray(source) {
+    var values = source || [];
+    var result = [];
+    var seen = {};
+
+    try {
+        if (values.toArray) {
+            values = values.toArray();
+        }
+    } catch (eToArray) {
+        values = [];
+    }
+
+    for (var i = 0; i < values.length; i++) {
+        var value = String(values[i] == null ? "" : values[i]).replace(/^\s+|\s+$/g, "");
+        if (value && !seen[value]) {
+            seen[value] = true;
+            result.push(value);
+        }
+    }
+
+    return result;
+}
+
+function htktExpenseView_readContact(currentUser) {
+    var result = {
+        fullName: "",
+        branchCode: "",
+        lv1: "",
+        lv2: "",
+        lv3: "",
+        orgUnit: "",
+        position: "",
+        positionName: ""
+    };
+    var contactFile = null;
+
+    if (!currentUser) {
+        return result;
+    }
+
+    try {
+        contactFile = new SCFile("contacts", SCFILE_READONLY);
+        var rcContact = contactFile.doSelect(
+            'contact.name="' + htktExpenseView_escapeQueryValue(currentUser) + '"'
+        );
+
+        if (rcContact == RC_SUCCESS) {
+            result.fullName = contactFile["full.name"] || contactFile["contact.full.name"] || contactFile["contact.name"] || "";
+            result.branchCode = contactFile["branch.code"] || contactFile.branch_code || "";
+            result.lv1 = contactFile["lv1.id"] || contactFile.lv1_id || "";
+            result.lv2 = contactFile["lv2.id"] || contactFile.lv2_id || "";
+            result.lv3 = contactFile["lv3.id"] || contactFile.lv3_id || "";
+            result.orgUnit = contactFile["org.unit"] || contactFile.org_unit || "";
+            result.position = contactFile.position || "";
+            result.positionName = contactFile["position.name"] || contactFile.position_name || "";
+        }
+    } catch (eContact) {
+        return result;
+    } finally {
+        if (contactFile) {
+            try {
+                contactFile.doClose();
+            } catch (eCloseContact) {}
+        }
+    }
+
+    return result;
+}
+
+function htktExpenseView_getRights() {
+    var rights = [];
+
+    try {
+        rights = vars['$G.rights'] ? vars['$G.rights'].toArray() : [];
+    } catch (eRights) {
+        rights = [];
+    }
+
+    return htktExpenseView_uniqueArray(rights);
+}
+
+function htktExpenseView_getDataPermission(currentUser) {
+    var result = {
+        scope: "QT_PQDL_01",
+        unit: []
+    };
+
+    try {
+        var permission = lib.ESD_PERMS_RIGHTS.getUnitByDataPermissions(currentUser, "00401") || {};
+        result.scope = String(
+            permission.scope ||
+            permission.dataScopeList ||
+            permission["permission.scope"] ||
+            "QT_PQDL_01"
+        ).replace(/^\s+|\s+$/g, "");
+        result.unit = htktExpenseView_uniqueArray(
+            permission.unit || permission.arrUnitRights || permission.units || []
+        );
+    } catch (eDataPermission) {}
+
+    return result;
+}
+
+function htktExpenseView_buildRelatedUserFilter(currentUser, hasView) {
+    if (!hasView || !currentUser) {
+        return "(1=0)";
+    }
+
+    var fields = [
+        "created.by",
+        "user.checker.kttc",
+        "user.checker.dmms",
+        "user.approver.dmms",
+        "user.approver.kttc",
+        "user.checker.final",
+        "user.approver.final"
+    ];
+    var conditions = [];
+
+    for (var i = 0; i < fields.length; i++) {
+        conditions.push(fields[i] + '="' + htktExpenseView_escapeQueryValue(currentUser) + '"');
+    }
+
+    return "(" + conditions.join(" OR ") + ")";
+}
+
+function htktExpenseView_getActiveEntityCodeByPsCode(psCode) {
+    var safePsCode = String(psCode || "").replace(/^\s+|\s+$/g, "");
+    var entityFile = null;
+    var entityCodes = [];
+
+    if (!safePsCode) {
+        return "";
+    }
+
+    try {
+        entityFile = new SCFile("esdDMentity", SCFILE_READONLY);
+        var rcEntity = entityFile.doSelect(
+            'ps.code="' + htktExpenseView_escapeQueryValue(safePsCode) + '" and status="ACTIVE"'
+        );
+
+        while (rcEntity == RC_SUCCESS) {
+            var entityCode = String(entityFile["entity.code"] || "").replace(/^\s+|\s+$/g, "");
+            if (entityCode && entityCodes.indexOf(entityCode) < 0) {
+                entityCodes.push(entityCode);
+            }
+            rcEntity = entityFile.getNext();
+        }
+    } catch (eEntity) {
+        return "";
+    } finally {
+        if (entityFile) {
+            try {
+                entityFile.doClose();
+            } catch (eCloseEntity) {}
+        }
+    }
+
+    return entityCodes.length === 1 ? entityCodes[0] : "";
+}
+
+function htktExpenseView_getActivePsCodesByEntityCode(entityCode, psPrefix) {
+    var safeEntityCode = String(entityCode || "").replace(/^\s+|\s+$/g, "");
+    var safePrefix = String(psPrefix || "").replace(/^\s+|\s+$/g, "");
+    var entityFile = null;
+    var result = [];
+
+    if (!safeEntityCode) {
+        return result;
+    }
+
+    try {
+        entityFile = new SCFile("esdDMentity", SCFILE_READONLY);
+        var rcEntity = entityFile.doSelect(
+            'entity.code="' + htktExpenseView_escapeQueryValue(safeEntityCode) + '" and status="ACTIVE"'
+        );
+
+        while (rcEntity == RC_SUCCESS) {
+            var psCode = String(entityFile["ps.code"] || "").replace(/^\s+|\s+$/g, "");
+            if (psCode && (!safePrefix || psCode.indexOf(safePrefix) === 0) && result.indexOf(psCode) < 0) {
+                result.push(psCode);
+            }
+            rcEntity = entityFile.getNext();
+        }
+    } catch (ePsCode) {
+        return [];
+    } finally {
+        if (entityFile) {
+            try {
+                entityFile.doClose();
+            } catch (eClosePsCode) {}
+        }
+    }
+
+    return result;
+}
+
+function htktExpenseView_buildPostAuditFilter(contactInfo, dataPermission) {
+    var result = {
+        defaultFilter: "(1=0)",
+        dataScope: "Khong co quyen xem",
+        dataScopeCode: "",
+        dataScopeField: "unit.lv1",
+        dataScopeUnits: []
+    };
+    var scope = dataPermission ? dataPermission.scope : "";
+
+    if (scope === "QT_PQDL_06") {
+        result.defaultFilter = "true";
+        result.dataScope = "Toan hang - Hau kiem";
+        result.dataScopeCode = "QT_PQDL_06";
+        result.dataScopeField = "ALL";
+        return result;
+    }
+
+    if (scope !== "QT_PQDL_04") {
+        return result;
+    }
+
+    var lv1 = String(contactInfo && contactInfo.lv1 || "").replace(/^\s+|\s+$/g, "");
+    result.dataScope = "Khoi/CN/DVSN - Hau kiem";
+    result.dataScopeCode = "QT_PQDL_04";
+
+    if (!lv1) {
+        return result;
+    }
+
+    var HEAD_OFFICE_PS_PREFIX = "0999";
+    var HEAD_OFFICE_OGL_SEG1 = "1010098";
+    var allowedLv1 = [];
+
+    if (lv1.indexOf(HEAD_OFFICE_PS_PREFIX) !== 0) {
+        allowedLv1 = [lv1];
+    } else if (htktExpenseView_getActiveEntityCodeByPsCode(lv1) === HEAD_OFFICE_OGL_SEG1) {
+        allowedLv1 = htktExpenseView_getActivePsCodesByEntityCode(
+            HEAD_OFFICE_OGL_SEG1,
+            HEAD_OFFICE_PS_PREFIX
+        );
+        result.dataScope = "Tru so chinh - Hau kiem";
+    }
+
+    if (allowedLv1.length === 0) {
+        return result;
+    }
+
+    var conditions = [];
+    for (var i = 0; i < allowedLv1.length; i++) {
+        conditions.push('unit.lv1="' + htktExpenseView_escapeQueryValue(allowedLv1[i]) + '"');
+    }
+
+    result.defaultFilter = conditions.length === 1 ? conditions[0] : "(" + conditions.join(" OR ") + ")";
+    result.dataScopeUnits = allowedLv1;
+    return result;
+}
+
 function renderExpenseList() {
-//    const payload = getUserAndPermissionInfor()
-    return lib.ESD_Addon_Nextjs_V1.renderPageNextJS('HachToanKeToan/DuChi/DanhSachDuChi', '', {});
+    var currentUser = String(vars['$lo.contact.name'] || "").replace(/^\s+|\s+$/g, "");
+    var operatorName = String(system.user.name || "").replace(/^\s+|\s+$/g, "");
+    var contactInfo = htktExpenseView_readContact(currentUser);
+    var rights = htktExpenseView_getRights();
+
+    var RIGHT_EXPENSE_VIEW = "0040040003000001";
+    var RIGHT_EXPENSE_CREATE = "0040040003000002";
+    var RIGHT_EXPENSE_ACCOUNTING = "0040040003000003";
+    var RIGHT_EXPENSE_POST_AUDIT = "0040040003000010";
+
+    var hasView = rights.indexOf(RIGHT_EXPENSE_VIEW) >= 0;
+    var hasCreate = rights.indexOf(RIGHT_EXPENSE_CREATE) >= 0;
+    var hasAccounting = rights.indexOf(RIGHT_EXPENSE_ACCOUNTING) >= 0;
+    var isPostAuditRole = rights.indexOf(RIGHT_EXPENSE_POST_AUDIT) >= 0;
+    var initialRole = "";
+
+    if (hasCreate) {
+        initialRole = hasAccounting ? "kttc" : "dmms";
+    }
+
+    var dataPermission = htktExpenseView_getDataPermission(currentUser);
+    var relatedUserFields = "created.by+user.checker.kttc+user.checker.dmms+user.approver.dmms+user.approver.kttc+user.checker.final+user.approver.final";
+    var dataFilterInfo;
+
+    if (isPostAuditRole) {
+        dataFilterInfo = htktExpenseView_buildPostAuditFilter(contactInfo, dataPermission);
+        dataPermission = {
+            scope: dataFilterInfo.dataScopeCode,
+            unit: dataFilterInfo.dataScopeUnits
+        };
+    } else {
+        dataFilterInfo = {
+            defaultFilter: htktExpenseView_buildRelatedUserFilter(currentUser, hasView),
+            dataScope: "Nguoi tao hoac nguoi duoc giao xu ly",
+            dataScopeCode: "HTKT_EXPENSE_RELATED_USER",
+            dataScopeField: relatedUserFields,
+            dataScopeUnits: currentUser ? [currentUser] : []
+        };
+    }
+
+    var defaultFilter = dataFilterInfo.defaultFilter;
+
+    return lib.ESD_Addon_Nextjs_V1.renderPageNextJS(
+        'HachToanKeToan/DuChi/DanhSachDuChi',
+        '',
+        {
+            user: currentUser,
+            currentUser: currentUser,
+            contactId: currentUser,
+            initialRole: initialRole,
+            operatorName: operatorName,
+            fullName: contactInfo.fullName,
+            branchCode: contactInfo.branchCode,
+            unit: {
+                lv1: contactInfo.lv1,
+                lv2: contactInfo.lv2,
+                lv3: contactInfo.lv3,
+                orgUnit: contactInfo.orgUnit,
+                position: contactInfo.position,
+                positionName: contactInfo.positionName
+            },
+            defaultFilter: defaultFilter,
+            permissionQuery: defaultFilter,
+            dataScope: dataFilterInfo.dataScope,
+            dataScopeCode: dataFilterInfo.dataScopeCode,
+            dataScopeField: dataFilterInfo.dataScopeField,
+            dataScopeUnits: dataFilterInfo.dataScopeUnits,
+            dataPermissionSubModule: "00401",
+            dataPermission: dataPermission,
+            rights: rights,
+            permission: {
+                view: isPostAuditRole ? true : hasView,
+                expenseView: isPostAuditRole ? true : hasView,
+                create: hasCreate,
+                accounting: hasAccounting,
+                postAudit: isPostAuditRole
+            },
+            btnConfig: [
+                { id: 'create', visible: hasCreate },
+                { id: 'accounting', visible: hasAccounting }
+            ],
+            debugSource: "ESD_HTKT_EXPENSE"
+        }
+    );
 }

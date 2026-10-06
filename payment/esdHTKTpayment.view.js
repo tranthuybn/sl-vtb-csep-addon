@@ -16,8 +16,6 @@ var record = vars.$L_file;
 
 vars.$showTab = false;
 vars.$descriptionReadOnly = !lib.ESD_HTKT_PAYMENT_WF.canEditInCurrenPhase(vars.$L_file);
-vars.$approvalLv1ReadOnly = !lib.ESD_HTKT_PAYMENT_WF.canUpdateApprovalInfo(vars.$L_file, 'require.check.level1');
-vars.$approvalLv2ReadOnly = !lib.ESD_HTKT_PAYMENT_WF.canUpdateApprovalInfo(vars.$L_file, 'require.check.level2');
 vars.$hideApprovalKttc = record['created.by'] == vars.$lo_operator["contact.name"] && record['initial.role'] == 'dmms';
 
 var accountingCurrentUser = vars.$lo_operator
@@ -59,139 +57,51 @@ if (vars.$L_file.department) {
     } catch (eDept) { }
 }
 
-vars["$isKttc"] = false;
-vars["$isDmms"] = false;
-
-try {
-    lib.ESD_HTKT_PAYMENT_LOAD_APRROVAL_COMBOBOX.loadPaymentApprovalComboBoxes();
-
-    // 2. Lấy trực tiếp tên người dùng đang đăng nhập (Current User)
-    var currentOperator = vars.$lo_operator;
-    var targetUser = currentOperator
-        ? String(currentOperator["contact.name"] || "").trim()
-        : "";
-
-    var currentPaymentRole =
-        lib.ESD_HTKT_PAYMENT_LOAD_APRROVAL_COMBOBOX
-            .getPaymentRoleByRights(targetUser);
-
-    vars["$isKttc"] = currentPaymentRole == "kttc";
-    vars["$isDmms"] = currentPaymentRole == "dmms";
-
-    vars.$currentUserRole = currentPaymentRole; // Role của user hiện tại đang login
-
-
-    var unitLv1 = "";
-    var unitLv2 = "";
-
-    // 3. Truy vấn bảng contacts theo user đang đăng nhập
-    if (targetUser) {
-        var contactFile = null;
-        try {
-            contactFile = new SCFile("contacts", SCFILE_READONLY);
-            var safeUser = (targetUser == null ? "" : String(targetUser)).replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-            var rcContact = contactFile.doSelect('contact.name="' + safeUser + '"');
-
-            if (rcContact == RC_SUCCESS) {
-                unitLv1 = String(contactFile["lv1.id"] || contactFile.lv1_id || "").trim();
-                unitLv2 = String(contactFile["lv2.id"] || contactFile.lv2_id || "").trim();
-            }
-        } catch (eContact) {
-        } finally {
-            if (contactFile) {
-                try {
-                    contactFile.doClose();
-                } catch (eCloseContact) { }
-            }
-        }
-    }
-} catch (eApprovalCombo) {
-    print("=== DEBUG [Error] eApprovalCombo: " + eApprovalCombo);
-    vars["$L.kttc.ids"] = [];
-    vars["$L.kttc.names"] = [];
-    vars["$L.dmms.ids"] = [];
-    vars["$L.dmms.rs1"] = [];
-    vars["$L.dmms.approval1.ids"] = [];
-    vars["$L.dmms.approval1"] = [];
-    vars["$L.kttc.approve2.ids"] = [];
-    vars["$L.kttc.approve2"] = [];
-    vars["$L.kttc.check2.ids"] = [];
-    vars["$L.kttc.check2"] = [];
-    vars["$L.approve.all.ids"] = [];
-    vars["$L.approve.all"] = [];
-    vars.$isKttc = false;
-    vars.$isDmms = false;
-}
 
 vars.$totalContractAmount = "0";
-vars.$totalPrepayment = "0";            // (1) Tổng giá trị đã tạm ứng
-vars.$totalPayment = "0";              // (2) Tổng giá trị đã thanh toán
+vars.$totalPrepaymentAndPayment = "0";
 vars.$remainingContractValue = "0";   // (3) Tổng giá trị HĐ/KMS còn lại
 
 var contractId = vars.$L_file.contract_id;
 
-
 if (contractId) {
     try {
-        // 1. Tính "Tổng giá trị đã tạm ứng" từ bảng esdHTKTprepaymentVendor
-        var totalPrepayment = "0";
-        var prepaymentFile = new SCFile("esdHTKTprepayment", SCFILE_READONLY);
-        var sqlPrepayment = 'contract.id="' + contractId + '"' +
-            ' and (status="accounted")';
-
-        if (prepaymentFile.doSelect(sqlPrepayment) === RC_SUCCESS) {
-            do {
-                var prepaymentVendorFile = new SCFile("esdHTKTprepaymentVendor", SCFILE_READONLY);
-
-                if (prepaymentVendorFile.doSelect('prepayment.id="' + prepaymentFile.id + '"') === RC_SUCCESS) {
-                    do {
-
-                        totalPrepayment =
-                            lib.ESD_HTKT_Utils.addStringsManual(
-                                totalPrepayment,
-                                prepaymentVendorFile.amount
-                            );
-                    } while (prepaymentVendorFile.getNext() === RC_SUCCESS);
-                }
-
-                prepaymentVendorFile.doClose();
-
-            } while (prepaymentFile.getNext() === RC_SUCCESS);
-        }
-
-        prepaymentFile.doClose();
-        // 2. Tính "Tổng giá trị đã thanh toán" (ĐNTT có trạng thái = "Đã hạch toán")
-        var totalPayment = "0";
-        var paymentFile = new SCFile("esdHTKTpayment", SCFILE_READONLY);
-        var sqlPayment = 'contract.id="' + contractId + '" and status="accounted"';
-        if (paymentFile.doSelect(sqlPayment) === RC_SUCCESS) {
-            do {
-                totalPayment =
-                    lib.ESD_HTKT_Utils.addStringsManual(
-                        totalPayment,
-                        paymentFile["total.amount.paid"]
-                    );
-            } while (paymentFile.getNext() === RC_SUCCESS);
-        }
-        paymentFile.doClose();
-
-        // 3. Tính "Tổng giá trị HĐ/KMS còn lại" 
-        var currentContractAmount = String(record["total.contract.amount"] || "0");
-        
-        var remainingContractValue =
-            lib.ESD_HTKT_Utils.subtractStringsManual(
-                currentContractAmount,
-                totalPrepayment
-            );
-
-        remainingContractValue =
-            lib.ESD_HTKT_Utils.subtractStringsManual(
-                remainingContractValue,
-                totalPayment
-            );
+        var totalPrepaymentAndPayment = "0";
 
         // =====================================================
-        // KIỂM TRA NẾU KẾT QUẢ LÀ SỐ ÂM THÌ ĐẶT VỀ "0"
+        // 1. LẤY TỔNG GIÁ TRỊ ĐÃ TẠM ỨNG & THANH TOÁN TỪ HỢP ĐỒNG
+        // =====================================================
+        var contractFile = new SCFile("esdHDcontract", SCFILE_READONLY);
+        
+        // Chú ý: Sửa 'id' thành tên trường khóa chính thực tế của bảng esdHDcontract (vd: 'contract.id') nếu cần.
+        var sqlContract = 'id="' + contractId + '"'; 
+        
+        if (contractFile.doSelect(sqlContract) === RC_SUCCESS) {
+            var rawTotalPaid = contractFile["total.paid.amount"];
+            
+            // Xử lý an toàn: Nếu khác null và không phải chuỗi rỗng thì mới gán
+            if (rawTotalPaid != null && String(rawTotalPaid).trim() !== "") {
+                totalPrepaymentAndPayment = String(rawTotalPaid).trim();
+            }
+        }
+        contractFile.doClose();
+
+        // =====================================================
+        // 2. TÍNH GIÁ TRỊ HĐ/KMS CÒN LẠI
+        // =====================================================
+        var currentContractAmount = String(record["total.contract.amount"] || "0").trim();
+        // Bắt lỗi thêm cho giá trị hợp đồng phòng trường hợp cũng bị rỗng
+        if (currentContractAmount === "") {
+            currentContractAmount = "0";
+        }
+        
+        var remainingContractValue = lib.ESD_HTKT_Utils.subtractStringsManual(
+            currentContractAmount,
+            totalPrepaymentAndPayment
+        );
+
+        // =====================================================
+        // 3. KIỂM TRA NẾU KẾT QUẢ LÀ SỐ ÂM THÌ ĐẶT VỀ "0"
         // =====================================================
         if (
             remainingContractValue && 
@@ -200,19 +110,16 @@ if (contractId) {
         ) {
             remainingContractValue = "0";
         }
-        // =====================================================
-        // 4. GÁN KẾT QUẢ
-        // =====================================================
-        vars.$totalPrepayment =
-            totalPrepayment;
 
-        vars.$totalPayment =
-            totalPayment;
+        // =====================================================
+        // 4. GÁN KẾT QUẢ VÀO BIẾN HIỂN THỊ
+        // =====================================================
+        vars.$totalPrepaymentAndPayment = totalPrepaymentAndPayment;
+        vars.$remainingContractValue = remainingContractValue;
 
-        vars.$remainingContractValue =
-            remainingContractValue;
     } catch (eCalc) {
-
+        print("ERROR CALCULATE MONEY: " + eCalc);
     }
 }
+
 vars['$showWF'] = lib.ESD_ENV_CONFIG.getENV() == "SIT";
