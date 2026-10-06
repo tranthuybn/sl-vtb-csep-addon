@@ -1,10 +1,8 @@
-run()
-
 function run() {
+
     var input = vars["$L.file"];
     var rawParams = input["queryString"];
     var name = input["name"];
-
     var details = getInputDetails(input);
 
     var startTime = system.functions.tod();
@@ -22,7 +20,13 @@ function run() {
     var result = null;
     try {
         switch (name) {
-            case "listPurchaseContracts":
+            case "getPaymentApprovalOptions":
+                result = lib.ESD_HTKT_PAYMENT_LOAD_APRROVAL_COMBOBOX.getPaymentApprovalOptions(details);
+                break;
+            case "savePaymentApprovalField":
+                result = lib.ESD_HTKT_PAYMENT_LOAD_APRROVAL_COMBOBOX.savePaymentApprovalField(details);
+                break;
+            case "listPurchaseContracts": // Danh sách hợp đồng
                 result = lib.ESD_HTKT_PAYMENT_CREATE_REQUEST.listPurchaseContracts(input);
                 break;
             case "createPaymentRequest":
@@ -75,10 +79,10 @@ function run() {
 
             case "deleteFileAttachment":
                 result = lib.ESD_HTKT_PAYMENT_FILE_ATTACHMENT.deleteFileAttachment(input);
-
+                break;
             case 'getListPaymentInvoice':
                 result = lib.ESD_HTKT_PAYMENT_INVOICE.getListPaymentInvoice(input);
-
+                break;
             case "getCostDivision":
                 var data = lib.ESD_HTKT_PAYMENT_COST_DIVISION.getCostDivision(input);
                 result = { success: true, data: data };
@@ -96,7 +100,7 @@ function run() {
                 result = lib.ESD_HTKT_PAYMENT_COST_DIVISION.importCostDivision(input);
                 break;
 
-            // --- DANH MỤC ---
+                // --- DANH MỤC ---
             case "getCreatorUnitInfo":
                 result = lib.ESD_HTKT_PAYMENT_COST_DIVISION.getCreatorAccountingInfo(input);
                 break;
@@ -114,7 +118,7 @@ function run() {
                 break;
 
 
-            //Danh sách Đề nghị theo nhà cung cấp
+                //Danh sách Đề nghị theo nhà cung cấp
             case 'getListPaymentVendor':
                 var data = lib.ESD_HTKT_PAYMENT_VENDOR.getListPaymentVendor(input);
                 result = { success: true, data: data };
@@ -172,7 +176,42 @@ function run() {
                 break;
             case "getSupplierDebtSummary":
                 result = { success: true, data: lib.ESD_HTKT_PAYMENT_SUPPLIER_LEDGER_LIST.getSupplierDebtSummary(input) };
-                break;    
+                break;
+                //            case "esdHTKTpaymentRequestErrors":     // Danh sách phiếu có lỗi hạch toán
+                //                var payload = JSON.parse(input.queryString);
+                //                result = { success: true, data: lib.ESD_HTKT_ACCOUNTING_ERROR_HANDLING.getPaymentRequestErrors(input), payload: payload };
+                //                break;
+            case "esdHTKTaccountingErrorHandling": // Danh sách giao dịch lỗi hạch toán
+                result = { success: true, data: lib.ESD_HTKT_ACCOUNTING_ERROR_HANDLING.getAccountingErrors(input) };
+                break;
+            case "retryAccountingErrorsResult": // Retry gửi hạch toán lỗi
+                result = { success: true, data: lib.ESD_HTKT_ACCOUNTING_ERROR_HANDLING.retryAccountingErrorsResult(input) };
+                break;
+            case "saveAccountingErrorsResult": // Lưu khai báo kết quả hạch toán
+                result = { success: true, data: lib.ESD_HTKT_ACCOUNTING_ERROR_HANDLING.saveAccountingErrorsResult(input) };
+                break;
+
+            case 'listFileAttachment':
+                lib.ESD_HTKT_PAYMENT_CREATE_REQUEST.listFileAttachment(input);
+                break;
+            case "getAccountingErrorApproverKttcOptions": // Danh sách cán bộ phê duyệt KTTC cho khai báo kết quả
+                result = lib.ESD_HTKT_ACCOUNTING_ERROR_HANDLING.getAccountingErrorApproverKttcOptions(input);
+                break;
+            case "approveAccountingErrorsResult": // Phê duyệt kết quả khai báo hạch toán
+                result = { success: true, data: lib.ESD_HTKT_ACCOUNTING_ERROR_HANDLING.approveAccountingErrorsResult(input) };
+                break;
+            case "getAccountingErrorHandlingApproverKttc":
+                result = lib.ESD_HTKT_ACCOUNTING_ERROR_HANDLING.getAccountingErrorHandlingApproverKttc(input);
+                break;
+            case "getAccountingErrorExecutorOptions":
+                result = lib.ESD_HTKT_ACCOUNTING_ERROR_HANDLING.getAccountingErrorExecutorOptions(input);
+                break;
+            case "getExpenceList":
+                result = lib.ESD_HTKT_EXPENSE_CREATE_REQUEST.getList(input);
+                break;
+            case "createExpenseRequest":
+                result = lib.ESD_HTKT_EXPENSE_CREATE_REQUEST.createExpenseRequest(input);
+                break;
 
             default:
                 result = {
@@ -199,7 +238,6 @@ function run() {
     input["queryReturn"] = JSON.stringify(result);
     vars.$L_exit = "normal";
 }
-
 
 
 function getInputDetails(input) {
@@ -235,3 +273,5 @@ function parseJsonObject(value) {
         return null;
     }
 }
+
+run()
