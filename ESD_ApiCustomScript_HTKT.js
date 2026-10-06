@@ -206,6 +206,8 @@ function run() {
             case "getAccountingErrorExecutorOptions":
                 result = lib.ESD_HTKT_ACCOUNTING_ERROR_HANDLING.getAccountingErrorExecutorOptions(input);
                 break;
+
+            //Dự chi    
             case "getExpenceList":
                 result = lib.ESD_HTKT_EXPENSE_CREATE_REQUEST.getList(input);
                 break;
