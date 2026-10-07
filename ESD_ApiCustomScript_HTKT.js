@@ -217,6 +217,12 @@ function run() {
             case "addExpenseContracts":
                 result = lib.ESD_HTKT_EXPENSE_CREATE_REQUEST.addExpenseContracts(input);
                 break;
+            case "getListExpenseVendor":
+                result = {
+                    success: true,
+                    data: lib.ESD_HTKT_EXPENSE_VENDOR.getListExpenseVendor(input)
+                };
+                break;
 
             default:
                 result = {
