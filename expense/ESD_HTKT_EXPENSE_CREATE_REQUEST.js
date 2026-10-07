@@ -4,7 +4,7 @@
  * Module       : HTKT - Đề nghị dự chi
  * Version      : 1.0.0
  * Chức năng:
- * - Khởi tạo và lưu thông tin phiếu đề nghị dự chi mới vào bảng esdHTKTexpense.
+ * - Khởi tạo và lưu phiếu đề nghị dự chi vào bảng dùng chung esdHTKTpayment.
  * - Tự động sinh mã phiếu định dạng DC.<branchCode>.<year>.<sequence> từ bộ đếm esdHTKTexpense.
  * - Khởi tạo trạng thái và phân quyền theo cấp đơn vị/vai trò của người lập (KTTC / DMMS).
  * - Tra cứu và phân trang danh sách các phiếu đề nghị dự chi (getList).
@@ -47,7 +47,7 @@ function createExpenseRequest(input) {
         var branchCode = oglBranchCode || "100";
         var docType = "DC";
 
-        var expenseRec = new SCFile("esdHTKTexpense");
+        var expenseRec = new SCFile("esdHTKTpayment");
         var newExpenseId = generateDocumentCode(docType, branchCode);
         mapExpenseRecord(expenseRec, expenseData, newExpenseId);
 
@@ -65,7 +65,7 @@ function createExpenseRequest(input) {
 
         if (returnCode == RC_SUCCESS) {
             createActivity(
-                    "activityHTKTexpense",
+                    "activityHTKTpayment",
                     'Thêm mới Đề nghị Dự chi: Mã đề nghị: "' +
                     expenseRec["id"] +
                     '"',
@@ -82,7 +82,7 @@ function createExpenseRequest(input) {
         } else {
             return {
                 success: false,
-                message: "Lỗi ghi nhận vào Database esdHTKTexpense. Code: " + returnCode + " reason " + expenseRec.getMessages()
+                message: "Lỗi ghi nhận phiếu Dự chi vào Database esdHTKTpayment. Code: " + returnCode + " reason " + expenseRec.getMessages()
             };
         }
 
@@ -92,10 +92,11 @@ function createExpenseRequest(input) {
 }
 
 /**
- * Map thông tin đề nghị dự chi vào SCFile esdHTKTexpense.
+ * Map thông tin đề nghị dự chi vào SCFile dùng chung esdHTKTpayment.
  */
 function mapExpenseRecord(expenseRec, expenseData, expenseId) {
     expenseRec['id'] = expenseId;
+    expenseRec['transaction.type'] = "Dự chi";
 
     expenseRec['department'] =
             expenseData['unitLv3'] ||
@@ -120,12 +121,10 @@ function mapExpenseRecord(expenseRec, expenseData, expenseId) {
 
     expenseRec['created.at'] = new Date();
     expenseRec['created.by'] = expenseData['createdBy'];
-    expenseRec['total.expense.amount'] = 0;
-    expenseRec['total.contract'] = 0;
-    expenseRec['total.vendor'] = 0;
-    expenseRec['approved.invoice.amount'] = 0;
+    expenseRec['total.amount.paid'] = 0;
+    expenseRec['total.contract.amount'] = 0;
     expenseRec['current.phase'] = "start";
-    expenseRec['executor.expense'] = expenseData['currentUser'];
+    expenseRec['executor.payment'] = expenseData['currentUser'];
 
     var creatorUser = String(expenseData['currentUser'] || "").replace(/^\s+|\s+$/g, "");
     if (!creatorUser) {
@@ -192,8 +191,8 @@ function generateDocumentCode(docType, branchCode) {
     var expenseId = docType + "." + branchCode + "." + year + "." +
             ("0000000" + sequence).slice(-7);
 
-    // Kiểm tra tính duy nhất trong bảng esdHTKTexpense
-    var existing = new SCFile("esdHTKTexpense", SCFILE_READONLY);
+    // Kiểm tra tính duy nhất trong bảng dùng chung esdHTKTpayment.
+    var existing = new SCFile("esdHTKTpayment", SCFILE_READONLY);
     try {
         var rc = existing.doSelect('id="' + escapeSmQueryValue(expenseId) + '"');
         if (rc === RC_SUCCESS) {
