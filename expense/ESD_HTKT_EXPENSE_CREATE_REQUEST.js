@@ -144,7 +144,6 @@ function addExpenseContracts(input) {
 
             var relationFile = new SCFile("esdHTKTpaymentContract");
             try {
-                relationFile["id"] = String(lib.UUID.generateUUID()).toLowerCase();
                 relationFile["payment.id"] = paymentId;
                 relationFile["contract.id"] = contractId;
                 relationFile["contract.name"] = contract.name || contract["item.name"] || "";

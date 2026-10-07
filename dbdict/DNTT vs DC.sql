@@ -51,7 +51,6 @@ Table esdHTKTpayment {
 
 
 Table esdHTKTpaymentContract {
-  "id" varchar [pk] // Khóa kỹ thuật của quan hệ Dự chi - Hợp đồng
   "payment.id" varchar // Mã phiếu dùng chung trên esdHTKTpayment (prefix DC)
   "contract.id" varchar // Mã HĐ/KMS nghiệp vụ
   "contract.name" varchar // Tên HĐ/KMS tại thời điểm đưa vào Dự chi
