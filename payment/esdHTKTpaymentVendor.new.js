@@ -21,24 +21,26 @@ if (vars.$isSupplierDisabled === undefined || vars.$isSupplierDisabled === null 
 
 vars.$L_mode = (vars.$isSupplierDisabled === true || vars.$isSupplierDisabled === "true") ? "view" : "add";
 
-// Nếu lần đầu vào màn này và user chưa chọn Phương thức thanh toán thì để mặc định là "CHUYENKHOAN"
-//if (!vars.$L_file['payment.method']) {
-//  vars.$L_file['payment.method'] = 'CHUYENKHOAN';
-//}
 
 
 // 1. Lấy payment.id từ biến $G.payment.id (hoặc fallback về $L.file nếu cần)
 var paymentId = vars.$L_file['payment.id'] || vars.$G_payment_id;
+var contractId = vars.$L_file['contract.id'] || vars.$G_contract_id;
 if (!paymentId && vars.$L_file && vars.$L_file.payment_id != null) {
   paymentId = vars.$L_file.payment_id;
 }
 vars.$L_file['payment.id'] = paymentId;
+vars.$L_file['contract.id'] = contractId;
 
 // Chỉ thực hiện truy vấn nếu có paymentId
 if (paymentId || vars.$L_file['payment.id']) {
   var usedSupplierIds = {};
   var paymentVendorFile = new SCFile("esdHTKTpaymentVendor");
-  var rc = paymentVendorFile.doSelect('payment.id="' + paymentId + '"');
+  var paymentVendorQuery = 'payment.id="' + paymentId + '"';
+  if (contractId) {
+    paymentVendorQuery += ' and contract.id="' + contractId + '"';
+  }
+  var rc = paymentVendorFile.doSelect(paymentVendorQuery);
 
   while (rc == RC_SUCCESS) {
     var vId = paymentVendorFile["vendor.id"];
@@ -64,14 +66,17 @@ if (paymentId || vars.$L_file['payment.id']) {
   // BƯỚC B: Query lấy NCC từ Hợp đồng và lọc
   arrVendors = [];
   var itemFile = new SCFile("esdHTKTpayment");
+  var contractJoinCondition = contractId
+    ? 'hdVendor.contract.id = "' + String(contractId).replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"'
+    : 'htktPayment.contract.id = hdVendor.contract.id';
 
   var itemQuery =
-    `select htktPayment.contract.id as contract.id, hdVendor.supplier.id as supplier.id, hdVendor.supplier.name as supplier.name,` +
-    ` hdVendor.payment.method as payment.method, hdVendor.remaining.amount as remaining.amount,` +
+    `select hdVendor.contract.id as contract.id, hdVendor.supplier.id as supplier.id, hdVendor.supplier.name as supplier.name,` +
+    ` hdVendor.payment.method as payment.method, hdVendor.unpaid.amount as unpaid.amount,` +
     ` dmVendor.tax.code as tax.code,htktPayment.description as description, dmVendor.address as address, dmVendor.type as type,` +
     ` htktPayment.unit.lv1 as unit.lv1` + // Lấy unit.lv1 từ phiếu cha
     ` from esdHTKTpayment htktPayment` +
-    ` JOIN esdHDcontractSupplier hdVendor ON (htktPayment.contract.id = hdVendor.contract.id)` +
+    ` JOIN esdHDcontractSupplier hdVendor ON (` + contractJoinCondition + `)` +
     ` JOIN esdDMSupplier dmVendor ON (hdVendor.supplier.id = dmVendor.id)` +
     ` where htktPayment.id = "` +
     paymentId +
@@ -107,8 +112,8 @@ if (paymentId || vars.$L_file['payment.id']) {
       usedSupplierIds[currentSupplierId] = true;
     }
     rcItem = itemFile.getNext();
-    vars.$L_file["transaction.des"] = arrVendors[0]["transaction.des"]
-    vars.$G_description = arrVendors[0]["transaction.des"]
+    if(arrVendors[0]) vars.$L_file["transaction.des"] = arrVendors[0]["transaction.des"]
+    if(arrVendors[0]) vars.$G_description = arrVendors[0]["transaction.des"]
   }
   try {
     if (itemFile) itemFile.doClose();

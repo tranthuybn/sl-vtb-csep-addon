@@ -148,7 +148,7 @@ function addExpenseContracts(input) {
                 relationFile["payment.id"] = paymentId;
                 relationFile["contract.id"] = contractId;
                 relationFile["contract.name"] = contract.name || contract["item.name"] || "";
-                relationFile["currency"] = contract.currency || "";
+                relationFile["currency"] = contract.currency || "VND";
                 relationFile["amount"] = 0;
                 relationFile["total.vendor"] = 0;
 
@@ -173,6 +173,13 @@ function addExpenseContracts(input) {
                 throw new Error("Đã thêm hợp đồng nhưng không cập nhật được tổng số hợp đồng trên phiếu. Code: " + updateRc);
             }
         }
+
+        // Process mở màn chi tiết NCC đọc hai biến này để rinit đúng phiếu và
+        // đúng hợp đồng của món Dự chi vừa chọn.
+        vars.$G_payment_id = paymentId;
+        vars.$G_contract_id = contracts.length > 0
+                ? htktCreateExpense_normalizeValue(contracts[0].id || contracts[0]["contract.id"])
+                : "";
 
         return {
             success: true,

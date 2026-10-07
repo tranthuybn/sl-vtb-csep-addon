@@ -388,6 +388,8 @@ function getTabThongTinMonDuChi(endpoint, input, extraData) {
         expenseId = String(expenseRecord["id"] || "").replace(/^\s+|\s+$/g, "");
     }
 
+    vars.$G_payment_id = expenseId;
+
     var currentUser = String(vars['$lo.contact.name'] || "").replace(/^\s+|\s+$/g, "");
     var operatorName = String(system.user.name || "").replace(/^\s+|\s+$/g, "");
     var contactInfo = htktExpenseView_readContact(currentUser);
@@ -476,4 +478,3 @@ function renderHdsd() {
         "</div>"
     );
 }
-
