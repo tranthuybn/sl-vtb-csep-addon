@@ -1,6 +1,6 @@
 /**
  * ScriptLibrary : ESD_HTKT_EXPENSE_VENDOR
- * Danh sách món Dự chi, lấy paymentContract làm dữ liệu gốc.
+ * Danh sách món Dự chi từ esdHTKTpaymentVendor.
  */
 
 function getListExpenseVendor(input) {
@@ -8,66 +8,41 @@ function getListExpenseVendor(input) {
     var paymentId = getExpenseVendorPaymentId(input);
     if (!paymentId) return resultList;
 
-    var contractFile = new SCFile("esdHTKTpaymentContract", SCFILE_READONLY);
-    try {
-        var contractRc = contractFile.doSelect(
-                'payment.id="' + escapeExpenseVendorQueryValue(paymentId) + '"'
-        );
-        while (contractRc == RC_SUCCESS) {
-            appendExpenseVendorRows(resultList, {
-                payment_id: String(contractFile["payment.id"] || paymentId),
-                contract_id: String(contractFile["contract.id"] || ""),
-                currency: String(contractFile["currency"] || "VND")
-            });
-            contractRc = contractFile.getNext();
-        }
-    } finally {
-        closeExpenseVendorFile(contractFile);
-    }
-    return resultList;
-}
-
-function appendExpenseVendorRows(resultList, contractItem) {
     var paymentVendorFile = new SCFile("esdHTKTpaymentVendor", SCFILE_READONLY);
-    var foundVendor = false;
     try {
         var vendorRc = paymentVendorFile.doSelect(
-                'payment.id="' + escapeExpenseVendorQueryValue(contractItem.payment_id) + '"' +
-                ' and contract.id="' + escapeExpenseVendorQueryValue(contractItem.contract_id) + '"'
+                'payment.id="' + escapeExpenseVendorQueryValue(paymentId) + '"'
         );
         while (vendorRc == RC_SUCCESS) {
-            foundVendor = true;
-            resultList.push(buildExpenseVendorItem(contractItem, paymentVendorFile));
+            resultList.push(buildExpenseVendorItem(paymentVendorFile));
             vendorRc = paymentVendorFile.getNext();
         }
     } finally {
         closeExpenseVendorFile(paymentVendorFile);
     }
-
-    // Tương đương LEFT JOIN: vẫn trả hợp đồng khi chưa có paymentVendor.
-    if (!foundVendor) resultList.push(buildExpenseVendorItem(contractItem, null));
+    return resultList;
 }
 
-function buildExpenseVendorItem(contractItem, paymentVendorFile) {
-    var paymentVendorId = paymentVendorFile ? String(paymentVendorFile["id"] || "") : "";
-    var vendorId = paymentVendorFile ? String(paymentVendorFile["vendor.id"] || "") : "";
+function buildExpenseVendorItem(paymentVendorFile) {
+    var paymentVendorId = String(paymentVendorFile["id"] || "");
+    var paymentId = String(paymentVendorFile["payment.id"] || "");
+    var contractId = String(paymentVendorFile["contract.id"] || "");
+    var vendorId = String(paymentVendorFile["vendor.id"] || "");
     var vendorInfo = getExpenseVendorInfo(vendorId);
     return {
-        id: paymentVendorId || buildExpenseContractRowId(contractItem.payment_id, contractItem.contract_id),
-        payment_id: contractItem.payment_id,
-        contract_id: contractItem.contract_id,
+        id: paymentVendorId,
+        payment_id: paymentId,
+        contract_id: contractId,
         vendor_number: vendorInfo.vendor_number,
         vendor_name: vendorInfo.vendor_name,
-        amount: paymentVendorFile ? Number(paymentVendorFile["amount"] || 0) : 0,
-        currency: contractItem.currency || "VND",
+        amount: Number(paymentVendorFile["amount"] || 0),
+        currency: String(paymentVendorFile["currency"] || "VND"),
         count: countExpenseVendorInvoices(
-                contractItem.payment_id,
-                contractItem.contract_id,
+                paymentId,
+                contractId,
                 vendorId
         ),
-        ogl_sync_status: paymentVendorFile
-                ? paymentVendorFile["ogl.sync.status"]
-                : false,
+        ogl_sync_status: paymentVendorFile["ogl.sync.status"],
         ogl_vendor_id: vendorInfo.ogl_vendor_id
     };
 }
@@ -118,10 +93,6 @@ function getExpenseVendorPaymentId(input) {
     } catch (e) {
         return "";
     }
-}
-
-function buildExpenseContractRowId(paymentId, contractId) {
-    return String(paymentId || "") + "|" + String(contractId || "");
 }
 
 function escapeExpenseVendorQueryValue(value) {

@@ -128,7 +128,7 @@ function addExpenseContracts(input) {
             if (!contractId || seen[contractId]) continue;
             seen[contractId] = true;
 
-            var duplicateFile = new SCFile("esdHTKTpaymentContract", SCFILE_READONLY);
+            var duplicateFile = new SCFile("esdHTKTpaymentVendor", SCFILE_READONLY);
             try {
                 var duplicateRc = duplicateFile.doSelect(
                         'payment.id="' + escapeSmQueryValue(paymentId) +
@@ -142,20 +142,19 @@ function addExpenseContracts(input) {
                 closeSCFile(duplicateFile);
             }
 
-            var relationFile = new SCFile("esdHTKTpaymentContract");
+            var relationFile = new SCFile("esdHTKTpaymentVendor");
             try {
+                relationFile["id"] = generatePaymentVendorId();
                 relationFile["payment.id"] = paymentId;
                 relationFile["contract.id"] = contractId;
-                relationFile["contract.name"] = contract.name || contract["item.name"] || "";
                 relationFile["currency"] = contract.currency || "VND";
                 relationFile["amount"] = 0;
-                relationFile["total.vendor"] = 0;
 
                 var addRc = relationFile.doAction("add");
                 if (addRc !== RC_SUCCESS) {
                     throw new Error(
                             "Không ghi được hợp đồng " + contractId +
-                            " vào esdHTKTpaymentContract. Code: " + addRc +
+                            " vào esdHTKTpaymentVendor. Code: " + addRc +
                             " reason " + relationFile.getMessages()
                     );
                 }
@@ -435,6 +434,37 @@ function htktCreateExpense_normalizeArray(source) {
     }
 
     return result;
+}
+
+/**
+ * Lấy ID mới từ Sequential Numbers của esdHTKTpaymentVendor.
+ */
+function generatePaymentVendorId() {
+    var numberClass = "esdHTKTpaymentVendor";
+    var numberRc = new SCDatum();
+    numberRc.setValue(-1);
+    var nextNumber = new SCDatum();
+
+    system.functions.rtecall(
+            "getnumber",
+            numberRc,
+            nextNumber,
+            numberClass
+    );
+
+    var rcText = String(numberRc.getText()).replace(/^\s+|\s+$/g, "");
+    var paymentVendorId = String(nextNumber.getText()).replace(/^\s+|\s+$/g, "");
+
+    if (rcText !== "0" || !paymentVendorId) {
+        throw new Error(
+                "Không cấp được ID từ Sequential Numbers " +
+                numberClass +
+                ". rc=" + rcText +
+                ", number=" + paymentVendorId
+        );
+    }
+
+    return paymentVendorId;
 }
 
 function escapeSmQueryValue(value) {
