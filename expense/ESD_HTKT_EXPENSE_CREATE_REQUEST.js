@@ -92,6 +92,103 @@ function createExpenseRequest(input) {
 }
 
 /**
+ * Gắn các hợp đồng được chọn vào phiếu Dự chi.
+ * @param {SCFile|object} input queryString: { paymentId, currentUser, contracts[] }
+ */
+function addExpenseContracts(input) {
+    var paymentFile = null;
+    try {
+        var rawData = input ? (input.details || input.queryString) : null;
+        if (!rawData) return { success: false, message: "Thiếu dữ liệu hợp đồng." };
+
+        var params = JSON.parse(rawData);
+        if (Array.isArray(params)) params = params[0] || {};
+
+        var paymentId = htktCreateExpense_normalizeValue(params.paymentId || params.expenseId);
+        var currentUser = htktCreateExpense_normalizeValue(params.currentUser);
+        var contracts = Array.isArray(params.contracts) ? params.contracts : [];
+        if (!paymentId) return { success: false, message: "Thiếu mã phiếu Dự chi." };
+        if (!currentUser) return { success: false, message: "Không xác định được người thực hiện." };
+        if (contracts.length === 0) return { success: false, message: "Chưa chọn hợp đồng." };
+
+        paymentFile = new SCFile("esdHTKTpayment");
+        var paymentRc = paymentFile.doSelect('id="' + escapeSmQueryValue(paymentId) + '"');
+        if (paymentRc !== RC_SUCCESS) {
+            return { success: false, message: "Không tìm thấy phiếu Dự chi " + paymentId + "." };
+        }
+        if (htktCreateExpense_normalizeValue(paymentFile["transaction.type"]) !== "Dự chi") {
+            return { success: false, message: "Phiếu " + paymentId + " không thuộc loại Dự chi." };
+        }
+
+        var addedIds = [];
+        var seen = {};
+        for (var i = 0; i < contracts.length; i++) {
+            var contract = contracts[i] || {};
+            var contractId = htktCreateExpense_normalizeValue(contract.id || contract["contract.id"]);
+            if (!contractId || seen[contractId]) continue;
+            seen[contractId] = true;
+
+            var duplicateFile = new SCFile("esdHTKTpaymentContract", SCFILE_READONLY);
+            try {
+                var duplicateRc = duplicateFile.doSelect(
+                        'payment.id="' + escapeSmQueryValue(paymentId) +
+                        '" and contract.id="' + escapeSmQueryValue(contractId) + '"'
+                );
+                if (duplicateRc === RC_SUCCESS) continue;
+                if (duplicateRc !== RC_NO_MORE) {
+                    throw new Error("Không kiểm tra được hợp đồng " + contractId + ". Code: " + duplicateRc);
+                }
+            } finally {
+                closeSCFile(duplicateFile);
+            }
+
+            var relationFile = new SCFile("esdHTKTpaymentContract");
+            try {
+                relationFile["id"] = String(lib.UUID.generateUUID()).toLowerCase();
+                relationFile["payment.id"] = paymentId;
+                relationFile["contract.id"] = contractId;
+                relationFile["contract.name"] = contract.name || contract["item.name"] || "";
+                relationFile["currency"] = contract.currency || "";
+                relationFile["amount"] = 0;
+                relationFile["total.vendor"] = 0;
+
+                var addRc = relationFile.doAction("add");
+                if (addRc !== RC_SUCCESS) {
+                    throw new Error(
+                            "Không ghi được hợp đồng " + contractId +
+                            " vào esdHTKTpaymentContract. Code: " + addRc +
+                            " reason " + relationFile.getMessages()
+                    );
+                }
+                addedIds.push(contractId);
+            } finally {
+                closeSCFile(relationFile);
+            }
+        }
+
+        if (addedIds.length > 0) {
+            paymentFile["total.contract"] = Number(paymentFile["total.contract"] || 0) + addedIds.length;
+            var updateRc = paymentFile.doUpdate();
+            if (updateRc !== RC_SUCCESS) {
+                throw new Error("Đã thêm hợp đồng nhưng không cập nhật được tổng số hợp đồng trên phiếu. Code: " + updateRc);
+            }
+        }
+
+        return {
+            success: true,
+            message: addedIds.length > 0 ? "Thêm hợp đồng vào phiếu Dự chi thành công." : "Các hợp đồng đã tồn tại trong phiếu Dự chi.",
+            paymentId: paymentId,
+            contractIds: addedIds,
+            addedCount: addedIds.length
+        };
+    } catch (error) {
+        return { success: false, message: "Lỗi thêm hợp đồng vào phiếu Dự chi: " + error.toString() };
+    } finally {
+        closeSCFile(paymentFile);
+    }
+}
+
+/**
  * Map thông tin đề nghị dự chi vào SCFile dùng chung esdHTKTpayment.
  */
 function mapExpenseRecord(expenseRec, expenseData, expenseId) {
@@ -126,6 +223,8 @@ function mapExpenseRecord(expenseRec, expenseData, expenseId) {
     expenseRec['created.at'] = new Date();
     expenseRec['created.by'] = expenseData['createdBy'];
     expenseRec['total.transaction'] = 0;
+    expenseRec['total.contract'] = 0;
+    expenseRec['total.vendor'] = 0;
     expenseRec['total.amount.paid'] = 0;
     expenseRec['total.contract.amount'] = 0;
     expenseRec['current.phase'] = "start";

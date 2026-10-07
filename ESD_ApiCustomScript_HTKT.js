@@ -214,6 +214,9 @@ function run() {
             case "createExpenseRequest":
                 result = lib.ESD_HTKT_EXPENSE_CREATE_REQUEST.createExpenseRequest(input);
                 break;
+            case "addExpenseContracts":
+                result = lib.ESD_HTKT_EXPENSE_CREATE_REQUEST.addExpenseContracts(input);
+                break;
 
             default:
                 result = {

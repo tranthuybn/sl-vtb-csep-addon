@@ -372,6 +372,60 @@ function getTabKetQuaHachToan() {
 function getTabKetQuaGD() {
     return lib.ESD_HTKT_PAYMENT_ENTRY_RESULT.renderTabAccountingResults();
 }
+
+
+/**
+ * Render tab Thông tin món Dự chi cho phiếu đang mở.
+ * Ngoài id phiếu, tab cần cùng context người dùng/phạm vi dữ liệu như màn
+ * danh sách để API listPurchaseContracts áp dụng đúng role và data scope.
+ */
+function getTabThongTinMonDuChi(endpoint, input, extraData) {
+    var currentRecord = extraData || {};
+    var expenseRecord = vars["$L.file"] || vars.$L_file;
+    var expenseId = String(currentRecord.id || "").replace(/^\s+|\s+$/g, "");
+
+    if (!expenseId && expenseRecord) {
+        expenseId = String(expenseRecord["id"] || "").replace(/^\s+|\s+$/g, "");
+    }
+
+    var currentUser = String(vars['$lo.contact.name'] || "").replace(/^\s+|\s+$/g, "");
+    var operatorName = String(system.user.name || "").replace(/^\s+|\s+$/g, "");
+    var contactInfo = htktExpenseView_readContact(currentUser);
+    var rights = htktExpenseView_getRights();
+    var hasCreate = rights.indexOf("0040040003000002") >= 0;
+    var hasAccounting = rights.indexOf("0040040003000003") >= 0;
+    var initialRole = hasCreate ? (hasAccounting ? "kttc" : "dmms") : "";
+    var dataPermission = htktExpenseView_getDataPermission(currentUser);
+
+    return lib.ESD_Addon_Nextjs_V1.renderPageNextJS(
+        'HachToanKeToan/DuChi/TabThongTinMonDuChi',
+        expenseId ? '?id=' + encodeURIComponent(expenseId) : '',
+        {
+            id: expenseId,
+            user: currentUser,
+            currentUser: currentUser,
+            contactId: currentUser,
+            operatorName: operatorName,
+            fullName: contactInfo.fullName,
+            branchCode: contactInfo.branchCode,
+            initialRole: initialRole,
+            unit: {
+                lv1: contactInfo.lv1,
+                lv2: contactInfo.lv2,
+                lv3: contactInfo.lv3,
+                orgUnit: contactInfo.orgUnit,
+                position: contactInfo.position,
+                positionName: contactInfo.positionName
+            },
+            dataScope: dataPermission.scope,
+            dataScopeCode: dataPermission.scope,
+            dataScopeUnits: dataPermission.unit,
+            dataPermissionSubModule: "00401",
+            dataPermission: dataPermission,
+            rights: rights
+        }
+    );
+}
 // ======================================================================================
 // ======================================================================================
 // ======================================================================================
@@ -422,7 +476,4 @@ function renderHdsd() {
         "</div>"
     );
 }
-
-
-
 

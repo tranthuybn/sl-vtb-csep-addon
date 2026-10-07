@@ -36,6 +36,28 @@ Table esdHTKTpayment {
   "approved.invoice.amount" decimal // Tổng số tiền hóa đơn chấp nhận
   "total.contract.amount" decimal // Tổng giá trị hợp đồng
   "executor.payment" varchar // Người đang xử lý
+  "total.contract" number // Tổng số hợp đồng/KMS; 
+  "total.vendor" number // Tổng số NCC trên toàn phiếu;
+  "total.transaction" number // Tổng số món (DC: tổng số món dự chi)
+  "unit.lv1.name" varchar // Tên đơn vị Khối/CN/DVSN
+  "unit.lv2.name" varchar // Tên đơn vị PB thuộc Khối/CN/ĐVSN
+}
+
+// ================================================================
+// HỢP ĐỒNG THUỘC PHIẾU DỰ CHI
+// Chỉ dùng khi esdHTKTpayment.transaction.type = "Dự chi".
+// Một phiếu Dự chi có nhiều hợp đồng/KMS.
+// ================================================================
+
+
+Table esdHTKTpaymentContract {
+  "id" varchar [pk] // Khóa kỹ thuật của quan hệ Dự chi - Hợp đồng
+  "payment.id" varchar // Mã phiếu dùng chung trên esdHTKTpayment (prefix DC)
+  "contract.id" varchar // Mã HĐ/KMS nghiệp vụ
+  "contract.name" varchar // Tên HĐ/KMS tại thời điểm đưa vào Dự chi
+  "currency" varchar // Loại tiền của hợp đồng
+  "amount" decimal // Tổng số tiền dự chi của hợp đồng
+  "total.vendor" number // Tổng số NCC thuộc hợp đồng trong phiếu
 }
 
 
@@ -72,6 +94,8 @@ Ref: esdHTKTpaymentAttachment."payment.id" > esdHTKTpayment.id
 Table esdHTKTpaymentAttachment {
   id varchar [pk]
   "payment.id" varchar  // Mã đề nghị thanh toán
+  "contract.id" varchar // Mã HĐ/KMS;
+  "vendor.id" varchar // Mã nhà cung cấp
   "ecm.doc.id" varchar // Mã tài liệu trên ecm
   "ecm.object.id" varchar // Mã tài liệu trên ecm
   name varchar // Tên tập tin
@@ -88,8 +112,10 @@ Table esdHTKTpaymentAttachment {
 
 
 // Bảng hóa đơn - thanh toán / TT + lấy từ nhà CC <-> Hóa đơn
+Ref: esdHTKTpaymentInvoice."payment.vendor.id" > esdHTKTpaymentVendor.id
 Table esdHTKTpaymentInvoice {
   "payment.id" varchar  // Mã đề nghị thanh toán
+  "contract.id" varchar // Mã HĐ/KMS để tra cứu/đối soát
   "invoice.id" varchar // Mã hóa đơn liên quan
   "deduction.amount" decimal // số tiền khấu trừ
   "deduction.rate" decimal // tỷ lệ khấu trừ
@@ -102,6 +128,7 @@ Table esdHTKTpaymentInvoice {
 Table esdHTKTaccountingInformation {
   "request.id" varchar [pk] // mã yêu cầu hạch toán, tự sinh, check trùng
   "payment.id" varchar  // Mã đề nghị thanh toán
+  "contract.id" varchar // Mã HĐ/KMS để tra cứu/đối soát
   "payment.entry.id" varchar // mã bảng entry
   "vendor.id" varchar // mã nhà cung cấp
   type varchar // loại hạch toán (OGL/Core)
@@ -119,7 +146,9 @@ Ref: esdHTKTpaymentVendor."vendor.id" > esdHTKTVendor.id
 
 // Bảng nhà cung cấp - thanh toán
 Table esdHTKTpaymentVendor {
+  "id" varchar [pk] // Khóa kỹ thuật NCC thuộc một HĐ trong phiếu
   "payment.id" varchar // Mã đề nghị thanh toán
+  "contract.id" varchar // Mã HĐ/KMS để tra cứu/đối soát
   "vendor.id" varchar  // Mã nhà cung cấp
   "vendor.site.id" varchar // Mã site nhà cung cấp
   "payment.method" varchar // Phương thức thanh toán (chuyển khoản, tiền mặt…)
@@ -130,7 +159,6 @@ Table esdHTKTpaymentVendor {
   "identity.number" varchar // Số giấy tờ tùy thân
   "issued.date" date // ngày cấp
   phone varchar // số điện thoại
-  id varchar // id bảng
   "check.name.success" bool // Trạng thái kiểm tra tên người thụ hưởng
   currency varchar // Loại tiền (VND, USD…)
   "payment.rate" decimal // Tỷ lệ thanh toán
@@ -161,6 +189,7 @@ Ref: esdHTKTpaymentEntry."vendor.id" > esdHTKTVendor.id
 Table esdHTKTpaymentEntry {
   id varchar [pk] // mã
   "payment.id" varchar  // Mã đề nghị thanh toán
+  "contract.id" varchar // Mã HĐ/KMS để tra cứu/đối soát
   "entry.type" varchar // Loại tài khoản (ví dụ: TK chi phí, TK KH, TK Thuế, TK TƯ, TK phải trả )
   "ledger.type" varchar // Loại hạch toán (Prepayment, Standard…)
   "account.type" varchar // (Nợ, Có)
@@ -187,6 +216,7 @@ Ref: esdHTKTpaymentEntry."accounting.request.id" > esdHTKTaccountingInformation.
 
 
 // Bảng phân chia chi phí
+Ref: esdHTKTpaymentCostDivision."payment.id" > esdHTKTpayment.id
 Table esdHTKTpaymentCostDivision {
   "id" varchar [pk] // mã
   "payment.id" varchar  // Mã đề nghị thanh toán
@@ -203,8 +233,3 @@ Table esdHTKTpaymentCostDivision {
   "transaction.name" varchar // Tên giao dịch
   "amount" decimal // Số tiền
 }
-
-
-
-
-
