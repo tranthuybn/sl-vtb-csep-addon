@@ -139,7 +139,7 @@ function getListPaymentVendor(input) {
         ['pv.id', 'id', 'S'],
         ['pv.payment.id', 'payment_id', 'S'],
         ['pv.contract.id', 'vendor_contract_id', 'S'],
-        ['p.contract.id', 'payment_contract_id', 'S'],
+        ['p.contract.id', 'contract_id', 'S'],
         ['pv.vendor.id', 'vendor_id', 'S'],
         ['v.vendor.name', 'vendor_name', 'S'],
         ['v.vendor.number', 'vendor_number', 'S'],
@@ -164,7 +164,7 @@ function getListPaymentVendor(input) {
 
     while (rc == RC_SUCCESS) {
         var item = mapRowToObject(f, fieldMappings);
-
+        
         var vendorId = item.vendorId || "";
         var countInvoiceId = 0;
 
@@ -1026,46 +1026,46 @@ function syncVendorOglFromPayment(record) {
  * Số tiền còn lại = số tiền ban đầu của NCC theo hợp đồng
  * - tổng thanh toán đã accounted, approved - tổng thanh toán đã accounted, approved.
  */
-function calculateVendorRemainingAmount(contractId, supplierId, initialRemainingAmount) {
-    var contract = String(contractId || '').trim();
-    var supplier = String(supplierId || '').trim();
-    var finalRemainingAmount = String(initialRemainingAmount || '0');
-
-    if (!contract || !supplier) return finalRemainingAmount;
-
-    var totalPrepaymentAmount = sumVendorAmount(
-            'esdHTKTprepaymentVendor',
-            'esdHTKTprepayment',
-            'prepayment.id',
-            contract,
-            supplier
-    );
-    var totalPaidAmount = sumVendorAmount(
-            'esdHTKTpaymentVendor',
-            'esdHTKTpayment',
-            'payment.id',
-            contract,
-            supplier
-    );
-//    print('contract' + contract)
-//    print('supplier' + supplier)
-//    print('initialRemainingAmount' + initialRemainingAmount)
-//    print('totalPrepaymentAmount' + totalPrepaymentAmount)
-//    print('totalPaidAmount' + totalPaidAmount)
-
-    finalRemainingAmount = lib.ESD_HTKT_Utils.subtractStringsManual(finalRemainingAmount, totalPrepaymentAmount);
-    finalRemainingAmount = lib.ESD_HTKT_Utils.subtractStringsManual(finalRemainingAmount, totalPaidAmount);
-
-    if (
-            finalRemainingAmount &&
-            (finalRemainingAmount.charAt(0) === '-' ||
-                    lib.ESD_HTKT_Utils.compareMoneyStrings(finalRemainingAmount, '0') < 0)
-    ) {
-        return '0';
-    }
-
-    return finalRemainingAmount;
-}
+//function calculateVendorRemainingAmount(contractId, supplierId, initialRemainingAmount) {
+//    var contract = String(contractId || '').trim();
+//    var supplier = String(supplierId || '').trim();
+//    var finalRemainingAmount = String(initialRemainingAmount || '0');
+//
+//    if (!contract || !supplier) return finalRemainingAmount;
+//
+//    var totalPrepaymentAmount = sumVendorAmount(
+//            'esdHTKTprepaymentVendor',
+//            'esdHTKTprepayment',
+//            'prepayment.id',
+//            contract,
+//            supplier
+//    );
+//    var totalPaidAmount = sumVendorAmount(
+//            'esdHTKTpaymentVendor',
+//            'esdHTKTpayment',
+//            'payment.id',
+//            contract,
+//            supplier
+//    );
+////    print('contract' + contract)
+////    print('supplier' + supplier)
+////    print('initialRemainingAmount' + initialRemainingAmount)
+////    print('totalPrepaymentAmount' + totalPrepaymentAmount)
+////    print('totalPaidAmount' + totalPaidAmount)
+//
+//    finalRemainingAmount = lib.ESD_HTKT_Utils.subtractStringsManual(finalRemainingAmount, totalPrepaymentAmount);
+//    finalRemainingAmount = lib.ESD_HTKT_Utils.subtractStringsManual(finalRemainingAmount, totalPaidAmount);
+//
+//    if (
+//            finalRemainingAmount &&
+//            (finalRemainingAmount.charAt(0) === '-' ||
+//                    lib.ESD_HTKT_Utils.compareMoneyStrings(finalRemainingAmount, '0') < 0)
+//    ) {
+//        return '0';
+//    }
+//
+//    return finalRemainingAmount;
+//}
 
 function sumVendorAmount(vendorTable, requestTable, requestIdField, contractId, supplierId) {
     var totalAmount = '0';
@@ -1113,7 +1113,7 @@ function loadPaymentVendorInfo(record) {
             ' hpv.refund.amount as refund.amount,' +
             ' hpv.vendor.type as vendor.type,' +
             ' hp.contract.id as contract.id,' +
-            ' hdVendor.remaining.amount as initial.remaining.amount,' +
+            ' hdVendor.unpaid.amount as unpaid.amount,' +
             ' hv.vendor.number as tax.code,' +
             ' hpv.ogl.sync.status as ogl.sync.status,' +
             ' hvs.ogl.site.code as ogl.site.code,' +
@@ -1138,11 +1138,7 @@ function loadPaymentVendorInfo(record) {
         vars.$currency = itemFile["currency"];
         vars.$supplierId = itemFile["supplier.id"];
         vars.$L_file["payment.method"] = itemFile["payment.method"];
-        vars.$remainingAmount = calculateVendorRemainingAmount(
-                itemFile['contract.id'],
-                itemFile['supplier.id'],
-                itemFile['initial.remaining.amount']
-        );
+        vars.$remainingAmount = itemFile['unpaid.amount'];
         vars.$taxCode = itemFile["tax.code"];
         vars.$supplierdisplays = [itemFile["supplier.name"]];
         vars.$suppliervalues = [itemFile["supplier.id"]];
@@ -1372,24 +1368,30 @@ function deletePaymentInvoice(input) {
     }
 }
 
-///**
-// * Hàm xử lý chính (Core Logic): Thực hiện xóa liên kết hóa đơn và cập nhật lại dữ liệu
-// * Có thể gọi trực tiếp hàm này ở bất kỳ đâu khi đã có invoiceId và paymentId
-// */
-function executeDeletePaymentInvoice(invoiceId, paymentId) {
-    if (!invoiceId || !paymentId) {
-        return { success: false, message: "Thiếu invoiceId hoặc paymentId" };
-    }
+/**
+ * [HÀM 1] Thao tác dữ liệu:
+ * - Xóa các bản ghi quan hệ trong esdHTKTpaymentInvoice
+ * - Thu thập danh sách vendorId bị ảnh hưởng
+ * - Gỡ liên kết hóa đơn trong esdHTKTinvoice (set request.id = null)
+ * 
+ * @param {string} invoiceId 
+ * @param {string} paymentId 
+ * @returns {{ deletedCount: number, affectedVendorIds: Object }}
+ */
+/**
+ * Xóa các bản ghi quan hệ trong esdHTKTpaymentInvoice và gỡ liên kết hóa đơn
+ */
+function deletePaymentInvoiceRelations(invoiceId, paymentId) {
+    var affectedVendorIds = {};
+    var deletedCount = 0;
 
+    // 1. Xóa bản ghi quan hệ trong bảng esdHTKTpaymentInvoice
+    var paymentInvFile = null;
     try {
-        var affectedVendorIds = {};
-
-        // Bước 1: Xóa bản ghi quan hệ trong bảng esdHTKTpaymentInvoice
-        var paymentInvFile = new SCFile("esdHTKTpaymentInvoice");
+        paymentInvFile = new SCFile("esdHTKTpaymentInvoice");
         var queryMapping = 'invoice.id="' + invoiceId + '" and payment.id="' + paymentId + '"';
         var rcSelect = paymentInvFile.doSelect(queryMapping);
 
-        var deletedCount = 0;
         while (rcSelect === RC_SUCCESS) {
             var vendorId = String(paymentInvFile["vendor.id"] || "").trim();
             if (vendorId) {
@@ -1402,34 +1404,81 @@ function executeDeletePaymentInvoice(invoiceId, paymentId) {
             }
             rcSelect = paymentInvFile.getNext();
         }
-        try { if (paymentInvFile) paymentInvFile.doClose(); } catch (e) {}
+    } finally {
+        try { if (paymentInvFile) paymentInvFile.doClose(); } catch (ignore) {}
+    }
 
-        // print("[PAYMENT_INVOICE_DELETE] deleted mapping rows count=" + deletedCount);
+    // 2. Gọi hàm tách riêng để gỡ liên kết trên esdHTKTinvoice
+//    resetInvoiceRequestId(invoiceId);
 
-        // Bước 2: Cập nhật lại esdHTKTinvoice (set request.id = null)
-        var invFile = new SCFile("esdHTKTinvoice");
+    return {
+        deletedCount: deletedCount,
+        affectedVendorIds: affectedVendorIds
+    };
+}
+
+/**
+ * Giải phóng liên kết hóa đơn gốc (set request.id = null)
+ * 
+ * @param {string} invoiceId - Mã hóa đơn cần reset
+ * @returns {boolean} true nếu cập nhật thành công hoặc không tìm thấy, false nếu có lỗi
+ */
+function resetInvoiceRequestId(invoiceId) {
+    if (!invoiceId) return false;
+
+    var invFile = null;
+    try {
+        invFile = new SCFile("esdHTKTinvoice");
         var queryInv = 'id="' + invoiceId + '"';
         var rcInv = invFile.doSelect(queryInv);
 
         if (rcInv === RC_SUCCESS) {
             invFile["request.id"] = null;
             var rcUpdate = invFile.doUpdate();
-            // print("[PAYMENT_INVOICE_DELETE] update invoice request.id to null rc=" + rcUpdate);
+            return (rcUpdate === RC_SUCCESS);
         }
-        try { if (invFile) invFile.doClose(); } catch (e) {}
+        return false;
+    } catch (e) {
+        // Có thể log lỗi nếu cần: print("[RESET_INVOICE_REQUEST_ID_ERROR] " + e);
+        return false;
+    } finally {
+        try {
+            if (invFile) invFile.doClose();
+        } catch (ignore) {}
+    }
+}
 
-        if (deletedCount > 0) {
-            refreshPaymentAmountsAfterInvoiceDelete(paymentId, affectedVendorIds);
+/**
+ * [HÀM 2] Hàm điều phối chính (Main Flow):
+ * - Validate đầu vào
+ * - Gọi xóa dữ liệu hóa đơn liên kết
+ * - Cập nhật lại số tiền của đề nghị thanh toán (nếu có hóa đơn bị xóa)
+ * 
+ * @param {string} invoiceId 
+ * @param {string} paymentId 
+ * @returns {{ success: boolean, message: string, deletedCount?: number }}
+ */
+function executeDeletePaymentInvoice(invoiceId, paymentId) {
+    if (!invoiceId || !paymentId) {
+        return { success: false, message: "Thiếu invoiceId hoặc paymentId" };
+    }
+
+    try {
+        // Thực hiện xóa dữ liệu và lấy thông tin các vendor bị ảnh hưởng
+        var result = deletePaymentInvoiceRelations(invoiceId, paymentId);
+
+        // Nếu có bản ghi bị xóa, cập nhật lại số tiền đề nghị thanh toán
+        if (result.deletedCount > 0) {
+            refreshPaymentAmountsAfterInvoiceDelete(paymentId, result.affectedVendorIds);
         }
 
         return {
             success: true,
             message: "Đã xóa liên kết hóa đơn thành công",
-            deletedCount: deletedCount
+            deletedCount: result.deletedCount
         };
 
     } catch (error) {
-        // print("[PAYMENT_INVOICE_DELETE] error=" + error.toString());
         return {
             success: false,
             message: "Lỗi khi xử lý xóa: " + error.toString()
