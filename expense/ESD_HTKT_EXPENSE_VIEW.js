@@ -514,6 +514,66 @@ function renderTabLiabilityInfo(endpoint, input, extraData) {
 
 
 /**
+ * Render tab Thông tin hạch toán
+ */
+function getTabThongTinHT(endpoint, input, extraData) {
+    var formRecord = vars['$L.file'];
+    var currentRecord = extraData || {};
+
+    if (
+            (!currentRecord || Object.keys(currentRecord).length === 0) &&
+            formRecord
+    ) {
+        currentRecord = formRecord;
+    }
+
+    var paymentId = currentRecord ?
+            String(currentRecord['id'] || '') :
+            '';
+
+    var currentUser = String(
+            vars['$lo.contact.name'] || ''
+    ).trim();
+
+    var currentPhase = formRecord ?
+            String(formRecord['current.phase'] || '').trim() :
+            '';
+
+    var userCheckerKttc = formRecord ?
+            String(formRecord['user.checker.kttc'] || '').trim() :
+            '';
+
+    var initialRole = formRecord ?
+            String(formRecord['initial.role'] || '').trim() :
+            '';
+
+    var createdBy = formRecord ?
+            String(formRecord['created.by'] || '').trim() :
+            '';
+
+    return lib.ESD_Addon_Nextjs_V1.renderPageNextJS(
+            'HachToanKeToan/DuChi/TabThongTinHachToan',
+            '', {
+                id: paymentId,
+                paymentId: paymentId,
+                user: currentUser,
+                currentUser: currentUser,
+                contactId: currentUser,
+                createdBy: createdBy,
+                currentPhase: currentPhase,
+                userCheckerKttc: userCheckerKttc,
+                initialRole: initialRole,
+                currentRecord: {
+                    id: paymentId,
+                    currentPhase: currentPhase,
+                    userCheckerKttc: userCheckerKttc,
+                    initialRole: initialRole
+                }
+            }
+    );
+}
+
+/**
  * Render tab Thông tin món Dự chi cho phiếu đang mở.
  * Ngoài id phiếu, tab cần cùng context người dùng/phạm vi dữ liệu như màn
  * danh sách để API listPurchaseContracts áp dụng đúng role và data scope.
