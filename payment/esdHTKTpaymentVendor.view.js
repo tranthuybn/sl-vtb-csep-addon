@@ -16,7 +16,18 @@ vars.$vendorSiteOptValue = [];
 vars.$vendorSiteOptDisp = [];
 vars.$canEditObj = false;
 
-lib.ESD_HTKT_PAYMENT_VENDOR.loadPaymentVendorInfo(vars.$L_file);
+var paymentId = String(vars.$L_file["payment.id"] || vars.$L_file.payment_id || "");
+var paymentPrefix = paymentId.split(".")[0].toUpperCase();
+var isPayment = paymentPrefix === "TT";
+var isExpense = paymentPrefix === "DC";
+vars.$isPayment = isPayment;
+vars.$isExpense = isExpense;
+
+if (isExpense) {
+    lib.ESD_HTKT_EXPENSE_VENDOR.loadPaymentVendorInfo(vars.$L_file);
+} else if (isPayment) {
+    lib.ESD_HTKT_PAYMENT_VENDOR.loadPaymentVendorInfo(vars.$L_file);
+}
 
 var entityInfo = lib.ESD_HTKT_ACCOUNTING_UTILS.mapPsToEntity(vars.$unitLv1);
 if (entityInfo && entityInfo.entity && entityInfo.oglBranchCode) {
@@ -35,11 +46,12 @@ if (entityInfo && entityInfo.entity && entityInfo.oglBranchCode) {
     }
 }
 
-
-// droplist ngan hang thu huong
-var bankList = lib.ESD_HTKT_ACCOUNTING_UTILS.getBankDroplist();
-vars.$bankcode = bankList.map(b => `${b.code}|${b.citad}|${b.napas}`); // citab.branch.code|citad.code|napas.code trong esdDMbank
-vars.$bankname = bankList.map(b => b.name);
+if (isPayment) {
+  // droplist ngan hang thu huong
+  var bankList = lib.ESD_HTKT_ACCOUNTING_UTILS.getBankDroplist();
+  vars.$bankcode = bankList.map((b) => `${b.code}|${b.citad}|${b.napas}`); // citab.branch.code|citad.code|napas.code trong esdDMbank
+  vars.$bankname = bankList.map((b) => b.name);
+}
 
 
 
