@@ -60,36 +60,47 @@ function handlePhaseChangeUpdate(rec, oldRec) {
 
 
 // =========================================================================
-if (record && record["transaction.type"] == "Thanh toán") {
-    // 1. Cập nhật Contract Payment khi có sự thay đổi Phase
-    handlePhaseChangeUpdate(record, oldrecord);
+var transactionType = record ? record["transaction.type"] : "";
+var isPayment = transactionType == "Thanh toán";
+var isExpense = transactionType == "Dự chi";
 
-    // 2. Sinh accountingInformation
-    if (
-        record["status"] == "approved" &&
-        record["current.phase"] == "end" &&
-        (!oldrecord || oldrecord["current.phase"] != "end")
-    ) {
-        var accountingResult =
+// 1. Chỉ Thanh toán mới cập nhật Contract Payment khi thay đổi phase.
+if (isPayment) {
+    handlePhaseChangeUpdate(record, oldrecord);
+}
+
+// 2. Sinh accountingInformation theo đúng SL của từng loại giao dịch.
+// 3. Gọi hạch toán dùng chung cho cả Thanh toán và Dự chi.
+if (
+    (isPayment || isExpense) &&
+    record["status"] == "approved" &&
+    record["current.phase"] == "end" &&
+    (!oldrecord || oldrecord["current.phase"] != "end")
+) {
+    var accountingResult;
+    if (isPayment) {
+        accountingResult =
             system.library.ESD_HTKT_PAYMENT_ACCOUNTING_INFORMATION
                 .generatePaymentAccountingInformation(record["id"], false);
-
-        // print("=== ACCOUNTING RESULT PAYMENT === " + JSON.stringify(accountingResult));
-        // 3. Gọi hạch toán
-        system.library.ESD_HTKT_ACCOUNTING_UTILS.processAccounting(record);
+    } else {
+        accountingResult =
+            system.library.ESD_HTKT_EXPENSE_ACCOUNTING_INFORMATION
+                .generatePaymentAccountingInformation(record["id"]);
     }
 
-    // 4. Đồng bộ báo cáo công nợ NCC khi Payment chuyển sang đã hạch toán (accounted)
-    if (
-        record["status"] == "accounted" &&
-        (!oldrecord || oldrecord["status"] != "accounted")
-    ) {
-        try {
-            lib.ESD_HTKT_REPORT_VENDOR_DEBT.syncVendorDebtReportForHTKT(record["id"], "PAYMENT");
-        } catch (eDebt) {
-            print("[ERROR] syncVendorDebtReportForHTKT failed for Payment ID: " + record["id"] + " | Exception: " + eDebt);
-        }
+    // print("=== ACCOUNTING RESULT === " + JSON.stringify(accountingResult));
+    system.library.ESD_HTKT_ACCOUNTING_UTILS.processAccounting(record);
+}
+
+// 4. Chỉ Thanh toán mới đồng bộ báo cáo công nợ NCC.
+if (
+    isPayment &&
+    record["status"] == "accounted" &&
+    (!oldrecord || oldrecord["status"] != "accounted")
+) {
+    try {
+        lib.ESD_HTKT_REPORT_VENDOR_DEBT.syncVendorDebtReportForHTKT(record["id"], "PAYMENT");
+    } catch (eDebt) {
+        print("[ERROR] syncVendorDebtReportForHTKT failed for Payment ID: " + record["id"] + " | Exception: " + eDebt);
     }
-} else if (record && record["transaction.type"] == "Dự chi") {
-    // TODO: Bổ sung logic xử lý Dự chi.
 }
