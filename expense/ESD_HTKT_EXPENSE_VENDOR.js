@@ -257,3 +257,71 @@ function closeExpenseVendorFile(file) {
     if (!file) return;
     try { file.doClose(); } catch (e) {}
 }
+
+function loadPaymentVendorInfo(record) {
+    var itemFile = new SCFile("esdHTKTpaymentVendor", SCFILE_READONLY);
+
+    var itemQuery =
+            'select hv.supplier.id as supplier.id,' +
+            ' hv.vendor.name as supplier.name,' +
+            ' hpv.amount as amount,' +
+            ' hv.vendor.number as tax.code,' +
+            ' hpv.ogl.sync.status as ogl.sync.status,' +
+            ' hvs.ogl.site.code as ogl.site.code,' +
+            ' hpv.currency as currency,' +
+            ' hp.unit.lv1 as unit.lv1,' +
+            ' hp.unit.lv2 as unit.lv2,' +
+            ' hp.current.phase as current.phase,' +
+            ' hp.created.by as created.by,' +
+            ' hp.initial.role as initial.role,' +
+            ' hp.user.checker.kttc as user.checker.kttc' +
+            ' from esdHTKTpaymentVendor hpv' +
+            ' LEFT JOIN esdHTKTvendor hv ON (hpv.vendor.id = hv.id)' +
+            ' LEFT JOIN esdHTKTpayment hp ON (hpv.payment.id = hp.id)' +
+            ' LEFT JOIN esdHTKTvendorSite hvs ON (hvs.id = hpv.vendor.site.id)' +
+            ' where hpv.id = "' + escapeExpenseVendorQueryValue(record.id) + '"';
+
+    if (itemFile.doSelect(itemQuery) == RC_SUCCESS) {
+
+        vars.$currency = itemFile["currency"];
+        vars.$supplierId = itemFile["supplier.id"];
+        vars.$taxCode = itemFile["tax.code"];
+        vars.$supplierdisplays = [itemFile["supplier.name"]];
+        vars.$suppliervalues = [itemFile["supplier.id"]];
+        vars.$oglSiteCode = itemFile["ogl.site.code"];
+        vars.$amount = itemFile["amount"];
+        vars.$unitLv1 = itemFile["unit.lv1"];
+        vars.$unitLv2 = itemFile["unit.lv2"];
+
+        vars.$showSyncVendorOgl =
+                itemFile["current.phase"] == "initial_kttc" &&
+                (
+                        itemFile["user.checker.kttc"] == vars.$lo_operator["contact.name"] ||
+                        (
+                                itemFile["created.by"] == vars.$lo_operator["contact.name"] &&
+                                itemFile["initial.role"] == "kttc"
+                        )
+                );
+
+        vars.$canEditSite = vars.$showSyncVendorOgl && itemFile["ogl.sync.status"] == true
+
+        vars.$canEditObj =
+                (
+                        itemFile["current.phase"] == "initial_dmms" &&
+                        itemFile["created.by"] == vars.$lo_operator["contact.name"] &&
+                        itemFile["initial.role"] == "dmms"
+                ) ||
+                (
+                        itemFile["current.phase"] == "initial_kttc" &&
+                        (
+                                itemFile["user.checker.kttc"] == vars.$lo_operator["contact.name"] ||
+                                (
+                                        itemFile["created.by"] == vars.$lo_operator["contact.name"] &&
+                                        itemFile["initial.role"] == "kttc"
+                                )
+                        )
+                );
+    }
+
+    closeExpenseVendorFile(itemFile);
+}
