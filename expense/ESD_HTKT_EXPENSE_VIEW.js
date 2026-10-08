@@ -629,8 +629,9 @@ function getTabThongTinMonDuChi(endpoint, input, extraData) {
         expenseId = String(expenseRecord["id"] || "").replace(/^\s+|\s+$/g, "");
     }
 
-    // Tab có thể được mở chỉ với id nên tải record để lấy đúng phase/role/quyền sửa.
-    if ((!expenseRecord || !expenseRecord["current.phase"] || !expenseRecord["initial.role"]) && expenseId) {
+    // Luôn tải lại theo id để quyền sửa dùng phase mới nhất trong database.
+    // $L.file có thể vẫn giữ phase cũ sau khi hồ sơ vừa chuyển bước workflow.
+    if (expenseId) {
         var expenseFile = new SCFile("esdHTKTpayment", SCFILE_READONLY);
         if (expenseFile.doSelect('id="' + expenseId.replace(/"/g, '\\"') + '"') == RC_SUCCESS) {
             expenseRecord = expenseFile;
