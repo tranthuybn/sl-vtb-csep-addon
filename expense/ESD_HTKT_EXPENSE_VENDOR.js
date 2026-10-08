@@ -230,7 +230,8 @@ function normalizeExpenseVendorValue(value) {
 }
 
 function generateExpensePaymentVendorId() {
-    var numberClass = "esdHTKTpaymentVendor";
+    var numberClass = "esdHTKTexpenseVendor";
+    var prefix = "DC";
     var numberRc = new SCDatum();
     numberRc.setValue(-1);
     var nextNumber = new SCDatum();
@@ -238,15 +239,18 @@ function generateExpensePaymentVendorId() {
     system.functions.rtecall("getnumber", numberRc, nextNumber, numberClass);
 
     var rcText = String(numberRc.getText()).replace(/^\s+|\s+$/g, "");
-    var paymentVendorId = String(nextNumber.getText()).replace(/^\s+|\s+$/g, "");
-    if (rcText !== "0" || !paymentVendorId) {
+    var rawNumber = String(nextNumber.getText()).replace(/^\s+|\s+$/g, "");
+    if (/^"[^"]*"$/.test(rawNumber) || /^'[^']*'$/.test(rawNumber)) {
+        rawNumber = rawNumber.substring(1, rawNumber.length - 1);
+    }
+    if (rcText !== "0" || !rawNumber) {
         throw new Error(
             "Không cấp được ID từ Sequential Numbers " + numberClass +
-            ". rc=" + rcText + ", number=" + paymentVendorId
+            ". rc=" + rcText + ", number=" + rawNumber
         );
     }
 
-    return paymentVendorId;
+    return rawNumber.indexOf(prefix) === 0 ? rawNumber : prefix + rawNumber;
 }
 
 function escapeExpenseVendorQueryValue(value) {
@@ -262,7 +266,8 @@ function loadPaymentVendorInfo(record) {
     var itemFile = new SCFile("esdHTKTpaymentVendor", SCFILE_READONLY);
 
     var itemQuery =
-            'select hv.supplier.id as supplier.id,' +
+            'select hpv.contract.id as contract.id,' +
+            ' hv.supplier.id as supplier.id,' +
             ' hv.vendor.name as supplier.name,' +
             ' hpv.amount as amount,' +
             ' hv.vendor.number as tax.code,' +
@@ -286,8 +291,38 @@ function loadPaymentVendorInfo(record) {
         vars.$currency = itemFile["currency"];
         vars.$supplierId = itemFile["supplier.id"];
         vars.$taxCode = itemFile["tax.code"];
-        vars.$supplierdisplays = [itemFile["supplier.name"]];
-        vars.$suppliervalues = [itemFile["supplier.id"]];
+        var contractId = normalizeExpenseVendorValue(itemFile["contract.id"]);
+        var arrVendors = [];
+        var supplierIds = {};
+        var contractVendorFile = new SCFile("esdHDcontractSupplier", SCFILE_READONLY);
+        try {
+            var contractVendorQuery =
+                    'select hdVendor.supplier.id as supplier.id,' +
+                    ' hdVendor.supplier.name as supplier.name' +
+                    ' from esdHDcontractSupplier hdVendor' +
+                    ' where hdVendor.contract.id = "' + escapeExpenseVendorQueryValue(contractId) + '"';
+            var contractVendorRc = contractVendorFile.doSelect(contractVendorQuery);
+            while (contractVendorRc == RC_SUCCESS) {
+                var supplierId = normalizeExpenseVendorValue(contractVendorFile["supplier.id"]);
+                if (supplierId && !supplierIds[supplierId]) {
+                    arrVendors.push({
+                        "supplier.id": supplierId,
+                        "supplier.name": contractVendorFile["supplier.name"]
+                    });
+                    supplierIds[supplierId] = true;
+                }
+                contractVendorRc = contractVendorFile.getNext();
+            }
+        } finally {
+            closeExpenseVendorFile(contractVendorFile);
+        }
+
+        vars.$supplierdisplays = arrVendors.map(function (vendor) {
+            return vendor["supplier.name"];
+        });
+        vars.$suppliervalues = arrVendors.map(function (vendor) {
+            return vendor["supplier.id"];
+        });
         vars.$oglSiteCode = itemFile["ogl.site.code"];
         vars.$amount = itemFile["amount"];
         vars.$unitLv1 = itemFile["unit.lv1"];
@@ -324,4 +359,49 @@ function loadPaymentVendorInfo(record) {
     }
 
     closeExpenseVendorFile(itemFile);
+}
+
+/**
+ * Validate thông tin món Dự chi theo NCC trước khi lưu.
+ * Không kiểm tra hóa đơn, hoàn ứng, số tiền còn lại hoặc công nợ phải trả.
+ */
+function validateVendorAndPaymentDetails(record) {
+    var errorMss = [];
+
+    function checkMaxLength(value, maxLength, fieldName) {
+        if (value && String(value).length > maxLength) {
+            errorMss.push(fieldName + " không được vượt quá " + maxLength + " ký tự.");
+        }
+    }
+
+    function parseAmount(value) {
+        if (value === null || value === undefined) return NaN;
+        var normalizedValue = String(value).replace(/,/g, "").trim();
+        if (!normalizedValue) return NaN;
+        var numberValue = Number(normalizedValue);
+        return isFinite(numberValue) ? numberValue : NaN;
+    }
+
+    var vendorName = vars.$supplierId;
+    if (!vendorName) {
+        errorMss.push("Tên Nhà cung cấp là bắt buộc.");
+    } else {
+        checkMaxLength(vendorName, 255, "Tên Nhà cung cấp");
+    }
+
+    var taxCode = vars.$taxCode;
+    if (!taxCode) {
+        errorMss.push("Thông tin Mã số thuế là bắt buộc.");
+    } else {
+        checkMaxLength(taxCode, 255, "Thông tin Mã số thuế");
+    }
+
+    var amountField = parseAmount(vars.$amount);
+    if (isNaN(amountField)) {
+        errorMss.push("Số tiền dự chi là bắt buộc.");
+    } else if (amountField < 0) {
+        errorMss.push("Số tiền dự chi không được âm.");
+    }
+    
+    return errorMss;
 }

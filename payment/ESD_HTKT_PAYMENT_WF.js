@@ -325,7 +325,20 @@ function cancelRequest(record) {
     }
 }
 
+function getReturnToUpdatePhase(record) {
+    var initialRole = String(record && record["initial.role"] || "").trim().toLowerCase();
+
+    if (initialRole === "dmms") return HTKT_WF_PHASE.INITIAL_DMMS;
+    if (initialRole === "kttc") return HTKT_WF_PHASE.INITIAL_KTTC;
+    return "";
+}
+
 function returnToUpdate(record, documentsAlreadyDeleted) {
+    var returnPhase = getReturnToUpdatePhase(record);
+    if (!returnPhase) {
+        throw new Error("Không xác định được initial.role để trả phiếu về chỉnh sửa.");
+    }
+
     if (documentsAlreadyDeleted !== true) {
         var deleteResult = deleteDocumentsBeforeReturn(record);
         if (!deleteResult || deleteResult.success !== true) {
@@ -337,6 +350,7 @@ function returnToUpdate(record, documentsAlreadyDeleted) {
         }
     }
 
+    record["current.phase"] = returnPhase;
     record.status = "request_edit";
 
     try {
@@ -351,7 +365,6 @@ function returnToUpdate(record, documentsAlreadyDeleted) {
             var activityDescription =
                     "Yêu cầu chỉnh sửa Đề nghị Thanh Toán" +
                     (returnReason ? '\nLý do: "' + returnReason + '"' : "");
-
             createActivity(
                     "activityHTKTpayment",
                     activityDescription,
@@ -359,6 +372,7 @@ function returnToUpdate(record, documentsAlreadyDeleted) {
                     "Yêu cầu chỉnh sửa",
                     currentUser
             );
+            
         }
     } catch (e) {
         /* print(
@@ -701,8 +715,6 @@ function validateVendorAndPaymentDetails(record) {
         errorMss.push("Số tiền hoàn ứng lần này là bắt buộc.");
     } else if (refundAmount < 0) {
         errorMss.push("Số tiền hoàn ứng lần này phải lớn hơn 0.");
-    } else if (refundAmount > remainingAmount) {
-        errorMss.push("Số tiền hoàn ứng lần này phải nhỏ hơn hoặc bằng Số tiền còn lại.");
     }
 
     var paymentId = String(record["payment.id"] || record.payment_id || "").trim();
@@ -1177,6 +1189,51 @@ function validateCurrentActor(record) {
     return htktWfFail("INVALID_CURRENT_ACTOR", "Người dùng hiện tại không được phép xử lý bước này.", "currentUser=" + context.currentUser, context);
 }
 
+function validateLatestWorkflowActor(record) {
+    try {
+        // Đã đổi từ PREPAYMENT sang PAYMENT tương ứng với module Thanh Toán
+        if (
+            !lib ||
+            !lib.ESD_HTKT_PAYMENT_LOAD_APRROVAL_COMBOBOX ||
+            typeof lib.ESD_HTKT_PAYMENT_LOAD_APRROVAL_COMBOBOX.syncPaymentApprovalFromDatabase !== "function"
+        ) {
+            return htktWfFail(
+                "WORKFLOW_ACTOR_REFRESH_DEPENDENCY_MISSING",
+                "Không kiểm tra được người xử lý mới nhất của hồ sơ. Vui lòng tải lại hồ sơ.",
+                "Thiếu ESD_HTKT_PAYMENT_LOAD_APRROVAL_COMBOBOX.syncPaymentApprovalFromDatabase()."
+            );
+        }
+
+        lib.ESD_HTKT_PAYMENT_LOAD_APRROVAL_COMBOBOX
+            .syncPaymentApprovalFromDatabase(record);
+
+        var actorResult = validateCurrentActor(record);
+
+        if (!actorResult || actorResult.success !== true) {
+            if (actorResult && actorResult.code === "INVALID_CURRENT_ACTOR") {
+                return htktWfFail(
+                    "PAYMENT_REASSIGNED", // Đổi từ PREPAYMENT_REASSIGNED
+                    "Hồ sơ đã được tái phân công cho cán bộ khác. Vui lòng tải lại hồ sơ.",
+                    actorResult.detail || "",
+                    actorResult.data || null
+                );
+            }
+
+            return actorResult || htktWfFail(
+                "WORKFLOW_ACTOR_VALIDATION_FAILED",
+                "Không kiểm tra được người xử lý hiện tại của hồ sơ. Vui lòng tải lại hồ sơ."
+            );
+        }
+
+        return actorResult;
+    } catch (error) {
+        return htktWfFailException(
+            "WORKFLOW_ACTOR_REFRESH_EXCEPTION",
+            "Không kiểm tra được người xử lý mới nhất của hồ sơ. Vui lòng tải lại hồ sơ.",
+            error
+        );
+    }
+}
 function htktWfValidateLegacy(record) {
     var errors;
     try {
@@ -1549,6 +1606,13 @@ function requestCorrection(record) {
                 "RETURN_PERMISSION_CHECK_EXCEPTION",
                 "Không kiểm tra được quyền yêu cầu chỉnh sửa.",
                 errorPermission
+        );
+    }
+
+    if (!getReturnToUpdatePhase(record)) {
+        return htktWfFail(
+                "INVALID_INITIAL_ROLE",
+                "Không xác định được initial.role để trả phiếu về chỉnh sửa."
         );
     }
 
