@@ -622,10 +622,20 @@ function getTabChiTietThongTinHT(endpoint, input, extraData) {
 function getTabThongTinMonDuChi(endpoint, input, extraData) {
     var currentRecord = extraData || {};
     var expenseRecord = vars["$L.file"] || vars.$L_file;
+    var loadedExpenseFile = null;
     var expenseId = String(currentRecord.id || "").replace(/^\s+|\s+$/g, "");
 
     if (!expenseId && expenseRecord) {
         expenseId = String(expenseRecord["id"] || "").replace(/^\s+|\s+$/g, "");
+    }
+
+    // Tab có thể được mở chỉ với id nên tải record để lấy đúng phase/role/quyền sửa.
+    if ((!expenseRecord || !expenseRecord["current.phase"] || !expenseRecord["initial.role"]) && expenseId) {
+        var expenseFile = new SCFile("esdHTKTpayment", SCFILE_READONLY);
+        if (expenseFile.doSelect('id="' + expenseId.replace(/"/g, '\\"') + '"') == RC_SUCCESS) {
+            expenseRecord = expenseFile;
+            loadedExpenseFile = expenseFile;
+        }
     }
 
     vars.$G_payment_id = expenseId;
@@ -636,7 +646,25 @@ function getTabThongTinMonDuChi(endpoint, input, extraData) {
     var rights = htktExpenseView_getRights();
     var hasCreate = rights.indexOf("0040040003000002") >= 0;
     var hasAccounting = rights.indexOf("0040040003000003") >= 0;
-    var initialRole = hasCreate ? (hasAccounting ? "kttc" : "dmms") : "";
+    var roleFromRights = hasCreate ? (hasAccounting ? "kttc" : "dmms") : "";
+    var currentPhase = String(
+        (expenseRecord && (expenseRecord["current.phase"] || expenseRecord.current_phase)) ||
+        currentRecord.currentPhase || currentRecord["current.phase"] || ""
+    ).replace(/^\s+|\s+$/g, "");
+    var initialRole = String(
+        (expenseRecord && (expenseRecord["initial.role"] || expenseRecord.initial_role)) ||
+        currentRecord.initialRole || currentRecord["initial.role"] || roleFromRights || ""
+    ).replace(/^\s+|\s+$/g, "");
+    var createdBy = String(
+        (expenseRecord && (expenseRecord["created.by"] || expenseRecord.created_by)) ||
+        currentRecord.createdBy || currentRecord["created.by"] || ""
+    ).replace(/^\s+|\s+$/g, "");
+    try {
+        if (loadedExpenseFile) loadedExpenseFile.doClose();
+    } catch (eCloseExpenseFile) {}
+    var isVendorEditable =
+        (currentPhase == "initial_dmms" && createdBy == currentUser) ||
+        (currentPhase == "initial_kttc" && initialRole == "kttc");
     var dataPermission = htktExpenseView_getDataPermission(currentUser);
 
     return lib.ESD_Addon_Nextjs_V1.renderPageNextJS(
@@ -651,6 +679,9 @@ function getTabThongTinMonDuChi(endpoint, input, extraData) {
             fullName: contactInfo.fullName,
             branchCode: contactInfo.branchCode,
             initialRole: initialRole,
+            currentPhase: currentPhase,
+            createdBy: createdBy,
+            isVendorEditable: isVendorEditable,
             unit: {
                 lv1: contactInfo.lv1,
                 lv2: contactInfo.lv2,

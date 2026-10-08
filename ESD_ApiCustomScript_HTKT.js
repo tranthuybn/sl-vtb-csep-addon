@@ -228,6 +228,9 @@ function run() {
             case "saveExpenseEntryEdit":
                 result = lib.ESD_HTKT_EXPENSE_ENTRY.saveExpenseEntryEdit(details);
                 break;
+            case "deleteExpenseVendor":
+                result = lib.ESD_HTKT_EXPENSE_VENDOR.deleteExpenseVendor(input);
+                break;
 
             default:
                 result = {
