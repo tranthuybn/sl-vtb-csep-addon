@@ -331,7 +331,13 @@ function getExpenseSummaryMeta(expenseId, request, metaParams) {
 function getListExpenseEntry(details) {
     var expenseId = safeString(details.expenseId || details.paymentId || details.id).trim();
 
+    debugExpenseEntry(
+        'GET-LIST-CALL',
+        'expenseId=' + expenseId + ', details=' + JSON.stringify(details || {})
+    );
+
     if (!expenseId) {
+        debugExpenseEntry('GET-LIST-SKIP', 'Không nhận được expenseId/paymentId/id.');
         return makeResult([], 'empty', {
             canGenerate: false,
             message: 'Thiếu mã đề nghị dự chi.',
@@ -348,6 +354,14 @@ function getListExpenseEntry(details) {
     var creatorUnit = getCreatorAccountingUnit(currentUser || createdBy);
     var savedEntries = getSavedExpenseEntries(expenseId);
 
+    debugExpenseEntry(
+        'GET-LIST-DB',
+        'expenseId=' + expenseId +
+        ', phase=' + safeString(currentPhase) +
+        ', currentUser=' + currentUser +
+        ', savedCount=' + savedEntries.length
+    );
+
     var summaryMeta = getExpenseSummaryMeta(expenseId, request, {
         currentPhase: currentPhase,
         userCheckerKttc: userCheckerKttc,
@@ -360,11 +374,14 @@ function getListExpenseEntry(details) {
 
     if (savedEntries.length > 0) {
         applyCreatorUnitToEntries(savedEntries, creatorUnit.code);
-        return makeResult(getUniqueCostEntriesByAccountNumber(savedEntries), 'saved', summaryMeta);
+        var savedResult = makeResult(getUniqueCostEntriesByAccountNumber(savedEntries), 'saved', summaryMeta);
+        debugExpenseEntry('GET-LIST-RETURN', 'mode=saved, rowCount=' + savedResult.data.length);
+        return savedResult;
     }
 
     if (isGenerationPhaseLocked(currentPhase)) {
         summaryMeta.locked = true;
+        debugExpenseEntry('GET-LIST-LOCKED', 'expenseId=' + expenseId + ', phase=' + safeString(currentPhase));
         return makeResult([], 'empty', summaryMeta);
     }
 
@@ -376,6 +393,12 @@ function getListExpenseEntry(details) {
         generatedResult.accountingItems = mapAccountingTableItems(generatedResult.data);
     }
     copyObject(generatedResult, summaryMeta);
+    debugExpenseEntry(
+        'GET-LIST-RETURN',
+        'mode=' + safeString(generatedResult.mode) +
+        ', rowCount=' + safeString(generatedResult.data && generatedResult.data.length || 0) +
+        ', errors=' + JSON.stringify(generatedResult.errors || [])
+    );
     return generatedResult;
 }
 

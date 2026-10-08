@@ -222,6 +222,17 @@ function run() {
                     data: lib.ESD_HTKT_EXPENSE_VENDOR.getListExpenseVendor(input)
                 };
                 break;
+            case "getListExpenseEntry":
+                print("[API-HTKT][getListExpenseEntry][REQUEST] details=" + JSON.stringify(details));
+                result = lib.ESD_HTKT_EXPENSE_ENTRY.getListExpenseEntry(details);
+                print(
+                    "[API-HTKT][getListExpenseEntry][RESPONSE] success=" +
+                    String(result && result.success) +
+                    ", mode=" + String(result && result.mode || "") +
+                    ", rowCount=" + String(result && result.data && result.data.length || 0) +
+                    ", message=" + String(result && (result.message || result.error) || "")
+                );
+                break;
 
             default:
                 result = {

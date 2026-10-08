@@ -573,6 +573,47 @@ function getTabThongTinHT(endpoint, input, extraData) {
     );
 }
 
+
+/**
+ * Render tab Chi tiết thông tin hạch toán
+ */
+function getTabChiTietThongTinHT(endpoint, input, extraData) {
+    var formRecord = vars['$L.file'];
+    var currentRecord = extraData || {};
+
+    if (
+            (!currentRecord || Object.keys(currentRecord).length === 0) &&
+            formRecord
+    ) {
+        currentRecord = formRecord;
+    }
+
+    var paymentId = vars.$G_payment_id;
+    if (paymentId) {
+        var paymentRec = new SCFile("esdHTKTpayment");
+        var sql = "id=\"" + paymentId + "\"";
+
+        if (paymentRec.doSelect(sql) === RC_SUCCESS) {
+            currentRecord = {
+                "paymentId": paymentId,
+                "currentPhase": paymentRec["current.phase"],
+                "initialRole": paymentRec["initial.role"],
+                "createdBy": paymentRec["created.by"],
+                "userCheckerDmms": paymentRec["user.checker.dmms"],
+                "userCheckerKttc": paymentRec["user.checker.kttc"],
+                "userApproverKttc": paymentRec["user.approver.kttc"],
+                "userApproverDmms": paymentRec["user.approver.dmms"],
+                "userCheckerFinal": paymentRec["user.checker.final"],
+                "userApproverFinal": paymentRec["user.approver.final"],
+                "currentUser": vars['$lo.contact.name'],
+                "status": paymentRec["status"]
+            };
+        }
+    }
+
+    return lib.ESD_Addon_Nextjs_V1.renderPageNextJS('HachToanKeToan/DuChi/TabThongTinHachToan/ChiTietHachToan', '', currentRecord)
+}
+
 /**
  * Render tab Thông tin món Dự chi cho phiếu đang mở.
  * Ngoài id phiếu, tab cần cùng context người dùng/phạm vi dữ liệu như màn
