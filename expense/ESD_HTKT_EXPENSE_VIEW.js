@@ -374,6 +374,58 @@ function getTabKetQuaGD() {
 }
 
 
+
+//Dung cho tab thong tin cong no
+function renderTabLiabilityInfo(endpoint, input, extraData) {
+    var currentRecord = extraData;
+
+    // 1. Kiểm tra và khởi tạo object nếu extraData trống
+    if (!currentRecord || (Array.isArray(currentRecord) && currentRecord.length === 0) || (typeof currentRecord === 'object' && Object.keys(currentRecord).length === 0)) {
+        if (vars.$L_file) {
+            currentRecord = {
+                "id": vars.$L_file["id"],
+                "payment.id": vars.$L_file["payment.id"],
+                "contract.id": vars.$L_file["contract.id"],
+                "payment.status": vars.$L_file["payment.status"],
+                "vendor.number": vars.$L_file["vendor.number"],
+                "vendor.id": vars.$L_file["vendor.id"]
+            };
+        } else {
+            currentRecord = {};
+        }
+    }
+
+    // 2. Thêm query lấy contract.id dựa vào payment.id nếu contract.id chưa có giá trị
+
+    var paymentId = currentRecord["payment.id"] || vars.$L_file["payment.id"];
+    if (paymentId && !currentRecord["contract.id"]) {
+        var paymentRec = new SCFile("esdHTKTpayment");
+        var sql = "id=\"" + paymentId + "\"";
+
+        if (paymentRec.doSelect(sql) === RC_SUCCESS) {
+            currentRecord = {
+                "id": vars.$L_file["id"],
+                "paymentId": paymentId,
+                "contractId": paymentRec["contract.id"],
+                "vendorId": vars.$L_file["vendor.id"],
+                "currentPhase": paymentRec["current.phase"],
+                "initialRole": paymentRec["initial.role"],
+                "createdBy": paymentRec["created.by"],
+                "userCheckerDmms": paymentRec["user.checker.dmms"],
+                "userCheckerKttc": paymentRec["user.checker.kttc"],
+                "userApproverKttc": paymentRec["user.approver.kttc"],
+                "userApproverDmms": paymentRec["user.approver.dmms"],
+                "userCheckerFinal": paymentRec["user.checker.final"],
+                "userApproverFinal": paymentRec["user.approver.final"],
+                "currentUser": vars['$lo.contact.name'],
+                "status": paymentRec["status"]
+            };
+        }
+    }
+    return lib.ESD_Addon_Nextjs_V1.renderPageNextJS("HachToanKeToan/DuChi/TabThongTinMonDuChi/TabThongTinCongNo", '', currentRecord);
+}
+
+
 /**
  * Render tab Thông tin món Dự chi cho phiếu đang mở.
  * Ngoài id phiếu, tab cần cùng context người dùng/phạm vi dữ liệu như màn

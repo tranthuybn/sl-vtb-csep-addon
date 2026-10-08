@@ -415,8 +415,15 @@ function validateVendorAndPaymentDetails(record) {
     var amountField = parseAmount(vars.$amount);
     if (isNaN(amountField)) {
         errorMss.push("Số tiền dự chi là bắt buộc.");
-    } else if (amountField < 0) {
-        errorMss.push("Số tiền dự chi không được âm.");
+    } else if (amountField <= 0) {
+        errorMss.push("Số tiền dự chi phải lớn hơn 0.");
+    }
+
+    var transactionDescription = String(record["transaction.des"] || "").trim();
+    if (!transactionDescription) {
+        errorMss.push("Nội dung đề nghị không được để trống.");
+    } else {
+        checkMaxLength(transactionDescription, 255, "Nội dung đề nghị");
     }
     
     return errorMss;

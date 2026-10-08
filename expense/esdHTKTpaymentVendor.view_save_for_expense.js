@@ -26,8 +26,7 @@ if (errorMss && errorMss.length > 0) {
 
   try {
     var queryVendor =
-      'vendor.number="' + taxCode +
-      '" and supplier.id="' + supplierId + '"';
+      'vendor.number="' + taxCode + '" and supplier.id="' + supplierId + '"';
 
     var result = itemVendor.doSelect(queryVendor);
 
@@ -63,9 +62,9 @@ if (errorMss && errorMss.length > 0) {
       if (addRc !== RC_SUCCESS) {
         throw new Error(
           "Không tạo được nhà cung cấp. Code: " +
-          addRc +
-          ", message: " +
-          itemVendor.getMessages()
+            addRc +
+            ", message: " +
+            itemVendor.getMessages()
         );
       }
     }
@@ -76,11 +75,61 @@ if (errorMss && errorMss.length > 0) {
 
     vars.$L_file["amount"] = vars.$amount;
     vars.$L_file["vendor.id"] = vendorId;
-    vars.$L_file["vendor.site.id"] = vars.$oglSiteCode;
     vars.$L_file["currency"] = vars.$currency;
   } finally {
     try {
       itemVendor.doClose();
     } catch (closeError) {}
+  }
+
+  try {
+    var defaultVendorSiteInfo =
+      lib.ESD_HTKT_ACCOUNTING_UTILS.getVendorDefaultSiteInfo();
+    var syncResult = lib.ESD_HTKT_PREPAYMENT_VENDOR.syncVendorToOgl(
+      vars.$L_file,
+      vars.$branchCode,
+      vars.$entityCode
+    );
+
+    if (syncResult && syncResult.success) {
+      var vendorSites = lib.ESD_HTKT_ACCOUNTING_UTILS.getVendorSiteList(
+        vendorId,
+        vars.$branchCode
+      );
+
+      vars.$vendorSiteOptValue = [];
+      vars.$vendorSiteOptDisp = [];
+
+      if (vendorSites && vendorSites.length > 0) {
+        for (var i = 0; i < vendorSites.length; i++) {
+          var vendorSite = vendorSites[i];
+          vars.$vendorSiteOptValue.push(vendorSite["id"]);
+          vars.$vendorSiteOptDisp.push(vendorSite["ogl.site.code"]);
+
+          if (
+            !vars.$L_file["vendor.site.id"] &&
+            defaultVendorSiteInfo &&
+            vendorSite["ogl.site.code"] == defaultVendorSiteInfo.siteCode
+          ) {
+            vars.$L_file["vendor.site.id"] = vendorSite["id"];
+          }
+        }
+        vars.$canEditSite = true;
+      }
+    } else {
+      print(
+        "Đồng bộ thông tin NCC/Site không thành công: " +
+          String(
+            syncResult && syncResult.message
+              ? syncResult.message
+              : "Không xác định được nguyên nhân."
+          )
+      );
+    }
+  } catch (syncError) {
+    print(
+      "Đồng bộ thông tin NCC/Site không thành công: " +
+        String(syncError.message || syncError)
+    );
   }
 }
