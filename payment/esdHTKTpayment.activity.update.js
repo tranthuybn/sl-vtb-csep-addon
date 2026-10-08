@@ -60,33 +60,36 @@ function handlePhaseChangeUpdate(rec, oldRec) {
 
 
 // =========================================================================
-// 1. Cập nhật Contract Payment khi có sự thay đổi Phase
-handlePhaseChangeUpdate(record, oldrecord);
+if (record && record["transaction.type"] == "Thanh toán") {
+    // 1. Cập nhật Contract Payment khi có sự thay đổi Phase
+    handlePhaseChangeUpdate(record, oldrecord);
 
- 
-// 2. Sinh accountingInformation
-if (
-    record["status"] == "approved" && record["current.phase"] == "end" && oldrecord["current.phase"] != "end"
-) {
+    // 2. Sinh accountingInformation
+    if (
+        record["status"] == "approved" &&
+        record["current.phase"] == "end" &&
+        (!oldrecord || oldrecord["current.phase"] != "end")
+    ) {
+        var accountingResult =
+            system.library.ESD_HTKT_PAYMENT_ACCOUNTING_INFORMATION
+                .generatePaymentAccountingInformation(record["id"], false);
 
-    var accountingResult =
-        system.library.ESD_HTKT_PAYMENT_ACCOUNTING_INFORMATION
-            .generatePaymentAccountingInformation(record["id"], false);
-
-//    print("=== ACCOUNTING RESULT PAYMENT === " + JSON.stringify(accountingResult));
-// 3. goi hach toan 
-    system.library.ESD_HTKT_ACCOUNTING_UTILS.processAccounting(record);
-//
-}
-
-// 4. Đồng bộ báo cáo công nợ NCC khi Payment chuyển sang đã hạch toán (accounted)
-if (
-    record["status"] == "accounted" &&
-    (!oldrecord || oldrecord["status"] != "accounted")
-) {
-    try {
-        lib.ESD_HTKT_REPORT_VENDOR_DEBT.syncVendorDebtReportForHTKT(record["id"], "PAYMENT");
-    } catch (eDebt) {
-        print("[ERROR] syncVendorDebtReportForHTKT failed for Payment ID: " + record["id"] + " | Exception: " + eDebt);
+        // print("=== ACCOUNTING RESULT PAYMENT === " + JSON.stringify(accountingResult));
+        // 3. Gọi hạch toán
+        system.library.ESD_HTKT_ACCOUNTING_UTILS.processAccounting(record);
     }
+
+    // 4. Đồng bộ báo cáo công nợ NCC khi Payment chuyển sang đã hạch toán (accounted)
+    if (
+        record["status"] == "accounted" &&
+        (!oldrecord || oldrecord["status"] != "accounted")
+    ) {
+        try {
+            lib.ESD_HTKT_REPORT_VENDOR_DEBT.syncVendorDebtReportForHTKT(record["id"], "PAYMENT");
+        } catch (eDebt) {
+            print("[ERROR] syncVendorDebtReportForHTKT failed for Payment ID: " + record["id"] + " | Exception: " + eDebt);
+        }
+    }
+} else if (record && record["transaction.type"] == "Dự chi") {
+    // TODO: Bổ sung logic xử lý Dự chi.
 }
