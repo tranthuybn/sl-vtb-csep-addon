@@ -228,7 +228,6 @@ function normalizeExpenseVendorValue(value) {
 
 function generateExpensePaymentVendorId() {
     var numberClass = "esdHTKTexpenseVendor";
-    var prefix = "DC";
     var numberRc = new SCDatum();
     numberRc.setValue(-1);
     var nextNumber = new SCDatum();
@@ -244,7 +243,7 @@ function generateExpensePaymentVendorId() {
         );
     }
 
-    return rawNumber.indexOf(prefix) === 0 ? rawNumber : prefix + rawNumber;
+    return rawNumber;
 }
 
 function escapeExpenseVendorQueryValue(value) {

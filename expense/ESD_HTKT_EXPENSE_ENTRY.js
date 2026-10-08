@@ -60,7 +60,7 @@ function run() {
 
         // 1. Danh sách hạch toán
         if (action === 'getListExpenseEntry' || action === 'getListPaymentEntry') {
-            result = getListExpenseEntryByInputDetails(details);
+            result = getListExpenseEntry(details);
         // 2. Options khi thêm dòng thủ công
         } else if (action === 'syncExpenseEntry' || action === 'syncPaymentEntry') {
             result = syncExpenseEntryNowByInputDetails(details);
@@ -328,7 +328,7 @@ function getExpenseSummaryMeta(expenseId, request, metaParams) {
 }
 
 /** Lấy danh sách bút toán Dự chi */
-function getListExpenseEntryByInputDetails(details) {
+function getListExpenseEntry(details) {
     var expenseId = safeString(details.expenseId || details.paymentId || details.id).trim();
 
     if (!expenseId) {
