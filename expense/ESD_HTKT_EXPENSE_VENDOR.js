@@ -63,17 +63,6 @@ function createPaymentVendor(input) {
         if (!currentUser) return { success: false, message: "Không xác định được người thực hiện." };
         if (contracts.length === 0) return { success: false, message: "Chưa chọn hợp đồng." };
 
-        paymentFile = new SCFile("esdHTKTpayment");
-        var paymentRc = paymentFile.doSelect(
-            'id="' + escapeExpenseVendorQueryValue(paymentId) + '"'
-        );
-        if (paymentRc !== RC_SUCCESS) {
-            return { success: false, message: "Không tìm thấy phiếu Dự chi " + paymentId + "." };
-        }
-        if (normalizeExpenseVendorValue(paymentFile["transaction.type"]) !== "Dự chi") {
-            return { success: false, message: "Phiếu " + paymentId + " không thuộc loại Dự chi." };
-        }
-
         var createdItems = [];
         var seen = {};
         for (var i = 0; i < contracts.length; i++) {
@@ -118,6 +107,14 @@ function createPaymentVendor(input) {
         }
 
         if (createdItems.length > 0) {
+            paymentFile = new SCFile("esdHTKTpayment");
+            var paymentRc = paymentFile.doSelect(
+                'id="' + escapeExpenseVendorQueryValue(paymentId) + '"'
+            );
+            if (paymentRc !== RC_SUCCESS) {
+                throw new Error("Không tìm thấy phiếu Dự chi " + paymentId + ".");
+            }
+
             paymentFile["total.contract"] =
                 Number(paymentFile["total.contract"] || 0) + createdItems.length;
             var updateRc = paymentFile.doUpdate();
@@ -292,7 +289,7 @@ function loadPaymentVendorInfo(record) {
             ' LEFT JOIN esdDMSupplier dmVendor ON (hdVendor.supplier.id = dmVendor.id)' +
             ' where hpv.id = "' + escapeExpenseVendorQueryValue(record.id) + '"';
 
-    var arrVendors = [];
+    arrVendors = [];
     var supplierIds = {};
     var itemRc = itemFile.doSelect(itemQuery);
     var hasItem = itemRc == RC_SUCCESS;
