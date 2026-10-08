@@ -206,16 +206,15 @@ function run() {
             case "getAccountingErrorExecutorOptions":
                 result = lib.ESD_HTKT_ACCOUNTING_ERROR_HANDLING.getAccountingErrorExecutorOptions(input);
                 break;
-
-            //Dự chi    
+            //Du chi
             case "getExpenceList":
                 result = lib.ESD_HTKT_EXPENSE_CREATE_REQUEST.getList(input);
                 break;
             case "createExpenseRequest":
                 result = lib.ESD_HTKT_EXPENSE_CREATE_REQUEST.createExpenseRequest(input);
                 break;
-            case "addExpenseContracts":
-                result = lib.ESD_HTKT_EXPENSE_CREATE_REQUEST.addExpenseContracts(input);
+            case "createPaymentVendor":
+                result = lib.ESD_HTKT_EXPENSE_VENDOR.createPaymentVendor(input);
                 break;
             case "getListExpenseVendor":
                 result = {

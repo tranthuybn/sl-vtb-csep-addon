@@ -1,8 +1,161 @@
 /**
  * ScriptLibrary : ESD_HTKT_EXPENSE_VENDOR
- * Danh sách món Dự chi từ esdHTKTpaymentVendor.
+ * Chức năng      : Cung cấp danh sách nhà cung cấp cho màn Dự chi.
+ * Nguồn dữ liệu  : esdHTKTpaymentVendor kết hợp esdHTKTvendor.
+ * Tối ưu         : Lấy thông tin NCC và tổng số hóa đơn trong một truy vấn,
+ *                  không truy vấn bổ sung theo từng NCC.
  */
 
+function run() {
+    try {
+        var input = vars["$L.file"];
+        if (!input) return;
+
+        var name = input.name;
+        if (!name) {
+            input.queryReturn = JSON.stringify({
+                success: false,
+                error: 'Missing action "name"'
+            });
+            return;
+        }
+
+        var result;
+        switch (name) {
+            // Danh sách món Dự chi theo nhà cung cấp.
+            case "getListExpenseVendor":
+                result = { success: true, data: getListExpenseVendor(input) };
+                break;
+            // Tạo esdHTKTpaymentVendor từ Hợp đồng/Khoản mua sắm được chọn.
+            case "createPaymentVendor":
+                result = createPaymentVendor(input);
+                break;
+            default:
+                result = {
+                    success: false,
+                    error: "Hanh dong (name) khong hop le: " + name
+                };
+        }
+
+        input.queryReturn = JSON.stringify(result);
+    } catch (e) {
+        if (vars["$L.file"]) {
+            vars["$L.file"].queryReturn = JSON.stringify({
+                success: false,
+                error: "Gateway Error: " + e.toString()
+            });
+        }
+    }
+}
+
+/**
+ * Tạo món Dự chi theo hợp đồng được chọn và trả về đúng ID bản ghi vừa tạo.
+ */
+function createPaymentVendor(input) {
+    var paymentFile = null;
+    try {
+        var params = getExpenseVendorInputDetails(input);
+        var paymentId = normalizeExpenseVendorValue(params.paymentId || params.expenseId);
+        var currentUser = normalizeExpenseVendorValue(params.currentUser);
+        var contracts = params.contracts instanceof Array ? params.contracts : [];
+
+        if (!paymentId) return { success: false, message: "Thiếu mã phiếu Dự chi." };
+        if (!currentUser) return { success: false, message: "Không xác định được người thực hiện." };
+        if (contracts.length === 0) return { success: false, message: "Chưa chọn hợp đồng." };
+
+        paymentFile = new SCFile("esdHTKTpayment");
+        var paymentRc = paymentFile.doSelect(
+            'id="' + escapeExpenseVendorQueryValue(paymentId) + '"'
+        );
+        if (paymentRc !== RC_SUCCESS) {
+            return { success: false, message: "Không tìm thấy phiếu Dự chi " + paymentId + "." };
+        }
+        if (normalizeExpenseVendorValue(paymentFile["transaction.type"]) !== "Dự chi") {
+            return { success: false, message: "Phiếu " + paymentId + " không thuộc loại Dự chi." };
+        }
+
+        var createdItems = [];
+        var seen = {};
+        for (var i = 0; i < contracts.length; i++) {
+            var contract = contracts[i] || {};
+            var contractId = normalizeExpenseVendorValue(contract.id || contract["contract.id"]);
+            if (!contractId || seen[contractId]) continue;
+            seen[contractId] = true;
+
+            var paymentVendorId = generateExpensePaymentVendorId();
+            var relationFile = new SCFile("esdHTKTpaymentVendor");
+            try {
+                relationFile["id"] = paymentVendorId;
+                relationFile["payment.id"] = paymentId;
+                relationFile["contract.id"] = contractId;
+                relationFile["currency"] = contract.currency || "VND";
+                relationFile["amount"] = 0;
+
+                var addRc = relationFile.doAction("add");
+                if (addRc !== RC_SUCCESS) {
+                    throw new Error(
+                        "Không ghi được hợp đồng " + contractId +
+                        " vào esdHTKTpaymentVendor. Code: " + addRc +
+                        " reason " + relationFile.getMessages()
+                    );
+                }
+
+                // Ghi nhớ đúng bản ghi vừa tạo trong session SM để menu/wizard
+                // kế tiếp select trực tiếp món Dự chi này.
+                if (createdItems.length === 0) {
+                    vars.$G_payment_vendor_id = paymentVendorId;
+                    vars["$G.payment.vendor.id"] = paymentVendorId;
+                    vars.$G_payment_id = paymentId;
+                    vars["$G.payment.id"] = paymentId;
+                    vars.$G_contract_id = contractId;
+                    vars["$G.contract.id"] = contractId;
+                }
+
+                createdItems.push({ id: paymentVendorId, contractId: contractId });
+            } finally {
+                closeExpenseVendorFile(relationFile);
+            }
+        }
+
+        if (createdItems.length > 0) {
+            paymentFile["total.contract"] =
+                Number(paymentFile["total.contract"] || 0) + createdItems.length;
+            var updateRc = paymentFile.doUpdate();
+            if (updateRc !== RC_SUCCESS) {
+                throw new Error(
+                    "Đã thêm hợp đồng nhưng không cập nhật được tổng số hợp đồng trên phiếu. Code: " +
+                    updateRc
+                );
+            }
+        }
+
+        var firstItem = createdItems.length > 0 ? createdItems[0] : null;
+        return {
+            success: true,
+            message: firstItem
+                ? "Thêm hợp đồng vào phiếu Dự chi thành công."
+                : "Không có hợp đồng hợp lệ để thêm vào phiếu Dự chi.",
+            id: firstItem ? firstItem.id : "",
+            paymentVendorId: firstItem ? firstItem.id : "",
+            paymentId: paymentId,
+            contractId: firstItem ? firstItem.contractId : "",
+            createdItems: createdItems,
+            addedCount: createdItems.length
+        };
+    } catch (error) {
+        return {
+            success: false,
+            message: "Lỗi thêm hợp đồng vào phiếu Dự chi: " + error.toString()
+        };
+    } finally {
+        closeExpenseVendorFile(paymentFile);
+    }
+}
+
+/**
+ * Lấy danh sách nhà cung cấp theo paymentId/expenseId nhận từ request.
+ *
+ */
 function getListExpenseVendor(input) {
     var resultList = [];
     var paymentId = getExpenseVendorPaymentId(input);
@@ -10,9 +163,14 @@ function getListExpenseVendor(input) {
 
     var paymentVendorFile = new SCFile("esdHTKTpaymentVendor", SCFILE_READONLY);
     try {
-        var vendorRc = paymentVendorFile.doSelect(
-                'payment.id="' + escapeExpenseVendorQueryValue(paymentId) + '"'
-        );
+        var vendorQuery =
+                "SELECT pv.id, pv.payment.id, pv.contract.id," +
+                " v.vendor.number, v.vendor.name, pv.amount, pv.currency," +
+                " pv.total.invoice, pv.ogl.sync.status, v.ogl.vendor.id" +
+                " FROM esdHTKTpaymentVendor pv" +
+                " LEFT JOIN esdHTKTvendor v ON (pv.vendor.id = v.id)" +
+                ' WHERE pv.payment.id="' + escapeExpenseVendorQueryValue(paymentId) + '"';
+        var vendorRc = paymentVendorFile.doSelect(vendorQuery);
         while (vendorRc == RC_SUCCESS) {
             resultList.push(buildExpenseVendorItem(paymentVendorFile));
             vendorRc = paymentVendorFile.getNext();
@@ -20,67 +178,27 @@ function getListExpenseVendor(input) {
     } finally {
         closeExpenseVendorFile(paymentVendorFile);
     }
+    print("resultList" + JSON.stringify(resultList))
     return resultList;
 }
 
 function buildExpenseVendorItem(paymentVendorFile) {
-    var paymentVendorId = String(paymentVendorFile["id"] || "");
-    var paymentId = String(paymentVendorFile["payment.id"] || "");
-    var contractId = String(paymentVendorFile["contract.id"] || "");
-    var vendorId = String(paymentVendorFile["vendor.id"] || "");
-    var vendorInfo = getExpenseVendorInfo(vendorId);
+    // Kết quả cross-table được đọc theo đúng thứ tự SELECT.
+    var paymentVendorId = String(paymentVendorFile[0] || "");
+    var paymentId = String(paymentVendorFile[1] || "");
+    var contractId = String(paymentVendorFile[2] || "");
     return {
         id: paymentVendorId,
         payment_id: paymentId,
         contract_id: contractId,
-        vendor_number: vendorInfo.vendor_number,
-        vendor_name: vendorInfo.vendor_name,
-        amount: Number(paymentVendorFile["amount"] || 0),
-        currency: String(paymentVendorFile["currency"] || "VND"),
-        count: countExpenseVendorInvoices(
-                paymentId,
-                contractId,
-                vendorId
-        ),
-        ogl_sync_status: paymentVendorFile["ogl.sync.status"],
-        ogl_vendor_id: vendorInfo.ogl_vendor_id
+        vendor_number: String(paymentVendorFile[3] || ""),
+        vendor_name: String(paymentVendorFile[4] || ""),
+        amount: Number(paymentVendorFile[5] || 0),
+        currency: String(paymentVendorFile[6] || "VND"),
+        count: Number(paymentVendorFile[7] || 0),
+        ogl_sync_status: paymentVendorFile[8],
+        ogl_vendor_id: String(paymentVendorFile[9] || "")
     };
-}
-
-function getExpenseVendorInfo(vendorId) {
-    var result = { vendor_number: "", vendor_name: "", ogl_vendor_id: "" };
-    if (!vendorId) return result;
-
-    var vendorFile = new SCFile("esdHTKTvendor", SCFILE_READONLY);
-    try {
-        if (vendorFile.doSelect('id="' + escapeExpenseVendorQueryValue(vendorId) + '"') == RC_SUCCESS) {
-            result.vendor_number = String(vendorFile["vendor.number"] || "");
-            result.vendor_name = String(vendorFile["vendor.name"] || "");
-            result.ogl_vendor_id = String(vendorFile["ogl.vendor.id"] || "");
-        }
-    } finally {
-        closeExpenseVendorFile(vendorFile);
-    }
-    return result;
-}
-
-function countExpenseVendorInvoices(paymentId, contractId, vendorId) {
-    if (!paymentId || !contractId || !vendorId) return 0;
-
-    var countFile = new SCFile("esdHTKTpaymentInvoice", SCFILE_READONLY);
-    try {
-        var query =
-                "SELECT count(*) FROM esdHTKTpaymentInvoice pi" +
-                ' WHERE pi.payment.id = "' + escapeExpenseVendorQueryValue(paymentId) + '"' +
-                ' AND pi.contract.id = "' + escapeExpenseVendorQueryValue(contractId) + '"' +
-                ' AND pi.vendor.id = "' + escapeExpenseVendorQueryValue(vendorId) + '"';
-        if (countFile.doSelect(query) == RC_SUCCESS) {
-            return Number(countFile[0] || 0);
-        }
-    } finally {
-        closeExpenseVendorFile(countFile);
-    }
-    return 0;
 }
 
 function getExpenseVendorPaymentId(input) {
@@ -93,6 +211,42 @@ function getExpenseVendorPaymentId(input) {
     } catch (e) {
         return "";
     }
+}
+
+function getExpenseVendorInputDetails(input) {
+    try {
+        var rawDetails = input ? (input.details || input.queryString) : null;
+        if (!rawDetails) return {};
+        var details = typeof rawDetails === "string" ? JSON.parse(rawDetails) : rawDetails;
+        if (details instanceof Array) details = details[0] || {};
+        return details || {};
+    } catch (e) {
+        return {};
+    }
+}
+
+function normalizeExpenseVendorValue(value) {
+    return String(value == null ? "" : value).replace(/^\s+|\s+$/g, "");
+}
+
+function generateExpensePaymentVendorId() {
+    var numberClass = "esdHTKTpaymentVendor";
+    var numberRc = new SCDatum();
+    numberRc.setValue(-1);
+    var nextNumber = new SCDatum();
+
+    system.functions.rtecall("getnumber", numberRc, nextNumber, numberClass);
+
+    var rcText = String(numberRc.getText()).replace(/^\s+|\s+$/g, "");
+    var paymentVendorId = String(nextNumber.getText()).replace(/^\s+|\s+$/g, "");
+    if (rcText !== "0" || !paymentVendorId) {
+        throw new Error(
+            "Không cấp được ID từ Sequential Numbers " + numberClass +
+            ". rc=" + rcText + ", number=" + paymentVendorId
+        );
+    }
+
+    return paymentVendorId;
 }
 
 function escapeExpenseVendorQueryValue(value) {
