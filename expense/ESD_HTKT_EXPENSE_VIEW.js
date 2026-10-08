@@ -373,9 +373,96 @@ function getTabKetQuaGD() {
     return lib.ESD_HTKT_PAYMENT_ENTRY_RESULT.renderTabAccountingResults();
 }
 
+//Dung cho tab tài liệu đính kèm của NCC
+function renderTabTaiLieuDinhKemNCC(endpoint, input, extraData) {
+    var currentRecord = extraData;
 
+    if (!currentRecord || (Array.isArray(currentRecord) && currentRecord.length === 0) || (typeof currentRecord === 'object' && Object.keys(currentRecord).length === 0)) {
+        if (vars.$L_file) {
+            var paymentId = vars.$L_file["payment.id"];
+            var currentPhase = vars.$L_file["current.phase"];
+            var initialRole = vars.$L_file["initial.role"];
+            var userCheckerKttc = vars.$L_file["user.checker.kttc"];
+            var userCheckerDmms = vars.$L_file["use.checker.dmms"];
+            //
+            var userApproverKttc = vars.$L_file["user.approver.kttc"];
+            var userApproverDmms = vars.$L_file["user.approver.dmms"];
+            var userCheckerFinal = vars.$L_file["user.checker.final"];
+            var userApproverFinal = vars.$L_file["user.approver.final"];
+            var userApproverKttc = vars.$L_file["user.approver.kttc"];
+            var createdBy = vars.$L_file["created.by"];
 
-//Dung cho tab thong tin cong no
+            var status = vars.$L_file["status"];
+
+            if ((!currentPhase || !initialRole) && paymentId) {
+                var prepFile = new SCFile("esdHTKTpayment");
+                var sqlPrep = "id=\"" + paymentId + "\"";
+                var rcPrep = prepFile.doSelect(sqlPrep);
+
+                if (rcPrep == RC_SUCCESS) {
+                    if (!currentPhase && prepFile["current.phase"]) {
+                        currentPhase = prepFile["current.phase"];
+                    }
+                    if (!initialRole && prepFile["initial.role"]) {
+                        initialRole = prepFile["initial.role"];
+                    }
+                    if (!userCheckerKttc && prepFile["user.checker.kttc"]) {
+                        userCheckerKttc = prepFile["user.checker.kttc"];
+                    }
+                    if (!userCheckerDmms && prepFile["use.checker.dmms"]) {
+                        userCheckerDmms = prepFile["use.checker.dmms"];
+                    }
+                    //
+                    if (!userApproverKttc && prepFile["user.approver.kttc"]) {
+                        userApproverKttc = prepFile["user.approver.kttc"];
+                    }
+                    if (!userApproverDmms && prepFile["user.approver.dmms"]) {
+                        userApproverDmms = prepFile["user.approver.dmms"];
+                    }
+                    if (!userCheckerFinal && prepFile["user.checker.final"]) {
+                        userCheckerFinal = prepFile["user.checker.final"];
+                    }
+                    if (!userApproverFinal && prepFile["user.approver.final"]) {
+                        userApproverFinal = prepFile["user.approver.final"];
+                    }
+                    if (!createdBy && prepFile["created.by"]) {
+                        createdBy = prepFile["created.by"];
+                    }
+                    if (!status && prepFile["status"]) {
+                        status = prepFile["status"];
+                    }
+                }
+            }
+
+            // Gán dữ liệu vào currentRecord
+            currentRecord = {
+                "id": vars.$L_file["id"],
+                "payment.id": paymentId,
+                "contract.id": vars.$L_file["contract.id"],
+                "payment.status": vars.$L_file["payment.status"],
+                "vendor.number": vars.$L_file["vendor.number"],
+                "vendor.id": vars.$L_file["vendor.id"],
+                "currentPhase": currentPhase,
+                "initialRole": initialRole,
+                "userCheckerKttc": userCheckerKttc,
+                "userCheckerDmms": userCheckerDmms,
+
+                "userApproverKttc": userApproverKttc,
+                "userApproverDmms": userApproverDmms,
+                "userCheckerFinal": userCheckerFinal,
+                "userApproverFinal": userApproverFinal,
+                "createdBy": createdBy,
+
+                "status": status,
+                "currentUser": vars['$lo.contact.name']
+            };
+        }
+    }
+
+    return lib.ESD_Addon_Nextjs_V1.renderPageNextJS('HachToanKeToan/DuChi/TabThongTinMonDuChi/TabTaiLieuDinhKem', '', currentRecord);
+}
+
+//Dung cho tab thong tin cong no của NCC
 function renderTabLiabilityInfo(endpoint, input, extraData) {
     var currentRecord = extraData;
 
