@@ -14,6 +14,14 @@
 
 var logger = typeof getLog === 'function' ? getLog("ESD_HTKT_EXPENSE_ENTRY") : { info: function(m) {}, error: function(m) {} };
 
+function debugExpenseEntry(point, message) {
+    try {
+        if (typeof print === 'function') {
+            print('[EXPENSE-ENTRY][' + point + '] ' + message);
+        }
+    } catch (ignore) {}
+}
+
 /*
  * ===========================================================================
  *  SƠ ĐỒ LUỒNG XỬ LÝ BÚT TOÁN DỰ CHI
@@ -379,7 +387,9 @@ function getUniqueCostEntriesByAccountNumber(entries) {
         var entry = entries[i];
         if (normalizeEntryType(entry.entry_type) === ENTRY_TYPE.COST) {
             var accountNumber = safeString(entry.account_number).trim();
-            var accountKey = 'vendor|' + safeString(entry.vendor_id).trim() + '|account|' + accountNumber;
+            var accountKey = 'ref|' + safeString(entry.ref_id || entry['ref.id']).trim() +
+                '|vendor|' + safeString(entry.vendor_id).trim() +
+                '|account|' + accountNumber;
             if (accountNumber && usedCostAccounts[accountKey]) {
                 usedCostAccounts[accountKey].amount += toNumber(entry.amount);
                 continue;
@@ -451,8 +461,15 @@ function getTransFromNamePrefix(value) {
 function syncExpenseEntryNowByInputDetails(details) {
     var expenseId = safeString(details.expenseId || details.paymentId || details.id).trim();
     var vendorId = safeString(details.vendorId).trim();
+    var paymentVendorId = safeString(details.paymentVendorId || details.payment_vendor_id).trim();
+
+    debugExpenseEntry(
+        'SYNC-NOW-START',
+        'expenseId=' + expenseId + ', vendorId=' + vendorId + ', paymentVendorId=' + paymentVendorId
+    );
 
     if (!expenseId) {
+        debugExpenseEntry('SYNC-NOW-SKIP', 'Thiếu expenseId.');
         return makeResult([], 'empty', {
             canGenerate: false,
             message: 'Thiếu mã đề nghị dự chi.',
@@ -461,14 +478,24 @@ function syncExpenseEntryNowByInputDetails(details) {
     }
 
     var savedEntries = getSavedExpenseEntries(expenseId);
-    var expectedResult = buildExpectedExpenseEntries(expenseId, vendorId);
+    var expectedResult = buildExpectedExpenseEntries(expenseId, vendorId, paymentVendorId);
     var expectedEntries = expectedResult.rows;
     var canGenerate = expectedResult.canGenerate;
     var generationErrors = expectedResult.errors || [];
     var successfulVendorIds = expectedResult.successfulVendorIds || [];
     var hasPartialSuccess = successfulVendorIds.length > 0;
 
+    debugExpenseEntry(
+        'SYNC-NOW-BUILD',
+        'expenseId=' + expenseId +
+        ', saved=' + savedEntries.length +
+        ', expected=' + expectedEntries.length +
+        ', canGenerate=' + canGenerate +
+        ', errors=' + JSON.stringify(generationErrors)
+    );
+
     if (!canGenerate && !hasPartialSuccess) {
+        debugExpenseEntry('SYNC-NOW-NOT-GENERATED', 'expenseId=' + expenseId);
         return makeResult(savedEntries, savedEntries.length > 0 ? 'saved' : 'empty', makeGenerationErrorMeta(generationErrors));
     }
 
@@ -479,6 +506,7 @@ function syncExpenseEntryNowByInputDetails(details) {
     }
 
     if (isGenerationPhaseLocked(expectedResult.currentPhase)) {
+        debugExpenseEntry('SYNC-NOW-LOCKED', 'expenseId=' + expenseId + ', phase=' + expectedResult.currentPhase);
         return makeResult(savedEntries, savedEntries.length > 0 ? 'saved' : 'empty', {
             locked: true,
             currentPhase: expectedResult.currentPhase
@@ -495,6 +523,8 @@ function syncExpenseEntryNowByInputDetails(details) {
     if (savedEntries.length === 0) {
         assignNewEntryIds(expenseId, expectedEntries, savedEntries);
         var inserted = insertExpenseEntries(expectedEntries);
+
+        debugExpenseEntry('SYNC-NOW-INSERT', 'expenseId=' + expenseId + ', inserted=' + inserted + '/' + expectedEntries.length);
 
         return makeResult(getSavedExpenseEntries(expenseId), 'generated', {
             canGenerate: canGenerate,
@@ -519,6 +549,11 @@ function syncExpenseEntryNowByInputDetails(details) {
     var inserted = insertExpenseEntries(mergedExpectedEntries);
     var syncResult = { inserted: inserted, updated: 0, deleted: deleted };
 
+    debugExpenseEntry(
+        'SYNC-NOW-REPLACE',
+        'expenseId=' + expenseId + ', deleted=' + deleted + ', inserted=' + inserted + '/' + mergedExpectedEntries.length
+    );
+
     return makeResult(getSavedExpenseEntries(expenseId), 'synced', {
         canGenerate: canGenerate,
         partial: !canGenerate,
@@ -538,7 +573,7 @@ function getPreservedAutoEntriesForOtherVendors(savedEntries, successfulVendorId
     for (var j = 0; j < savedEntries.length; j++) {
         var saved = savedEntries[j];
         if (!isAutoEntry(saved)) continue;
-        if (successfulMap[safeString(saved.vendor_id).trim()]) continue;
+        if (successfulMap[safeString(saved.ref_id || saved['ref.id']).trim()]) continue;
         result.push(copyObject({}, saved));
     }
 
@@ -552,15 +587,32 @@ function getPreservedAutoEntriesForOtherVendors(savedEntries, successfulVendorId
 function syncExpenseEntryBySourceChange(sourceTable, sourceRecord) {
     var source = sourceRecord || {};
     var expenseIds = resolveExpenseIdsFromSourceChange(sourceTable, source);
+    var isPaymentVendorSource = normalizeSourceTableName(sourceTable) ===
+        normalizeSourceTableName(TABLE_PAYMENT_VENDOR);
+    var sourcePaymentVendorId = isPaymentVendorSource ? safeString(source['id']).trim() : '';
     var results = [];
     var errors = [];
+
+    debugExpenseEntry(
+        'SOURCE-SYNC-START',
+        'sourceTable=' + safeString(sourceTable) +
+        ', sourceId=' + safeString(source['id']) +
+        ', paymentId=' + safeString(source['payment.id']) +
+        ', expenseIds=' + JSON.stringify(expenseIds)
+    );
 
     for (var i = 0; i < expenseIds.length; i++) {
         var syncResult = syncExpenseEntryNowByInputDetails({
             expenseId: expenseIds[i],
-            vendorId: ''
+            vendorId: '',
+            paymentVendorId: sourcePaymentVendorId
         });
         results.push(syncResult);
+
+        debugExpenseEntry(
+            'SOURCE-SYNC-RESULT',
+            'expenseId=' + expenseIds[i] + ', result=' + JSON.stringify(syncResult)
+        );
 
         if (syncResult.canGenerate === false) {
             var syncErrors = syncResult.errors || [];
@@ -854,7 +906,7 @@ function getEntryTypeByRuleCode(entryCode) {
  * - Ghi Có TK Phải trả NCC (TT-BK-03*)
  * Bút toán thuế GTGT (TT-BK-02) chỉ phát sinh khi hóa đơn NCC có thuế khấu trừ (DC_BR_01).
  */
-function buildExpectedExpenseEntries(expenseId, vendorId) {
+function buildExpectedExpenseEntries(expenseId, vendorId, paymentVendorId) {
     var request = getExpenseRequest(expenseId);
     var creatorUnit = getCreatorAccountingUnit(request.created_by);
     request.creator_unit_code = creatorUnit.code;
@@ -862,7 +914,7 @@ function buildExpectedExpenseEntries(expenseId, vendorId) {
         getTransactionOfficeOptions(creatorUnit.lv1Id)
     );
 
-    var vendors = getExpenseVendors(expenseId, vendorId);
+    var vendors = getExpenseVendors(expenseId, vendorId, paymentVendorId);
     var rows = [];
     var errors = [];
     var successfulVendorIds = [];
@@ -915,7 +967,7 @@ function buildExpectedExpenseEntries(expenseId, vendorId) {
         }
 
         rows = rows.concat(vendorRows);
-        successfulVendorIds.push(vendor.vendor_id);
+        successfulVendorIds.push(vendor.payment_vendor_id);
     }
 
     return {
@@ -1039,6 +1091,7 @@ function buildExpenseEntryRow(params) {
         currency: params.vendor.currency,
         description: safeString(params.vendor.transaction_description).trim(),
         vendor_id: params.vendor.vendor_id,
+        ref_id: params.vendor.payment_vendor_id,
         type: TYPE.AP,
         order: params.order,
         accounting_request_id: '',
@@ -1387,13 +1440,17 @@ function getExpenseRequest(expenseId) {
     );
 }
 
-function getExpenseVendors(expenseId, vendorId) {
+function getExpenseVendors(expenseId, vendorId, paymentVendorId) {
     var list = [];
     var f = new SCFile(TABLE_PAYMENT_VENDOR, SCFILE_READONLY);
     var query = 'payment.id="' + escapeQueryValue(expenseId) + '"';
     var rc;
 
-    if (vendorId) query += ' and vendor.id="' + escapeQueryValue(vendorId) + '"';
+    if (paymentVendorId) {
+        query += ' and id="' + escapeQueryValue(paymentVendorId) + '"';
+    } else if (vendorId) {
+        query += ' and vendor.id="' + escapeQueryValue(vendorId) + '"';
+    }
 
     try {
         rc = f.doSelect(query);
@@ -1404,6 +1461,7 @@ function getExpenseVendors(expenseId, vendorId) {
 
     while (rc === RC_SUCCESS) {
         list.push({
+            payment_vendor_id: readText(f, 'id'),
             vendor_id: readText(f, 'vendor.id'),
             vendor_site_id: readText(f, 'vendor.site.id'),
             contract_id: readText(f, 'contract.id'),
@@ -1523,7 +1581,7 @@ function getSavedExpenseEntries(expenseId) {
         TABLE_PAYMENT_ENTRY +
         ' e LEFT JOIN ' +
         TABLE_PAYMENT_VENDOR +
-        ' pv ON (e.payment.id = pv.payment.id AND e.vendor.id = pv.vendor.id)' +
+        ' pv ON (e.ref.id = pv.id AND e.payment.id = pv.payment.id)' +
         ' LEFT JOIN ' +
         TABLE_VENDOR +
         ' v ON (e.vendor.id = v.id)' +
@@ -1618,7 +1676,8 @@ function makeAutoEntryMatchKey(row) {
     var entryType = normalizeEntryType(row.entry_type);
     if (!entryType) return '';
 
-    var key = safeString(row.vendor_id).trim() + '|' + entryType;
+    var key = safeString(row.ref_id || row['ref.id']).trim() + '|' +
+        safeString(row.vendor_id).trim() + '|' + entryType;
     if (entryType === ENTRY_TYPE.COST || entryType === ENTRY_TYPE.TAX) {
         key += '|' + safeString(row.account_number).trim();
     }
@@ -1646,8 +1705,31 @@ function insertExpenseEntries(rows) {
 
     for (var i = 0; i < rows.length; i++) {
         var rowId = safeString(rows[i].id).trim();
+
+        if (!rowId) {
+            debugExpenseEntry('DB-INSERT-SKIP', 'Dòng ' + (i + 1) + ' không có id.');
+            continue;
+        }
+
+        if (seenIds[rowId]) {
+            debugExpenseEntry(
+                'DB-INSERT-SKIP',
+                'Trùng id trong cùng bộ dữ liệu: id=' + rowId + ', dòng=' + (i + 1)
+            );
+            continue;
+        }
+
         seenIds[rowId] = true;
+        debugExpenseEntry(
+            'DB-INSERT-BEFORE',
+            'id=' + rowId +
+            ', paymentId=' + safeString(rows[i].payment_id) +
+            ', contractId=' + safeString(rows[i].contract_id) +
+            ', vendorId=' + safeString(rows[i].vendor_id)
+        );
+
         var rc = insertRecord(TABLE_PAYMENT_ENTRY, toPaymentEntryRecord(rows[i]));
+        debugExpenseEntry('DB-INSERT-AFTER', 'id=' + rowId + ', rc=' + rc);
         if (rc === RC_SUCCESS) inserted++;
     }
 
@@ -1680,12 +1762,28 @@ function toPaymentEntryRecord(row) {
 
 function insertRecord(tableName, row) {
     var f = new SCFile(tableName);
-    for (var key in row) {
-        if (row.hasOwnProperty(key)) f[key] = row[key];
+    try {
+        for (var key in row) {
+            if (row.hasOwnProperty(key)) f[key] = row[key];
+        }
+        return f.doInsert();
+    } catch (error) {
+        var messages = '';
+        try {
+            messages = f.getMessages();
+        } catch (ignore) {}
+        debugExpenseEntry(
+            'DB-INSERT-ERROR',
+            'table=' + tableName +
+            ', id=' + safeString(row.id) +
+            ', paymentId=' + safeString(row['payment.id']) +
+            ', error=' + error.toString() +
+            ', messages=' + safeString(messages)
+        );
+        return typeof RC_ERROR !== 'undefined' ? RC_ERROR : -1;
+    } finally {
+        closeFile(f);
     }
-    var rc = f.doInsert();
-    closeFile(f);
-    return rc;
 }
 
 function deleteAutoExpenseEntries(expenseId) {
@@ -1900,6 +1998,12 @@ function getTransactionOfficeByLv2(lv2Id) {
     } catch (e) {
         return { code: '', name: '' };
     }
+}
+
+function compareTransactionOfficeOption(left, right) {
+    var a = safeString(left.segment1EntityCode || left.psCode) + '|' + safeString(left.value);
+    var b = safeString(right.segment1EntityCode || right.psCode) + '|' + safeString(right.value);
+    return a === b ? 0 : a < b ? -1 : 1;
 }
 
 function getDefaultTransactionOfficeCode(options) {
@@ -2423,24 +2527,49 @@ function getNextManualEntryIdSequence(expenseId, rows) {
  * Chỉ chạy khi record ở Phase 'initial_kttc'
  */
 function handleUpdatePaymentVendorAndAccountingSync(rec, oldRec) {
+    debugExpenseEntry('TRIGGER-START', 'record=' + (rec ? 'available' : 'null'));
+
     if (!rec) {
+        debugExpenseEntry('TRIGGER-SKIP', 'Record không tồn tại.');
         return;
     }
 
-    var paymentId = rec["payment.id"] || rec["id"];
+    var paymentId = safeString(rec["payment.id"] || rec["id"]).trim();
+    debugExpenseEntry(
+        'TRIGGER-RECORD',
+        'recordId=' + safeString(rec["id"]) + ', paymentId=' + paymentId
+    );
+
     if (!paymentId) {
+        debugExpenseEntry('TRIGGER-SKIP', 'Không lấy được payment.id từ record.');
         return;
     }
 
     var payment = getExpenseRequest(paymentId);
-    if (!payment || payment.current_phase !== "initial_kttc") {
+    debugExpenseEntry(
+        'TRIGGER-PAYMENT',
+        'paymentId=' + paymentId +
+        ', found=' + (!!payment) +
+        ', phase=' + safeString(payment && payment.current_phase)
+    );
+
+    if (!payment || !payment.id) {
+        debugExpenseEntry('TRIGGER-SKIP', 'Không tìm thấy phiếu ' + paymentId + '.');
+        return;
+    }
+
+    if (payment.current_phase !== "initial_kttc") {
+        debugExpenseEntry('TRIGGER-SKIP', 'Phase không hợp lệ: ' + safeString(payment.current_phase));
         return;
     }
 
     try {
-        syncExpenseEntryBySourceChange(
+        var syncResult = syncExpenseEntryBySourceChange(
                 "esdHTKTpaymentVendor",
                 rec
         );
-    } catch (ex) {}
+        debugExpenseEntry('TRIGGER-DONE', 'paymentId=' + paymentId + ', result=' + JSON.stringify(syncResult));
+    } catch (ex) {
+        debugExpenseEntry('TRIGGER-ERROR', 'paymentId=' + paymentId + ', error=' + ex.toString());
+    }
 }
