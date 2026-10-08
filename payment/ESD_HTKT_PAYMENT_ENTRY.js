@@ -1093,11 +1093,6 @@ function savePaymentEntryEdit(details) {
             defaultTransactionOfficeCode,
             transactionOfficeOptions
     );
-//    var transactionOfficeValidation = validateTransactionOfficeRows(
-//            normalized.entries,
-//            transactionOfficeOptions
-//    );
-//    if (!transactionOfficeValidation.success) return transactionOfficeValidation;
 
 
 //    // === BỔ SUNG: Kiểm tra khớp chi tiết tài khoản COST với bảng esdHTKTpaymentCostDivision ===
@@ -2705,9 +2700,6 @@ function getVendorAutoEntryErrors(vendor) {
     if (!vendor.currency) {
         errors.push(subject + ' chưa chọn Loại tiền. Vui lòng kiểm tra lại.');
     }
-    if (toNumber(vendor.amount) > 0 && !vendor.payment_method) {
-        errors.push(subject + ' chưa chọn Phương thức thanh toán (Chuyển khoản/Tiền mặt). Vui lòng kiểm tra lại.');
-    }
 
 // Chỉ bắt buộc thông tin thụ hưởng khi case thực sự có đi tiền.
     if (toNumber(vendor.amount) > 0) {
@@ -2829,14 +2821,6 @@ function getTaxDeductionAccount(deductionType) {
     var accountItem = null;
 
     if (itemId) {
-        deductionItem = selectOne(
-                TABLE_CATEGORY_ITEM,
-                'category.id="' + escapeQueryValue(CATEGORY_TAX_DEDUCTION_TYPE) + '" and item.id="' + escapeQueryValue(itemId) + '"',
-                function (record) {
-                    return { itemName: readText(record, 'item.name') };
-                }
-        );
-
         accountItem = selectOne(
                 TABLE_CATEGORY_ITEM,
                 'category.id="' + escapeQueryValue(CATEGORY_TAX_ACCOUNT_NUMBER) + '" and item.id="' + escapeQueryValue(itemId) + '"',
@@ -2846,9 +2830,23 @@ function getTaxDeductionAccount(deductionType) {
         );
     }
 
+    var accountNumber = accountItem ? safeString(accountItem.itemName).trim() : '';
+    var accountName = accountNumber ? getGlAccountName(accountNumber) : '';
+
+    if (!accountName && itemId) {
+        deductionItem = selectOne(
+                TABLE_CATEGORY_ITEM,
+                'category.id="' + escapeQueryValue(CATEGORY_TAX_DEDUCTION_TYPE) + '" and item.id="' + escapeQueryValue(itemId) + '"',
+                function (record) {
+                    return { itemName: readText(record, 'item.name') };
+                }
+        );
+        accountName = deductionItem ? safeString(deductionItem.itemName).trim() : '';
+    }
+
     return {
-        number: accountItem ? safeString(accountItem.itemName).trim() : '',
-        name: deductionItem ? safeString(deductionItem.itemName).trim() : ''
+        number: accountNumber,
+        name: accountName
     };
 }
 
