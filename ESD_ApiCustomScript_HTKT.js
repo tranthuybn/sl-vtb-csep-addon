@@ -237,6 +237,24 @@ function run() {
                     data: lib.ESD_HTKT_EXPENSE_VENDOR.createListInvoinVendor(input)
                 };
                 break;
+            case "addExpenseFileAttachment":
+                result = lib.ESD_HTKT_EXPENSE_FILE_ATTACHMENT.addFileAttachment(input);
+                break;
+            case "getExpenseFileAttachments":
+                result = lib.ESD_HTKT_EXPENSE_FILE_ATTACHMENT.getFileAttachments(input);
+                break;
+            case "listAvailableExpenseFileAttachments":
+                lib.ESD_HTKT_PAYMENT_CREATE_REQUEST.listFileAttachment(input);
+                break;
+            case "viewExpenseFileAttachment":
+                result = lib.ESD_HTKT_EXPENSE_FILE_ATTACHMENT.viewFileAttachment(input);
+                break;
+            case "downloadExpenseFileAttachment":
+                result = lib.ESD_HTKT_EXPENSE_FILE_ATTACHMENT.downloadFileAttachment(input);
+                break;
+            case "deleteExpenseFileAttachment":
+                result = lib.ESD_HTKT_EXPENSE_FILE_ATTACHMENT.deleteFileAttachment(input);
+                break;
 
             default:
                 result = {
