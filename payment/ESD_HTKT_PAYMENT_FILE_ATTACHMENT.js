@@ -1,3 +1,15 @@
+/**
+ * ScriptLibrary : ESD_HTKT_PAYMENT_FILE_ATTACHMENT
+ * -----------------------------------------------------------------------------
+ * Module       : HTKT - Đề nghị thanh toán
+ * Version      : 1.0.0
+ * Chức năng:
+ * - Quản lý danh sách các tệp đính kèm (esdHTKTpaymentAttachment) thuộc đề nghị thanh toán.
+ * - Thực hiện thêm mới, cập nhật, xóa và liên kết tài liệu với từng hạng mục/nhà cung cấp.
+ * - Kiểm tra tính hợp lệ và đồng bộ thông tin file đính kèm giữa NextJS và Service Manager.
+ * -----------------------------------------------------------------------------
+ */
+
 var createActivity = lib.ESD_Utils.createActivity;
 
 function run() {
@@ -17,16 +29,16 @@ function run() {
         switch (name) {
             case 'addFileAttachment':
                 result = addFileAttachment(input);
-                break; 
-                
+                break;
+
             case 'viewFileAttachment':
                 result = viewFileAttachment(input);
                 break;
-                
+
             case 'downloadFileAttachment':
                 result = downloadFileAttachment(input);
                 break;
-                
+
             case 'deleteFileAttachment':
                 result = deleteFileAttachment(input);
                 break;
@@ -62,11 +74,11 @@ function addFileAttachment(fileInput) {
 
         for (var i = 0; i < dataObj.length; i++) {
             var feeData = dataObj[i];
-            
+
             var feeId = nextId1("esdHTKTpaymentAttachment");
             var itemRec = new SCFile("esdHTKTpaymentAttachment");
 
-            
+
             mapPaymentAttachment(itemRec, feeData, feeId);
 
             var rc = itemRec.doInsert();
@@ -76,25 +88,25 @@ function addFileAttachment(fileInput) {
                 var fileName = feeData['name'] || "File không tên";
                 successFileNames.push(fileName);
             } else {
-                console.error("Không thể chèn file đính kèm: " + feeData['name'] + ". Mã lỗi hệ thống: " + rc);
+                // console.error("Không thể chèn file đính kèm: " + feeData['name'] + ". Mã lỗi hệ thống: " + rc);
             }
         }
 
 
         if (successFileNames.length === dataObj.length) {
-            return { 
-                success: true, 
-                message: "Đã thêm thành công tất cả các file: " + successFileNames.join(", ") 
+            return {
+                success: true,
+                message: "Đã thêm thành công tất cả các file: " + successFileNames.join(", ")
             };
         } else if (successFileNames.length > 0) {
-            return { 
-                success: true, 
-                message: "Thêm thành công các file: " + successFileNames.join(", ") + " (Thất bại " + (dataObj.length - successFileNames.length) + " file)" 
+            return {
+                success: true,
+                message: "Thêm thành công các file: " + successFileNames.join(", ") + " (Thất bại " + (dataObj.length - successFileNames.length) + " file)"
             };
         } else {
-            return { 
-                success: false, 
-                message: "Lưu file đính kèm thất bại. Không có file nào được thêm vào hệ thống." 
+            return {
+                success: false,
+                message: "Lưu file đính kèm thất bại. Không có file nào được thêm vào hệ thống."
             };
         }
 
@@ -109,9 +121,9 @@ function mapPaymentAttachment(itemRec, feeData, feeId) {
 
     itemRec['ecm.doc.id'] = feeData['doc.id'];
     itemRec['ecm.object.id'] = feeData['attach.id'];
-    
-    itemRec['name'] = feeData['name']; 
-    
+
+    itemRec['name'] = feeData['name'];
+
     itemRec['uploaded.by'] = feeData['executor'] ;
 
     if (feeData['size'] !== undefined && feeData['size'] !== null) {
@@ -123,6 +135,7 @@ function mapPaymentAttachment(itemRec, feeData, feeId) {
     }
     itemRec['doc.code'] = feeData['document.type'] || "DINH_KEM";
     itemRec['uploaded.at'] = new Date();
+    itemRec['type'] = "TL_S2";
 }
 
 function viewFileAttachment(fileInput) {
@@ -134,7 +147,7 @@ function viewFileAttachment(fileInput) {
     try {
         var dataObj = JSON.parse(rawQueryString);
         var ids = dataObj.objectIds || dataObj.objectId;
-        
+
         if (!ids || (Array.isArray(ids) && ids.length === 0)) {
             return { success: false, message: "Thiếu 'objectIds' hoặc 'objectId' trong cấu trúc JSON" };
         }
@@ -153,7 +166,7 @@ function downloadFileAttachment(fileInput) {
 
     try {
         var dataObj = JSON.parse(rawQueryString);
-        
+
         var ids = dataObj.objectIds || dataObj.objectId;
 
         if (!ids || (Array.isArray(ids) && ids.length === 0)) {
