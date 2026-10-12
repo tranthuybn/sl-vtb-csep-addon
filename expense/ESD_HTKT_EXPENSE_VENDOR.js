@@ -30,6 +30,10 @@ function run() {
             case "createPaymentVendor":
                 result = createPaymentVendor(input);
                 break;
+            // Gắn danh sách hóa đơn vào món Dự chi theo nhà cung cấp.
+            case "createListInvoinVendor":
+                result = createListInvoinVendor(input);
+                break;
             // Xóa món Dự chi theo ID esdHTKTpaymentVendor.
             case "deleteExpenseVendor":
                 result = deleteExpenseVendor(input);
@@ -49,6 +53,172 @@ function run() {
                 error: "Gateway Error: " + e.toString()
             });
         }
+    }
+}
+
+/**
+ * Gắn hóa đơn vào món Dự chi.
+ *
+ * Luồng Dự chi chỉ cập nhật amount của esdHTKTpaymentVendor, không cập nhật
+ * trường tổng tiền hóa đơn đã duyệt của luồng Thanh toán.
+ */
+function createListInvoinVendor(input) {
+    var params = getExpenseVendorInputDetails(input);
+    var rows = params.updatedSelectedRows instanceof Array
+        ? params.updatedSelectedRows
+        : (params instanceof Array ? params : []);
+
+    if (rows.length === 0) {
+        return {
+            success: false,
+            message: "Danh sách hóa đơn trống",
+            checkStatus: []
+        };
+    }
+
+    var paymentId = normalizeExpenseVendorValue(
+        rows[0].transactionId || rows[0].paymentId || params.paymentId
+    );
+    var paymentVendorId = normalizeExpenseVendorValue(
+        rows[0].paymentVendorId || rows[0]["payment.vendor.id"] || params.paymentVendorId || params.id
+    );
+    var vendorId = normalizeExpenseVendorValue(rows[0].vendorId || params.vendorId);
+
+    if (!paymentId || !paymentVendorId) {
+        return {
+            success: false,
+            message: "Thiếu thông tin mã phiếu Dự chi hoặc mã món Dự chi.",
+            checkStatus: []
+        };
+    }
+
+    var vendorFile = new SCFile("esdHTKTpaymentVendor");
+    try {
+        var vendorQuery = 'id="' + escapeExpenseVendorQueryValue(paymentVendorId) + '"';
+        if (vendorFile.doSelect(vendorQuery) !== RC_SUCCESS) {
+            return {
+                success: false,
+                message: "Không tìm thấy món Dự chi của nhà cung cấp trong hệ thống.",
+                checkStatus: []
+            };
+        }
+
+        var successInvoiceIds = [];
+        var checkStatusList = [];
+
+        for (var i = 0; i < rows.length; i++) {
+            var invoice = rows[i] || {};
+            var invoiceId = normalizeExpenseVendorValue(invoice.id || invoice.invoiceId);
+            if (!invoiceId) continue;
+
+            var relationFile = new SCFile("esdHTKTpaymentInvoice");
+            try {
+                relationFile["payment.id"] = paymentId;
+                relationFile["invoice.id"] = invoiceId;
+                relationFile["vendor.id"] = normalizeExpenseVendorValue(invoice.vendorId) || vendorId;
+                relationFile["contract.id"] = normalizeExpenseVendorValue(invoice.contractId);
+                relationFile["ref.id"] = paymentVendorId;
+
+                var totalTax = Number(invoice.totalTax || 0);
+                relationFile["deduction.type"] = totalTax > 0 ? "KHAUTRU_001" : "KHAUTRU_003";
+
+                var insertRc = relationFile.doInsert();
+                if (insertRc !== true && insertRc !== RC_SUCCESS) continue;
+
+                successInvoiceIds.push(invoiceId);
+
+                var checkStatus = "DangKiemTra";
+                var warningMsg = "";
+                var invoiceFile = new SCFile("esdHTKTinvoice");
+                try {
+                    if (invoiceFile.doSelect('id="' + escapeExpenseVendorQueryValue(invoiceId) + '"') === RC_SUCCESS) {
+                        invoiceFile["request.id"] = paymentId;
+                        invoiceFile.doUpdate();
+
+                        try {
+                            var apiResponse = lib.ESD_HTKT_SCHEDULE_OGL.callCheckInvoiceAPI(invoiceFile);
+                            if (apiResponse !== null && apiResponse.success === true) {
+                                invoiceFile["last.check.date"] = new Date();
+                                invoiceFile.doUpdate();
+                            }
+                        } catch (apiError) {}
+
+                        checkStatus = String(invoiceFile["check.status.detail"] || checkStatus);
+                    }
+                } finally {
+                    closeExpenseVendorFile(invoiceFile);
+                }
+
+                checkStatusList.push({
+                    invoiceId: invoiceId,
+                    invoiceNumber: invoice.invoiceNumber || "",
+                    status: checkStatus,
+                    warningMsg: warningMsg
+                });
+            } finally {
+                closeExpenseVendorFile(relationFile);
+            }
+        }
+
+        if (successInvoiceIds.length > 0) {
+            var totalInvoiceAmount = "0";
+            var invoiceSumFile = new SCFile("esdHTKTinvoice", SCFILE_READONLY);
+            try {
+                var sumSql = 'SELECT i.grand.total FROM esdHTKTinvoice i ' +
+                    'JOIN esdHTKTpaymentInvoice pi ON (pi.invoice.id = i.id) ' +
+                    'WHERE pi.ref.id="' + escapeExpenseVendorQueryValue(paymentVendorId) + '"';
+                var sumRc = invoiceSumFile.doSelect(sumSql);
+                while (sumRc === RC_SUCCESS) {
+                    totalInvoiceAmount = lib.ESD_HTKT_Utils.addStringsManual(
+                        totalInvoiceAmount,
+                        String(invoiceSumFile["grand.total"] || "0")
+                    );
+                    sumRc = invoiceSumFile.getNext();
+                }
+            } finally {
+                closeExpenseVendorFile(invoiceSumFile);
+            }
+
+            // Dự chi chỉ lưu tổng hóa đơn vào amount.
+            vendorFile["amount"] = totalInvoiceAmount;
+            var updateRc = vendorFile.doUpdate();
+            if (updateRc !== RC_SUCCESS) {
+                return {
+                    success: false,
+                    message: "Đã gắn hóa đơn nhưng không cập nhật được số tiền món Dự chi.",
+                    checkStatus: checkStatusList
+                };
+            }
+        }
+
+        if (successInvoiceIds.length === rows.length) {
+            return {
+                success: true,
+                message: "Đã liên kết thành công tất cả các hóa đơn: " + successInvoiceIds.join(", "),
+                checkStatus: checkStatusList
+            };
+        }
+        if (successInvoiceIds.length > 0) {
+            return {
+                success: true,
+                message: "Liên kết thành công các hóa đơn: " + successInvoiceIds.join(", ") +
+                    " (Thất bại " + (rows.length - successInvoiceIds.length) + " hóa đơn)",
+                checkStatus: checkStatusList
+            };
+        }
+        return {
+            success: false,
+            message: "Lưu thông tin hóa đơn liên kết thất bại.",
+            checkStatus: []
+        };
+    } catch (error) {
+        return {
+            success: false,
+            message: "Lỗi khi gắn hóa đơn vào Dự chi: " + error.toString(),
+            checkStatus: []
+        };
+    } finally {
+        closeExpenseVendorFile(vendorFile);
     }
 }
 

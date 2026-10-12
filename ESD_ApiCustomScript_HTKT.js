@@ -224,12 +224,18 @@ function run() {
                 break;
             case "getListExpenseEntry":
                 result = lib.ESD_HTKT_EXPENSE_ENTRY.getListExpenseEntry(details);
-                break;
+                break;    
             case "saveExpenseEntryEdit":
                 result = lib.ESD_HTKT_EXPENSE_ENTRY.saveExpenseEntryEdit(details);
                 break;
             case "deleteExpenseVendor":
                 result = lib.ESD_HTKT_EXPENSE_VENDOR.deleteExpenseVendor(input);
+                break;
+            case "createListInvoinExpenseVendor":
+                result = {
+                    success: true,
+                    data: lib.ESD_HTKT_EXPENSE_VENDOR.createListInvoinVendor(input)
+                };
                 break;
 
             default:
