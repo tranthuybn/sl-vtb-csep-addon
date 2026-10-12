@@ -243,9 +243,6 @@ function run() {
             case "getExpenseFileAttachments":
                 result = lib.ESD_HTKT_EXPENSE_FILE_ATTACHMENT.getFileAttachments(input);
                 break;
-            case "listAvailableExpenseFileAttachments":
-                lib.ESD_HTKT_PAYMENT_CREATE_REQUEST.listFileAttachment(input);
-                break;
             case "viewExpenseFileAttachment":
                 result = lib.ESD_HTKT_EXPENSE_FILE_ATTACHMENT.viewFileAttachment(input);
                 break;
