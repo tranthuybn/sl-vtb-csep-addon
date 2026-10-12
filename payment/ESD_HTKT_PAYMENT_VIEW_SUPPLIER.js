@@ -118,32 +118,37 @@ function renderTabLiabilityInfo(endpoint, input, extraData) {
         }
     }
 
-    // 2. Thêm query lấy contract.id dựa vào payment.id nếu contract.id chưa có giá trị
+    // 2. Bổ sung dữ liệu phân quyền nếu payload của riêng tab Công nợ chưa có đủ.
+    // Không dùng contract.id làm điều kiện vì hợp đồng có thể đã có nhưng quyền vẫn thiếu.
+    var localFile = vars.$L_file || {};
+    var paymentId = currentRecord["payment.id"] || currentRecord["paymentId"] || localFile["payment.id"];
+    var missingPermission = !currentRecord["currentPhase"] ||
+        !currentRecord["initialRole"] ||
+        !currentRecord["currentUser"] ||
+        !currentRecord["createdBy"] ||
+        !currentRecord["status"];
 
-    var paymentId = currentRecord["payment.id"] || vars.$L_file["payment.id"];
-    if (paymentId && !currentRecord["contract.id"]) {
-        var paymentRec = new SCFile("esdHTKTpayment");
+    if (paymentId && missingPermission) {
+        var paymentRec = new SCFile("esdHTKTpayment", SCFILE_READONLY);
         var sql = "id=\"" + paymentId + "\"";
 
         if (paymentRec.doSelect(sql) === RC_SUCCESS) {
-            currentRecord = {
-                "id": vars.$L_file["id"],
-                "paymentId": paymentId,
-                "contractId": paymentRec["contract.id"],
-                "vendorId": vars.$L_file["vendor.id"],
-                "currentPhase": paymentRec["current.phase"],
-                "initialRole": paymentRec["initial.role"],
-                "createdBy": paymentRec["created.by"],
-                "userCheckerDmms": paymentRec["user.checker.dmms"],
-                "userCheckerKttc": paymentRec["user.checker.kttc"],
-                "userApproverKttc": paymentRec["user.approver.kttc"],
-                "userApproverDmms": paymentRec["user.approver.dmms"],
-                "userCheckerFinal": paymentRec["user.checker.final"],
-                "userApproverFinal": paymentRec["user.approver.final"],
-                "currentUser": vars['$lo.contact.name'],
-                "status": paymentRec["status"]
-            };
+            currentRecord["paymentId"] = paymentId;
+            currentRecord["contractId"] = currentRecord["contract.id"] || paymentRec["contract.id"];
+            currentRecord["vendorId"] = currentRecord["vendor.id"] || localFile["vendor.id"];
+            currentRecord["currentPhase"] = paymentRec["current.phase"];
+            currentRecord["initialRole"] = paymentRec["initial.role"];
+            currentRecord["createdBy"] = paymentRec["created.by"];
+            currentRecord["userCheckerDmms"] = paymentRec["user.checker.dmms"];
+            currentRecord["userCheckerKttc"] = paymentRec["user.checker.kttc"];
+            currentRecord["userApproverKttc"] = paymentRec["user.approver.kttc"];
+            currentRecord["userApproverDmms"] = paymentRec["user.approver.dmms"];
+            currentRecord["userCheckerFinal"] = paymentRec["user.checker.final"];
+            currentRecord["userApproverFinal"] = paymentRec["user.approver.final"];
+            currentRecord["currentUser"] = vars['$lo.contact.name'];
+            currentRecord["status"] = paymentRec["status"];
         }
+        paymentRec.doClose();
     }
     return lib.ESD_Addon_Nextjs_V1.renderPageNextJS("HachToanKeToan/ThanhToan/TabThongTinDeNghi/TabThongTinCongNo", '', currentRecord);
 }
