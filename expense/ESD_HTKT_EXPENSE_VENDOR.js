@@ -232,6 +232,7 @@ function deleteExpenseVendor(input) {
     }
 
     var relationFile = new SCFile("esdHTKTpaymentVendor");
+    var paymentFile = null;
     try {
         var query = 'id="' + escapeExpenseVendorQueryValue(paymentVendorId) +
             '" and payment.id="' + escapeExpenseVendorQueryValue(paymentId) + '"';
@@ -243,9 +244,24 @@ function deleteExpenseVendor(input) {
         if (deleteRc !== RC_SUCCESS) {
             return { success: false, status: "error", message: "Xóa món Dự chi thất bại. Code: " + deleteRc };
         }
+        
+        paymentFile = new SCFile("esdHTKTpayment");
+        if (paymentFile.doSelect('id="' + escapeExpenseVendorQueryValue(paymentId) + '"') !== RC_SUCCESS) {
+            throw new Error("Không tìm thấy phiếu Dự chi " + paymentId + ".");
+        }
+        paymentFile["total.transaction"] = Math.max(
+            0, Number(paymentFile["total.transaction"] || 0) - 1
+        );
+        var updateRc = paymentFile.doUpdate();
+        if (updateRc !== RC_SUCCESS) {
+            throw new Error("Đã xóa món nhưng không cập nhật được tổng số món Dự chi. Code: " + updateRc);
+        }
 
         return { success: true, status: "success", message: "Xóa món Dự chi thành công." };
+    } catch (error) {
+        return { success: false, status: "error", message: "Lỗi xóa món Dự chi: " + error.toString() };
     } finally {
+        closeExpenseVendorFile(paymentFile);
         closeExpenseVendorFile(relationFile);
     }
 }
@@ -317,8 +333,10 @@ function createPaymentVendor(input) {
                 throw new Error("Không tìm thấy phiếu Dự chi " + paymentId + ".");
             }
 
-            paymentFile["total.contract"] =
-                Number(paymentFile["total.contract"] || 0) + createdItems.length;
+            // paymentFile["total.contract"] =
+            //     Number(paymentFile["total.contract"] || 0) + createdItems.length;
+            paymentFile["total.transaction"] =
+                Number(paymentFile["total.transaction"] || 0) + createdItems.length;
             var updateRc = paymentFile.doUpdate();
             if (updateRc !== RC_SUCCESS) {
                 throw new Error(
