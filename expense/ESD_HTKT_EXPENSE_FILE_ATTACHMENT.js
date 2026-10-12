@@ -167,12 +167,34 @@ function deleteFileAttachment(fileInput) {
             return { success: false, message: "Không tìm thấy tài liệu thuộc món Dự chi." };
         }
         var ecmDocId = String(attachmentFile["ecm.doc.id"] || "").trim();
+        if (!ecmDocId) {
+            return { success: false, message: "Tài liệu Dự chi chưa có ecm.doc.id để xóa trên ECM." };
+        }
+
+        var ecmResult;
+        try {
+            ecmResult = lib.ESD_HTKT_INVOICE_ECM.deleteDocId(ecmDocId);
+        } catch (ecmError) {
+            return {
+                success: false,
+                message: "Xóa tài liệu trên ECM thất bại: " + ecmError.toString()
+            };
+        }
+
+        if (ecmResult && ecmResult.success === false) {
+            return {
+                success: false,
+                message: ecmResult.message || ecmResult.error || "Xóa tài liệu trên ECM thất bại."
+            };
+        }
+
+        // Chỉ xóa bản ghi liên kết sau khi ECM đã xử lý thành công.
         var deleteRc = attachmentFile.doDelete();
         if (deleteRc !== RC_SUCCESS) {
-            return { success: false, message: "Xóa liên kết tài liệu Dự chi thất bại. Code: " + deleteRc };
-        }
-        if (ecmDocId) {
-            try { lib.ESD_HTKT_INVOICE_ECM.deleteDocId(ecmDocId); } catch (ecmError) {}
+            return {
+                success: false,
+                message: "Đã xóa tài liệu trên ECM nhưng xóa bản ghi esdHTKTpaymentAttachment thất bại. Code: " + deleteRc
+            };
         }
         return { success: true, message: "Xóa tài liệu Dự chi thành công." };
     } finally {
