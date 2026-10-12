@@ -879,7 +879,8 @@ function mapPaymentAttachment(itemRec, feeData) {
     itemRec['payment.id'] = feeData['transactionId'];
     itemRec['invoice.id'] = feeData['id'];
     itemRec['vendor.id'] = feeData['vendorId'];
-
+    itemRec['contract.id'] = feeData['contractId'];
+    
     if (feeData['totalTax'] === 0) {
         itemRec['deduction.type'] = "KHAUTRU_003"; // Không khấu trừ
     } else if (feeData['totalTax'] > 0) {
@@ -1098,6 +1099,46 @@ function sumVendorAmount(vendorTable, requestTable, requestIdField, contractId, 
 
 function escapePaymentVendorQueryValue(value) {
     return String(value || '').replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
+/** Lấy thông tin HĐ/KMS theo mã hợp đồng để Display Screen bind vào FD. */
+function getContractInfo(contractId) {
+    var id = String(contractId || "").trim();
+    var contractInfo = {
+        id: id,
+        name: "",
+        category: "",
+        categoryName: "",
+        startDate: null,
+        totalValue: "",
+        totalPaidAmount: "",
+        remainingAmount: ""
+    };
+    if (!id) return contractInfo;
+
+    var contractFile = new SCFile("esdHDcontract", SCFILE_READONLY);
+    try {
+        if (contractFile.doSelect('id="' + escapePaymentVendorQueryValue(id) + '"') != RC_SUCCESS) {
+            return contractInfo;
+        }
+
+        var category = String(contractFile["category"] || "");
+        contractInfo.category = category;
+        contractInfo.categoryName = category === "HD_GT" ? "Hợp đồng" :
+            category === "HD_KMS" ? "Khoản mua sắm" : category;
+        contractInfo.name = category === "HD_KMS" ?
+            (contractFile["item.name"] || contractFile["name"] || "") :
+            (contractFile["name"] || "");
+        contractInfo.startDate = contractFile["start.date"] || null;
+        contractInfo.totalValue = category === "HD_KMS" ?
+            (contractFile["total.budget"] || "") :
+            (contractFile["contract.value.after.tax"] || "");
+        contractInfo.totalPaidAmount = contractFile["total.paid.amount"] || "";
+        contractInfo.remainingAmount = contractFile["remaining.amount"] || "";
+        return contractInfo;
+    } finally {
+        try { contractFile.doClose(); } catch (closeError) { }
+    }
 }
 
 function loadPaymentVendorInfo(record) {
