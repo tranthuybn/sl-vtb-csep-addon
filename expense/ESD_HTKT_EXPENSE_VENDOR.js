@@ -162,6 +162,7 @@ function createListInvoinVendor(input) {
 
         if (successInvoiceIds.length > 0) {
             var totalInvoiceAmount = "0";
+            var totalInvoiceCount = 0;
             var invoiceSumFile = new SCFile("esdHTKTinvoice", SCFILE_READONLY);
             try {
                 var sumSql = 'SELECT i.grand.total FROM esdHTKTinvoice i ' +
@@ -173,6 +174,7 @@ function createListInvoinVendor(input) {
                         totalInvoiceAmount,
                         String(invoiceSumFile["grand.total"] || "0")
                     );
+                    totalInvoiceCount++;
                     sumRc = invoiceSumFile.getNext();
                 }
             } finally {
@@ -181,6 +183,7 @@ function createListInvoinVendor(input) {
 
             // Dự chi chỉ lưu tổng hóa đơn vào amount.
             vendorFile["amount"] = totalInvoiceAmount;
+            vendorFile["total.invoice"] = totalInvoiceCount;
             var updateRc = vendorFile.doUpdate();
             if (updateRc !== RC_SUCCESS) {
                 return {
