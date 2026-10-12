@@ -211,24 +211,7 @@ function getListExpenseVendor(input) {
     return resultList;
 }
 
-/** Đếm toàn bộ món dự chi trên phiếu, kể cả món chưa chọn NCC. */
-function getExpenseItemCount(paymentId) {
-    var id = normalizeExpenseVendorValue(paymentId);
-    if (!id) return 0;
 
-    var itemFile = new SCFile("esdHTKTpaymentVendor", SCFILE_READONLY);
-    try {
-        var query = 'SELECT count(*) FROM esdHTKTpaymentVendor WHERE payment.id="' +
-            escapeExpenseVendorQueryValue(id) + '"';
-        var rc = itemFile.doSelect(query);
-        if (rc != RC_SUCCESS) {
-            throw new Error("Không lấy được tổng số món Dự chi. Code: " + rc);
-        }
-        return Number(itemFile[0] || 0);
-    } finally {
-        closeExpenseVendorFile(itemFile);
-    }
-}
 
 function buildExpenseVendorItem(paymentVendorFile) {
     // Kết quả cross-table được đọc theo đúng thứ tự SELECT.
