@@ -270,9 +270,12 @@ function getListAccountsPayable(input) {
             "ai.contract.id AS contractId, " +
             "ai.data AS ai_data, " +// Để lấy currency
 
-            (currentPaymentId ? "currentEntry.amount AS current_payment_entry_amount, " +
-            "currentEntry.id AS current_payment_entry_id, " +
-            "currentEntry.description, " : "") +
+            (currentPaymentId ? "currentPaymentEntry.amount AS currentPaymentEntryAmount, " +
+            "currentPaymentEntry.id AS currentPaymentEntryId, " +
+            "currentPaymentEntry.description AS currentPaymentEntryDescription, " +
+            "currentExpenseEntry.amount AS currentExpenseEntryAmount, " +
+            "currentExpenseEntry.id AS currentExpenseEntryId, " +
+            "currentExpenseEntry.description AS currentExpenseEntryDescription, " : "") +
 
             "pv.approved.invoice.amount, " +
             "pv.amount, " +
@@ -298,8 +301,17 @@ function getListAccountsPayable(input) {
             var internalRefId = String(file["internalRefId"] || file["ai.internal.ref.id"] || file["internal.ref.id"] || "").trim();
             var paymentVendorRefId = String(file["paymentVendorRefId"] || file["pv.id"] || "").trim();
             var amount = getNumberField(file, ["amount"]);
-            var currentPaymentEntryAmount = currentPaymentId ? getNumberField(file, ["currentEntry.amount"]) : 0;
-            var currentPaymentEntryDescription = currentPaymentId ? String(file["currentEntry.description"] || "").trim() : "";
+            var subType = String(file["subType"] || "").trim();
+            var isExpensePayable = subType.toUpperCase() === "DU_CHI";
+            var currentPaymentEntryAmount = currentPaymentId ? getNumberField(file, [
+                isExpensePayable ? "currentExpenseEntryAmount" : "currentPaymentEntryAmount"
+            ]) : 0;
+            var currentPaymentEntryDescription = currentPaymentId ? String(file[
+                isExpensePayable ? "currentExpenseEntryDescription" : "currentPaymentEntryDescription"
+            ] || "").trim() : "";
+            var currentPaymentEntryId = currentPaymentId ? String(file[
+                isExpensePayable ? "currentExpenseEntryId" : "currentPaymentEntryId"
+            ] || "").trim() : "";
             var refundAmount = getNumberField(file, ["pv.refund.amount"]);
             var paidAmount = getNumberField(file, ["pv.amount"]);
             var payableAmount = getNumberField(file, ["pe.amount"]);
@@ -314,8 +326,6 @@ function getListAccountsPayable(input) {
             var totalPayableAmountAccounted = getTotalPayableAmountAccounted(prepaymentId, vendorId);
             var totalReferencedAmountAccounted = getTotalReferencedPayableAmountAccounted(prepaymentId, vendorId);
             var totalTax = getTotalTax(prepaymentId, vendorId);
-            var subType = String(file["subType"] || "").trim();
-            var isExpensePayable = subType.toUpperCase() === "DU_CHI";
 
 
             var item = {
@@ -339,7 +349,7 @@ function getListAccountsPayable(input) {
                 amount: amount, //Số tiền thanh toán sau 
                 contractId: String(file["contractId"] || "").trim(),
                 description: currentPaymentEntryDescription,           // Nội dung diễn giải của đề nghị lần này
-                id: currentPaymentId ? String(file["currentEntry.id"] || "").trim() : "",
+                id: currentPaymentEntryId,
                 totalTax: totalTax,
                 totalAmountPaid: paidAmount + refundAmount - totalPayableAmountAccounted + totalReferencedAmountAccounted, // Cộng thanh toán tham chiếu đã hạch toán.
                 other_pending_amount: 0,   // Số tiền chờ duyệt ở các ĐNTT khác
@@ -405,12 +415,20 @@ function buildAccountsPayableQueryScope(vendorId, contractId, currentPaymentId) 
             'AND pv.vendor.id = "' + escapeSmQueryValue(vendorId) + '" ' +
             'AND (ai.sub.type ~= "DU_CHI" OR ' +
             '(pe.ref.id = pv.id AND ai.internal.ref.id = pv.id))) ' +
-            (currentPaymentId ? "LEFT JOIN esdHTKTpaymentEntry currentEntry " +
-            "ON (ai.prepayment.id = currentEntry.ref.id " +
-            'AND currentEntry.payment.id = "' + escapeSmQueryValue(currentPaymentId) + '" ' +
-            'AND currentEntry.entry.type = "PAYABLE" ' +
-            'AND currentEntry.account.type = "DEBIT" ' +
-            'AND currentEntry.vendor.id = "' + escapeSmQueryValue(vendorId) + '") ' : "") +
+            (currentPaymentId ? "LEFT JOIN esdHTKTpaymentEntry currentPaymentEntry " +
+            'ON (ai.sub.type = "THANH_TOAN" ' +
+            'AND ai.prepayment.id = currentPaymentEntry.ref.id ' +
+            'AND currentPaymentEntry.payment.id = "' + escapeSmQueryValue(currentPaymentId) + '" ' +
+            'AND currentPaymentEntry.entry.type = "PAYABLE" ' +
+            'AND currentPaymentEntry.account.type = "DEBIT" ' +
+            'AND currentPaymentEntry.vendor.id = "' + escapeSmQueryValue(vendorId) + '") ' +
+            "LEFT JOIN esdHTKTpaymentEntry currentExpenseEntry " +
+            'ON (ai.sub.type = "DU_CHI" ' +
+            'AND ai.internal.ref.id = currentExpenseEntry.ref.id ' +
+            'AND currentExpenseEntry.payment.id = "' + escapeSmQueryValue(currentPaymentId) + '" ' +
+            'AND currentExpenseEntry.entry.type = "PAYABLE" ' +
+            'AND currentExpenseEntry.account.type = "DEBIT" ' +
+            'AND currentExpenseEntry.vendor.id = "' + escapeSmQueryValue(vendorId) + '") ' : "") +
             'WHERE (ai.sub.type = "THANH_TOAN" OR ai.sub.type = "DU_CHI") ' +
             'AND ai.contract.id = "' + escapeSmQueryValue(contractId) + '" ' +
             'AND ai.vendor.id = "' + escapeSmQueryValue(vendorId) + '" ' +
