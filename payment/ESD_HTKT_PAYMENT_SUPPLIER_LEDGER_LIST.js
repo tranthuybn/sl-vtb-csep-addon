@@ -379,7 +379,8 @@ function buildAccountsPayableQueryScope(vendorId, contractId, currentPaymentId) 
     return (
             "FROM esdHTKTaccountingInformation ai " +
             "JOIN esdHTKTpayment payment " +
-            'ON (ai.prepayment.id = payment.id AND payment.status = "accounted") ' +
+            'ON (ai.prepayment.id = payment.id ' +
+            'AND (ai.sub.type = "DU_CHI" OR payment.status = "accounted")) ' +
             "JOIN esdHTKTpaymentEntry pe " +
             "ON (ai.prepayment.id = pe.payment.id " +
             'AND pe.entry.type = "PAYABLE" ' +
@@ -387,14 +388,16 @@ function buildAccountsPayableQueryScope(vendorId, contractId, currentPaymentId) 
             'AND pe.vendor.id = "' + escapeSmQueryValue(vendorId) + '") ' +
             "JOIN esdHTKTpaymentVendor pv " +
             "ON (pv.payment.id = pe.payment.id " +
-            'AND pv.vendor.id = "' + escapeSmQueryValue(vendorId) + '") ' +
+            'AND pv.vendor.id = "' + escapeSmQueryValue(vendorId) + '" ' +
+            'AND (ai.sub.type ~= "DU_CHI" OR ' +
+            '(pe.ref.id = pv.id AND ai.internal.ref.id = pv.id))) ' +
             (currentPaymentId ? "LEFT JOIN esdHTKTpaymentEntry currentEntry " +
             "ON (ai.prepayment.id = currentEntry.ref.id " +
             'AND currentEntry.payment.id = "' + escapeSmQueryValue(currentPaymentId) + '" ' +
             'AND currentEntry.entry.type = "PAYABLE" ' +
             'AND currentEntry.account.type = "DEBIT" ' +
             'AND currentEntry.vendor.id = "' + escapeSmQueryValue(vendorId) + '") ' : "") +
-            'WHERE ai.sub.type = "THANH_TOAN" or ai.sub.type = "DU_CHI" ' +
+            'WHERE (ai.sub.type = "THANH_TOAN" OR ai.sub.type = "DU_CHI") ' +
             'AND ai.contract.id = "' + escapeSmQueryValue(contractId) + '" ' +
             'AND ai.vendor.id = "' + escapeSmQueryValue(vendorId) + '" ' +
             'AND ai.status = "COMPLETED" ' +
