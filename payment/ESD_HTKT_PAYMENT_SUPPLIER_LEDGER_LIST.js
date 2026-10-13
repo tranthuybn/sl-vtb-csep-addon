@@ -323,8 +323,26 @@ function getListAccountsPayable(input) {
                 continue;
             }
 
-            var totalPayableAmountAccounted = getTotalPayableAmountAccounted(prepaymentId, vendorId);
-            var totalReferencedAmountAccounted = getTotalReferencedPayableAmountAccounted(prepaymentId, vendorId);
+            var totalPayableAmountAccounted = 0;
+            var totalReferencedAmountAccounted = 0;
+            var totalAmountPaid = 0;
+
+            if (isExpensePayable) {
+                // Dự chi được tham chiếu theo từng món dự chi (paymentVendorId),
+                // không tính theo mã phiếu dự chi dùng chung cho nhiều món.
+                var expenseReferenceId = internalRefId || paymentEntryRefId || paymentVendorRefId;
+                totalReferencedAmountAccounted = getTotalReferencedPayableAmountAccounted(
+                        expenseReferenceId,
+                        vendorId
+                );
+                totalAmountPaid = totalReferencedAmountAccounted;
+            } else {
+                // Thanh toán giữ nguyên công thức và phạm vi query hiện tại.
+                totalPayableAmountAccounted = getTotalPayableAmountAccounted(prepaymentId, vendorId);
+                totalReferencedAmountAccounted = getTotalReferencedPayableAmountAccounted(prepaymentId, vendorId);
+                totalAmountPaid = paidAmount + refundAmount - totalPayableAmountAccounted +
+                        totalReferencedAmountAccounted;
+            }
             var totalTax = getTotalTax(prepaymentId, vendorId);
 
 
@@ -351,7 +369,7 @@ function getListAccountsPayable(input) {
                 description: currentPaymentEntryDescription,           // Nội dung diễn giải của đề nghị lần này
                 id: currentPaymentEntryId,
                 totalTax: totalTax,
-                totalAmountPaid: paidAmount + refundAmount - totalPayableAmountAccounted + totalReferencedAmountAccounted, // Cộng thanh toán tham chiếu đã hạch toán.
+                totalAmountPaid: totalAmountPaid,
                 other_pending_amount: 0,   // Số tiền chờ duyệt ở các ĐNTT khác
                 currentPaymentAmount: currentPaymentEntryAmount,   // Số tiền thanh toán lần này (của ĐNTT hiện tại)
                 totalRemainingAmount: totalRemainingAmount,
@@ -554,18 +572,18 @@ function getTotalPayableAmountAccounted(prepaymentId, vendorId) {
 }
 
 
-function getTotalReferencedPayableAmountAccounted(prepaymentId, vendorId) {
+function getTotalReferencedPayableAmountAccounted(referenceId, vendorId) {
     var totalAmount = 0;
     var paymentEntryFile = null;
 
-    if (!prepaymentId) return totalAmount;
+    if (!referenceId) return totalAmount;
 
     var query =
             "SELECT pe.amount AS amount FROM esdHTKTpaymentEntry pe " +
             "JOIN esdHTKTpayment p ON (pe.payment.id = p.id) " +
             'WHERE pe.entry.type = "PAYABLE" ' +
             'AND pe.account.type = "DEBIT" ' +
-            'AND pe.ref.id = "' + escapeSmQueryValue(prepaymentId) + '" ' +
+            'AND pe.ref.id = "' + escapeSmQueryValue(referenceId) + '" ' +
             'AND p.status = "accounted"' +
             (vendorId ? ' AND pe.vendor.id = "' + escapeSmQueryValue(vendorId) + '"' : '');
 
