@@ -261,6 +261,9 @@ function getListAccountsPayable(input) {
             "ai.response AS response, " +
             "ai.transaction.id AS transactionId, " +
             "ai.ap.code AS apCode, " +
+            "ai.internal.ref.id AS internalRefId, " +
+            "pe.ref.id AS paymentEntryRefId, " +
+            "pv.id AS paymentVendorRefId, " +
             "ai.checked.time AS checkedTime, " +
             "ai.sub.type AS subType, " +
             "ai.amount, " +
@@ -291,6 +294,9 @@ function getListAccountsPayable(input) {
         while (rc == RC_SUCCESS) {
             var accountingInformationId = String(file["requestId"] || "").trim();
             var prepaymentId = String(file["prepaymentId"] || "").trim();
+            var paymentEntryRefId = String(file["paymentEntryRefId"] || file["pe.ref.id"] || file["ref.id"] || "").trim();
+            var internalRefId = String(file["internalRefId"] || file["ai.internal.ref.id"] || file["internal.ref.id"] || "").trim();
+            var paymentVendorRefId = String(file["paymentVendorRefId"] || file["pv.id"] || "").trim();
             var amount = getNumberField(file, ["amount"]);
             var currentPaymentEntryAmount = currentPaymentId ? getNumberField(file, ["currentEntry.amount"]) : 0;
             var currentPaymentEntryDescription = currentPaymentId ? String(file["currentEntry.description"] || "").trim() : "";
@@ -308,6 +314,8 @@ function getListAccountsPayable(input) {
             var totalPayableAmountAccounted = getTotalPayableAmountAccounted(prepaymentId, vendorId);
             var totalReferencedAmountAccounted = getTotalReferencedPayableAmountAccounted(prepaymentId, vendorId);
             var totalTax = getTotalTax(prepaymentId, vendorId);
+            var subType = String(file["subType"] || "").trim();
+            var isExpensePayable = subType.toUpperCase() === "DU_CHI";
 
 
             var item = {
@@ -320,8 +328,14 @@ function getListAccountsPayable(input) {
                 response: String(file["response"] || "").trim(),
                 transactionId: String(file["transactionId"] || "").trim(),
                 apCode: String(file["ap.code"] || file["apCode"] || ""),
+                paymentEntryRefId: paymentEntryRefId,
+                internalRefId: internalRefId,
+                paymentVendorRefId: paymentVendorRefId,
+                refId: isExpensePayable
+                        ? (paymentEntryRefId || internalRefId || paymentVendorRefId)
+                        : prepaymentId,
                 checkedTime: file["checkedTime"] || "",
-                subType: String(file["subType"] || "").trim(),
+                subType: subType,
                 amount: amount, //Số tiền thanh toán sau 
                 contractId: String(file["contractId"] || "").trim(),
                 description: currentPaymentEntryDescription,           // Nội dung diễn giải của đề nghị lần này
@@ -807,7 +821,12 @@ function validatePaymentEntryPayableAmounts(details) {
         }
         var key = JSON.stringify([paymentId, vendorId]);
         if (!groups[key]) groups[key] = { paymentId: paymentId, vendorId: vendorId, amounts: {} };
-        var refKey = JSON.stringify(String(row.prepaymentId || row.refId || ""));
+        // refId đã được getListAccountsPayable lấy trực tiếp từ paymentEntry.ref.id.
+        var refId = String(row.refId || row.internalRefId || "").trim();
+        if (!refId) {
+            return "Dòng " + (i + 1) + ": thiếu tham chiếu khoản phải trả của nhà cung cấp " + vendorId;
+        }
+        var refKey = JSON.stringify(refId);
         if (Object.prototype.hasOwnProperty.call(groups[key].amounts, refKey)) {
             return "Danh sách có khoản phải trả trùng tham chiếu của nhà cung cấp " + vendorId;
         }
@@ -910,7 +929,11 @@ function saveListPaymentEntryPayable(input) {
             var currentPayment = Number(feeData['currentPayment']) || 0;
             var currency = feeData['currency'] || "";
             var description = feeData['description'] || "";
-            var refId = feeData['prepaymentId'] || feeData['refId'] || "";
+            var prepaymentId = feeData['prepaymentId'] || "";
+            var subType = String(feeData['subType'] || feeData['sub.type'] || "").trim().toUpperCase();
+            var isExpensePayable = subType === "DU_CHI";
+            // THANH_TOAN giữ tham chiếu cũ là prepaymentId; DU_CHI dùng paymentVendorId.
+            var refId = isExpensePayable ? (feeData['refId'] || "") : prepaymentId;
             var apCode = feeData['apCode'];
             var order = feeData['order'] || 0;
 
@@ -945,8 +968,11 @@ function saveListPaymentEntryPayable(input) {
                 var accountName = "";
                 var sourceEntryFile = new SCFile("esdHTKTpaymentEntry");
                 try {
-                    var sourceEntryQuery = 'payment.id="' + refId +
+                    var sourceEntryQuery = 'payment.id="' + escapeSmQueryValue(prepaymentId) +
                             '" AND entry.type="PAYABLE" AND account.type="ASSET"';
+                    if (isExpensePayable) {
+                        sourceEntryQuery += ' AND ref.id="' + escapeSmQueryValue(refId) + '"';
+                    }
                     var rcSourceEntry = sourceEntryFile.doSelect(sourceEntryQuery);
                     if (rcSourceEntry == RC_SUCCESS) {
                         accountNumber = sourceEntryFile['account.number'] || "";
