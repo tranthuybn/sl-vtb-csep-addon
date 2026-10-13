@@ -394,7 +394,7 @@ function buildAccountsPayableQueryScope(vendorId, contractId, currentPaymentId) 
             'AND currentEntry.entry.type = "PAYABLE" ' +
             'AND currentEntry.account.type = "DEBIT" ' +
             'AND currentEntry.vendor.id = "' + escapeSmQueryValue(vendorId) + '") ' : "") +
-            'WHERE ai.sub.type = "THANH_TOAN" ' +
+            'WHERE ai.sub.type = "THANH_TOAN" or ai.sub.type = "DU_CHI" ' +
             'AND ai.contract.id = "' + escapeSmQueryValue(contractId) + '" ' +
             'AND ai.vendor.id = "' + escapeSmQueryValue(vendorId) + '" ' +
             'AND ai.status = "COMPLETED" ' +
