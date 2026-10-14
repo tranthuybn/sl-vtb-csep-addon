@@ -315,7 +315,16 @@ function getListAccountsPayable(input) {
             var refundAmount = getNumberField(file, ["pv.refund.amount"]);
             var paidAmount = getNumberField(file, ["pv.amount"]);
             var payableAmount = getNumberField(file, ["pe.amount"]);
-            var totalRemainingAmount = getAccountPayableRemainingAmount(prepaymentId, currentPaymentId, vendorId, payableAmount);
+            var expenseReferenceId = isExpensePayable
+                    ? (internalRefId || paymentEntryRefId || paymentVendorRefId)
+                    : "";
+            var remainingAmountReferenceId = isExpensePayable ? expenseReferenceId : prepaymentId;
+            var totalRemainingAmount = getAccountPayableRemainingAmount(
+                    remainingAmountReferenceId,
+                    currentPaymentId,
+                    vendorId,
+                    payableAmount
+            );
 
             // Giữ cả khoản đã hết số dư để hiển thị đầy đủ thông tin công nợ.
             if (totalRemainingAmount < 0) {
@@ -330,7 +339,6 @@ function getListAccountsPayable(input) {
             if (isExpensePayable) {
                 // Dự chi được tham chiếu theo từng món dự chi (paymentVendorId),
                 // không tính theo mã phiếu dự chi dùng chung cho nhiều món.
-                var expenseReferenceId = internalRefId || paymentEntryRefId || paymentVendorRefId;
                 totalReferencedAmountAccounted = getTotalReferencedPayableAmountAccounted(
                         expenseReferenceId,
                         vendorId
