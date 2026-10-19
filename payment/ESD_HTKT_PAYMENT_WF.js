@@ -242,6 +242,12 @@ function updateNextStatus(record, previousRecord) {
     return documentResult;
 }
 
+function htktWfIsExpense(record) {
+    var transactionType = String(record["transaction.type"] || record.transaction_type || "").trim().toLowerCase();
+    if (transactionType) return transactionType === "dự chi";
+    return String(record["id"] || "").trim().toUpperCase().indexOf("DC.") === 0;
+}
+
 /**
  * Ghi lịch sử chuyển phase workflow:
  * - Trình phê duyệt: initial_dmms / initial_kttc
@@ -287,7 +293,7 @@ function createApprovalHistory(record) {
 
         createActivity(
                 "activityHTKTpayment",
-                activityType + ' Đề nghị Thanh Toán: Mã đề nghị: "' + paymentId + '"',
+                activityType + (htktWfIsExpense(record) ? ' Đề nghị Dự chi' : ' Đề nghị Thanh Toán') + ': Mã đề nghị: "' + paymentId + '"',
                 paymentId,
                 activityType,
                 currentUser
@@ -300,6 +306,16 @@ function createApprovalHistory(record) {
 }
 
 function cancelRequest(record) {
+    // Chỉ bổ sung vào action Xóa lớn của Workflow; không đụng nút xóa NCC/hóa đơn.
+    var paymentIdForUnlink = String(record["id"] || record.id || "").trim();
+    if (!paymentIdForUnlink) {
+        throw new Error("Không tìm thấy mã đề nghị thanh toán để gỡ hóa đơn.");
+    }
+    var unlinkResult = lib.ESD_HTKT_PAYMENT_INVOICE.unlinkAllInvoicesOnPaymentCancel(paymentIdForUnlink);
+    if (!unlinkResult || unlinkResult.success !== true) {
+        throw new Error("Không thể xóa đề nghị thanh toán do lỗi gỡ liên kết hóa đơn: " +
+            (unlinkResult && unlinkResult.message ? unlinkResult.message : "Không xác định"));
+    }
     record.status = "cancelled";
 
     try {
@@ -312,7 +328,7 @@ function cancelRequest(record) {
         if (currentUser && paymentId) {
             createActivity(
                     "activityHTKTpayment",
-                    'Xóa Đề nghị Thanh toán: Mã đề nghị: "' + paymentId + '"',
+                    'Xóa ' + (htktWfIsExpense(record) ? 'Đề nghị Dự chi' : 'Đề nghị Thanh toán') + ': Mã đề nghị: "' + paymentId + '"',
                     paymentId,
                     "Xóa",
                     currentUser
@@ -334,11 +350,6 @@ function getReturnToUpdatePhase(record) {
 }
 
 function returnToUpdate(record, documentsAlreadyDeleted) {
-    var returnPhase = getReturnToUpdatePhase(record);
-    if (!returnPhase) {
-        throw new Error("Không xác định được initial.role để trả phiếu về chỉnh sửa.");
-    }
-
     if (documentsAlreadyDeleted !== true) {
         var deleteResult = deleteDocumentsBeforeReturn(record);
         if (!deleteResult || deleteResult.success !== true) {
@@ -350,21 +361,24 @@ function returnToUpdate(record, documentsAlreadyDeleted) {
         }
     }
 
-    record["current.phase"] = returnPhase;
+    // 1. Cập nhật trạng thái phiếu
     record.status = "request_edit";
 
+    var currentUser = String(
+            vars.$lo_operator["contact.name"] || vars["$lo.contact.name"] || ""
+    ).trim();
+    var paymentId = String(record["id"] || record.id || "").trim();
+    var returnReason = String(record["return.reason"] || "").trim();
+    var createdBy = String(record["created.by"] || "").trim();
+    var currentStatus = String(record.status || record["status"] || "").trim();
+
+    // 2. Ghi Activity log
     try {
-        var currentUser = String(
-                vars.$lo_operator["contact.name"] || vars["$lo.contact.name"] || ""
-        ).trim();
-
-        var paymentId = String(record["id"] || record.id || "").trim();
-        var returnReason = String(record["return.reason"] || "").trim();
-
         if (currentUser && paymentId) {
             var activityDescription =
-                    "Yêu cầu chỉnh sửa Đề nghị Thanh Toán" +
+                    "Yêu cầu chỉnh sửa " + (htktWfIsExpense(record) ? "Đề nghị Dự chi" : "Đề nghị Thanh Toán") +
                     (returnReason ? '\nLý do: "' + returnReason + '"' : "");
+
             createActivity(
                     "activityHTKTpayment",
                     activityDescription,
@@ -372,15 +386,22 @@ function returnToUpdate(record, documentsAlreadyDeleted) {
                     "Yêu cầu chỉnh sửa",
                     currentUser
             );
-            
         }
     } catch (e) {
-        /* print(
-                "[ESD_HTKT_PAYMENT_WF.returnToUpdate] Không thể ghi activity: " + e.toString()
-        ); */
+        /* print("[ESD_HTKT_PAYMENT_WF.returnToUpdate] Không thể ghi activity: " + e.toString()); */
+    }
+
+    // 3. KIỂM TRA ĐIỀU KIỆN TRƯỚC KHI GỌI GỬI EMAIL
+    try {
+        if (currentStatus === "request_edit" && paymentId && createdBy && returnReason) {
+            if (lib.ESD_HTKT_ACTION_WF_SEND_EMAIL && typeof lib.ESD_HTKT_ACTION_WF_SEND_EMAIL.sendEmailRequestEdit === "function") {
+                lib.ESD_HTKT_ACTION_WF_SEND_EMAIL.sendEmailRequestEdit(record);
+            }
+        }
+    } catch (eMail) {
+        /* Bọc try-catch để nếu có lỗi gửi mail cũng không làm sập luồng trả lại phiếu */
     }
 }
-
 
 /* =============================================================================
  * 4. TẦNG VALIDATION NGHIỆP VỤ (BUSINESS VALIDATIONS)
@@ -391,13 +412,23 @@ function validateDataInPhase(record, type) {
     if (type !== "wf") {
         return null;
     }
+    
+    var submissionPhase = record.current_phase || record["current.phase"];
+    if (submissionPhase === "initial_dmms" || submissionPhase === "initial_kttc") {
+        try {
+            lib.ESD_HTKT_PAYMENT_LOAD_APRROVAL_COMBOBOX.syncPaymentApprovalFromDatabase(record);
+        } catch (approvalError) {
+            return ["Không tải lại được thông tin phê duyệt trước khi trình: " + String(approvalError.message || approvalError)];
+        }
+    }
 
     var errorMss = [];
 
     // Validate chung thông tin NCC + thanh toán
     var vendorErrors = validateVendorAndPaymentDetailsOnWorkflow(record);
     if (vendorErrors && vendorErrors.length > 0) {
-        errorMss = errorMss.concat(vendorErrors);
+        // errorMss = errorMss.concat(vendorErrors);
+        return vendorErrors;
     }
 
     var currentPhase = record.current_phase || record["current.phase"];
@@ -727,7 +758,7 @@ function validateVendorAndPaymentDetails(record) {
                 throw new Error("Thiếu thông tin phiếu thanh toán.");
             }
             var totalPayableRemaining = parseAmount(
-                lib.ESD_HTKT_PAYMENT_SUPPLIER_LEDGER_LIST.getTotalAccountsPayableRemainingAmount(paymentId, vendorId)
+                    lib.ESD_HTKT_PAYMENT_SUPPLIER_LEDGER_LIST.getTotalAccountsPayableRemainingAmount(paymentId, vendorId)
             );
             if (isNaN(totalPayableRemaining)) {
                 throw new Error("Tổng số tiền phải trả còn lại không hợp lệ.");
@@ -750,15 +781,15 @@ function validateVendorAndPaymentDetails(record) {
 
             paymentInvoiceFile = new SCFile("esdHTKTpaymentInvoice", SCFILE_READONLY);
             var paymentInvoiceQuery = 'payment.id="' + escapeSmQueryValue(paymentId) +
-                '" and vendor.id="' + escapeSmQueryValue(vendorId) + '"';
+                    '" and vendor.id="' + escapeSmQueryValue(vendorId) + '"';
             if (paymentInvoiceFile.doSelect(paymentInvoiceQuery) == RC_SUCCESS) {
                 // Cùng phạm vi và cách cộng grand.total với createListInvoinVendor.
                 var totalAttachedInvoiceAmount = "0";
                 attachedInvoiceFile = new SCFile("esdHTKTinvoice", SCFILE_READONLY);
                 var attachedInvoiceQuery = "SELECT i.id, i.grand.total " +
-                    "FROM esdHTKTinvoice i JOIN esdHTKTvendor v ON (i.seller.tax.code = v.vendor.number) " +
-                    'WHERE i.request.id = "' + escapeSmQueryValue(paymentId) +
-                    '" AND v.id = "' + escapeSmQueryValue(vendorId) + '"';
+                        "FROM esdHTKTinvoice i JOIN esdHTKTvendor v ON (i.seller.tax.code = v.vendor.number) " +
+                        'WHERE i.request.id = "' + escapeSmQueryValue(paymentId) +
+                        '" AND v.id = "' + escapeSmQueryValue(vendorId) + '"';
                 var rcAttachedInvoice = attachedInvoiceFile.doSelect(attachedInvoiceQuery);
                 while (rcAttachedInvoice == RC_SUCCESS) {
                     var attachedInvoiceAmount = String(attachedInvoiceFile["grand.total"] || attachedInvoiceFile["grandTotal"] || "0");
@@ -936,6 +967,18 @@ function validateVendorAndPaymentDetails(record) {
     }
     return errorMss;
 }
+
+//function validateVendorAndPaymentDetailsOnWorkflow(record) {
+//    var paymentId = String(record.id || "");
+//    var vendor = new SCFile("esdHTKTpaymentVendor", SCFILE_READONLY);
+//    var rc = vendor.doSelect('payment.id="' + paymentId + '"');
+//
+//    try {
+//        vendor.doClose();
+//    } catch (e) {}
+//
+//    return rc == RC_SUCCESS ? null : ["Vui lòng chọn nhà cung cấp."];
+//}
 
 function validateVendorAndPaymentDetailsOnWorkflow(record) {
     var paymentId = String(record.id || "");
@@ -1152,7 +1195,7 @@ function isSignaturePhase(record) {
 
 // Kiểm tra quyền hiển thị Workflow Action Test ký.
 function checkCanSign(record) {
-    var actorResult = validateCurrentActor(record);
+    var actorResult = validateLatestWorkflowActor(record);
 
     if (!actorResult || actorResult.success !== true) {
         return "F";
@@ -1189,48 +1232,61 @@ function validateCurrentActor(record) {
     return htktWfFail("INVALID_CURRENT_ACTOR", "Người dùng hiện tại không được phép xử lý bước này.", "currentUser=" + context.currentUser, context);
 }
 
+/**
+ * Tải lại thông tin phân công mới nhất từ DB trước khi kiểm tra actor workflow.
+ *
+ * Mục đích:
+ * - NextJS có thể vừa tái phân công user xử lý và lưu trực tiếp xuống DB.
+ * - Record đang mở trên SM có thể vẫn giữ actor cũ.
+ * - Các entry point workflow phải kiểm tra actor sau khi đồng bộ lại dữ liệu.
+ *
+ * Lưu ý:
+ * - Không thay đổi phase/status.
+ * - Không thay đổi quyền workflow hiện hữu.
+ * - Chỉ đồng bộ thông tin approval rồi dùng validateCurrentActor() kiểm tra.
+ */
 function validateLatestWorkflowActor(record) {
     try {
         // Đã đổi từ PREPAYMENT sang PAYMENT tương ứng với module Thanh Toán
         if (
-            !lib ||
-            !lib.ESD_HTKT_PAYMENT_LOAD_APRROVAL_COMBOBOX ||
-            typeof lib.ESD_HTKT_PAYMENT_LOAD_APRROVAL_COMBOBOX.syncPaymentApprovalFromDatabase !== "function"
+                !lib ||
+                !lib.ESD_HTKT_PAYMENT_LOAD_APRROVAL_COMBOBOX ||
+                typeof lib.ESD_HTKT_PAYMENT_LOAD_APRROVAL_COMBOBOX.syncPaymentApprovalFromDatabase !== "function"
         ) {
             return htktWfFail(
-                "WORKFLOW_ACTOR_REFRESH_DEPENDENCY_MISSING",
-                "Không kiểm tra được người xử lý mới nhất của hồ sơ. Vui lòng tải lại hồ sơ.",
-                "Thiếu ESD_HTKT_PAYMENT_LOAD_APRROVAL_COMBOBOX.syncPaymentApprovalFromDatabase()."
+                    "WORKFLOW_ACTOR_REFRESH_DEPENDENCY_MISSING",
+                    "Không kiểm tra được người xử lý mới nhất của hồ sơ. Vui lòng tải lại hồ sơ.",
+                    "Thiếu ESD_HTKT_PAYMENT_LOAD_APRROVAL_COMBOBOX.syncPaymentApprovalFromDatabase()."
             );
         }
 
         lib.ESD_HTKT_PAYMENT_LOAD_APRROVAL_COMBOBOX
-            .syncPaymentApprovalFromDatabase(record);
+                .syncPaymentApprovalFromDatabase(record);
 
         var actorResult = validateCurrentActor(record);
 
         if (!actorResult || actorResult.success !== true) {
             if (actorResult && actorResult.code === "INVALID_CURRENT_ACTOR") {
                 return htktWfFail(
-                    "PAYMENT_REASSIGNED", // Đổi từ PREPAYMENT_REASSIGNED
-                    "Hồ sơ đã được tái phân công cho cán bộ khác. Vui lòng tải lại hồ sơ.",
-                    actorResult.detail || "",
-                    actorResult.data || null
+                        "PAYMENT_REASSIGNED", // Đổi từ PREPAYMENT_REASSIGNED
+                        "Hồ sơ đã được tái phân công cho cán bộ khác. Vui lòng tải lại hồ sơ.",
+                        actorResult.detail || "",
+                        actorResult.data || null
                 );
             }
 
             return actorResult || htktWfFail(
-                "WORKFLOW_ACTOR_VALIDATION_FAILED",
-                "Không kiểm tra được người xử lý hiện tại của hồ sơ. Vui lòng tải lại hồ sơ."
+                    "WORKFLOW_ACTOR_VALIDATION_FAILED",
+                    "Không kiểm tra được người xử lý hiện tại của hồ sơ. Vui lòng tải lại hồ sơ."
             );
         }
 
         return actorResult;
     } catch (error) {
         return htktWfFailException(
-            "WORKFLOW_ACTOR_REFRESH_EXCEPTION",
-            "Không kiểm tra được người xử lý mới nhất của hồ sơ. Vui lòng tải lại hồ sơ.",
-            error
+                "WORKFLOW_ACTOR_REFRESH_EXCEPTION",
+                "Không kiểm tra được người xử lý mới nhất của hồ sơ. Vui lòng tải lại hồ sơ.",
+                error
         );
     }
 }
@@ -1278,7 +1334,7 @@ function submitForApproval(record) {
         return htktWfFailException("WORKFLOW_DEPENDENCY_ERROR", "Không khởi tạo được dịch vụ bản trình ký.", error);
     }
 
-    var actorResult = validateCurrentActor(record);
+    var actorResult = validateLatestWorkflowActor(record);
     if (actorResult.success !== true) return actorResult;
 
     var validationResult = htktWfValidateLegacy(record);
@@ -1316,7 +1372,7 @@ function confirmReview(record) {
         return htktWfFail("INVALID_REVIEW_PHASE", "Phase hiện tại không phải bước rà soát.", "currentPhase=" + phase);
     }
 
-    var actorResult = validateCurrentActor(record);
+    var actorResult = validateLatestWorkflowActor(record);
     if (actorResult.success !== true) return actorResult;
 
     var validationResult = htktWfValidateLegacy(record);
@@ -1350,7 +1406,7 @@ function prepareApprovalForSignature(record) {
         return htktWfFailException("WORKFLOW_DEPENDENCY_ERROR", "Không khởi tạo được dịch vụ bản trình ký.", error);
     }
 
-    var actorResult = validateCurrentActor(record);
+    var actorResult = validateLatestWorkflowActor(record);
     if (actorResult.success !== true) return actorResult;
 
     var validationResult = htktWfValidateLegacy(record);
@@ -1465,7 +1521,7 @@ function completeApprovalAfterSignature(record, signResult) {
         return htktWfFailException("WORKFLOW_DEPENDENCY_ERROR", "Không khởi tạo được dịch vụ bản trình ký.", error);
     }
 
-    var actorResult = validateCurrentActor(record);
+    var actorResult = validateLatestWorkflowActor(record);
     if (actorResult.success !== true) return actorResult;
 
     var sign = htktWfExtractSignResult(signResult);
