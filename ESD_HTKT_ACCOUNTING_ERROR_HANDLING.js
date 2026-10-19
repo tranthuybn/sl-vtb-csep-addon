@@ -53,7 +53,7 @@ function getInitialAccountingErrorExecutor(requestId) {
     try {
         var normalizedId = String(requestId || "").trim();
         var upperId = normalizedId.toUpperCase();
-        var tableName = upperId.indexOf("TT") === 0
+        var tableName = upperId.indexOf("TT") === 0 || upperId.indexOf("DC") === 0
                 ? "esdHTKTpayment"
                 : (upperId.indexOf("TU") === 0 ? "esdHTKTprepayment" : "");
 
@@ -215,6 +215,117 @@ function getAccountingErrorHandlingApproverKttc(input) {
 }
 
 /**
+ * Đếm trạng thái bút toán cho các phiếu đang hiển thị trên trang danh sách.
+ * Chỉ đọc các field cần thiết và chỉ trả dữ liệu trong phạm vi quyền của user.
+ */
+function getAccountingErrorStatusCounts(input) {
+    var handlingRec = null;
+    var accountingRec = null;
+    try {
+        var details = JSON.parse(input && input.queryString || "{}");
+        var currentUser = String(details.currentUser || "").trim();
+        var requestIds = details.requestIds;
+        if (!currentUser || !Array.isArray(requestIds) ||
+                requestIds.length > 200) {
+            return { success: false, message: "Dữ liệu kiểm tra trạng thái không hợp lệ." };
+        }
+
+        var uniqueIds = [];
+        var seen = {};
+        for (var i = 0; i < requestIds.length; i++) {
+            var id = String(requestIds[i] || "").trim();
+            var key = id.toLowerCase();
+            if (id && !seen[key]) {
+                seen[key] = true;
+                uniqueIds.push(id);
+            }
+        }
+        if (!uniqueIds.length) return { success: true, data: { items: [] } };
+
+        var idConditions = [];
+        for (var j = 0; j < uniqueIds.length; j++) {
+            idConditions.push('request.id="' +
+                    escapeQueryValue(uniqueIds[j]) + '"');
+        }
+        var contactInfo = readHTKTContactInfo(currentUser);
+        var permission = getHTKTDataPermission(currentUser, "00401");
+        var scopeFilter = buildHTKTUnitFilter(
+                permission, true, contactInfo.lv1
+        ).defaultFilter;
+
+        var allowedIds = [];
+        var itemsById = {};
+        handlingRec = new SCFile(
+                "esdHTKTaccountingErrorHandling", SCFILE_READONLY
+        );
+        handlingRec.setFields(["request.id"]);
+        var handlingRc = handlingRec.doSelect(
+                "(" + scopeFilter + ") AND (" +
+                idConditions.join(" OR ") + ")"
+        );
+        while (handlingRc === RC_SUCCESS) {
+            var allowedId = String(handlingRec["request.id"] || "").trim();
+            if (allowedId && !itemsById[allowedId.toLowerCase()]) {
+                allowedIds.push(allowedId);
+                itemsById[allowedId.toLowerCase()] = {
+                    requestId: allowedId,
+                    totalTrans: 0,
+                    totalErrorTrans: 0,
+                    errorChannel: ""
+                };
+            }
+            handlingRc = handlingRec.getNext();
+        }
+        if (!allowedIds.length) {
+            return { success: true, data: { items: [] } };
+        }
+
+        var accountingConditions = [];
+        for (var k = 0; k < allowedIds.length; k++) {
+            accountingConditions.push('prepayment.id="' +
+                    escapeQueryValue(allowedIds[k]) + '"');
+        }
+        accountingRec = new SCFile(
+                "esdHTKTaccountingInformation", SCFILE_READONLY
+        );
+        accountingRec.setFields(["prepayment.id", "status", "type"]);
+        var accountingRc = accountingRec.doSelect(
+                "(" + accountingConditions.join(" OR ") + ")"
+        );
+        while (accountingRc === RC_SUCCESS) {
+            var accountingId = String(
+                    accountingRec["prepayment.id"] || ""
+            ).trim().toLowerCase();
+            var item = itemsById[accountingId];
+            if (item) {
+                item.totalTrans++;
+                if (String(accountingRec["status"] || "")
+                        .trim().toUpperCase() === ACCOUNTING_STATUS.ERROR) {
+                    item.totalErrorTrans++;
+                    if (!item.errorChannel) {
+                        item.errorChannel = String(
+                                accountingRec["type"] || ""
+                        ).trim().toUpperCase();
+                    }
+                }
+            }
+            accountingRc = accountingRec.getNext();
+        }
+
+        var items = [];
+        for (var m = 0; m < allowedIds.length; m++) {
+            items.push(itemsById[allowedIds[m].toLowerCase()]);
+        }
+        return { success: true, data: { items: items } };
+    } catch (e) {
+        return { success: false, message: String(e && e.message || e) };
+    } finally {
+        try { if (accountingRec) accountingRec.doClose(); } catch (e1) {}
+        try { if (handlingRec) handlingRec.doClose(); } catch (e2) {}
+    }
+}
+
+/**
  * Lay danh sach distinct Nguoi dang xu ly trong dung scope cua user.
  * Khong dung REST EXPAND/@totalcount vi UI chi can mot field duy nhat.
  */
@@ -289,7 +400,7 @@ function getAccountingErrorApproverKttcOptions(input) {
             throw new Error("Thiếu ScriptLibrary danh sách cán bộ phê duyệt KTTC.");
         }
 
-        var tableName = requestId.toUpperCase().indexOf("TT") === 0 ? "esdHTKTpayment" : "esdHTKTprepayment";
+        var tableName = /^(TT|DC)/.test(requestId.toUpperCase()) ? "esdHTKTpayment" : "esdHTKTprepayment";
         requestFile = new SCFile(tableName, SCFILE_READONLY);
         if (requestFile.doSelect('id="' + escapeQueryValue(requestId) + '"') !== RC_SUCCESS) {
             throw new Error("Không tìm thấy đề nghị " + requestId + ".");
@@ -332,7 +443,7 @@ function validateAccountingErrorApproverKttc(requestId, currentUser, approverKtt
             return { success: false, message: "Thiếu ScriptLibrary danh sách cán bộ phê duyệt KTTC." };
         }
 
-        var tableName = requestId.toUpperCase().indexOf("TT") === 0 ? "esdHTKTpayment" : "esdHTKTprepayment";
+        var tableName = /^(TT|DC)/.test(requestId.toUpperCase()) ? "esdHTKTpayment" : "esdHTKTprepayment";
         requestFile = new SCFile(tableName, SCFILE_READONLY);
         if (requestFile.doSelect('id="' + escapeQueryValue(requestId) + '"') !== RC_SUCCESS) {
             return { success: false, message: "Không tìm thấy đề nghị " + requestId + "." };
@@ -443,6 +554,7 @@ function renderTabKetQuaHachToan() {
  * - Backfill các field còn thiếu trong accountingErrorHandling
  * - Update record đã tồn tại
  * - Insert nếu chưa tồn tại và có ERROR
+ * - Truyền requestIdFilter để đồng bộ riêng một phiếu cũ.
  *
  * LƯU Ý:
  * - Không gọi checkCompleteAccounting().
@@ -450,7 +562,7 @@ function renderTabKetQuaHachToan() {
  * - unit.lv1/lv2 bảng đích đang FLOAT nên convert Number().
  * ============================================================================
  */
-function syncAllAccountingErrorHandling() {
+function syncAllAccountingErrorHandling(requestIdFilter) {
     var accountingRec = null;
     var targetRec = null;
     var requestMap = {};
@@ -464,7 +576,11 @@ function syncAllAccountingErrorHandling() {
         // BƯỚC 1: QUÉT TOÀN BỘ ACCOUNTING INFORMATION
         // ================================================================
         accountingRec = new SCFile("esdHTKTaccountingInformation", SCFILE_READONLY);
-        var accountingRc = accountingRec.doSelect("true");
+        var normalizedRequestId = String(requestIdFilter || "").trim();
+        var accountingQuery = normalizedRequestId
+                ? 'prepayment.id="' + escapeQueryValue(normalizedRequestId) + '"'
+                : "true";
+        var accountingRc = accountingRec.doSelect(accountingQuery);
 
         while (accountingRc === RC_SUCCESS) {
             var prepaymentId = String(
@@ -478,7 +594,9 @@ function syncAllAccountingErrorHandling() {
                     var upperId = prepaymentId.toUpperCase();
                     var requestType = "";
 
-                    if (upperId.indexOf("TT") === 0) {
+                    if (upperId.indexOf("DC") === 0) {
+                        requestType = "DU_CHI";
+                    } else if (upperId.indexOf("TT") === 0) {
                         requestType = "THANH_TOAN";
                     } else if (upperId.indexOf("TU") === 0) {
                         requestType = "TAM_UNG";
@@ -565,7 +683,7 @@ function syncAllAccountingErrorHandling() {
             var upperRequestId = String(requestId).toUpperCase();
             var tableName = "";
 
-            if (upperRequestId.indexOf("TT") === 0) {
+            if (upperRequestId.indexOf("TT") === 0 || upperRequestId.indexOf("DC") === 0) {
                 tableName = "esdHTKTpayment";
             } else if (upperRequestId.indexOf("TU") === 0) {
                 tableName = "esdHTKTprepayment";
@@ -634,9 +752,10 @@ function syncAllAccountingErrorHandling() {
                 );
 
                 // Amount
-                if (upperRequestId.indexOf("TT") === 0) {
+                if (upperRequestId.indexOf("TT") === 0 || upperRequestId.indexOf("DC") === 0) {
                     amount = Number(
                             detailRec['total.amount.paid'] ||
+                            detailRec['total.expense.amount'] ||
                             detailRec['total_amount_paid'] ||
                             detailRec['amount'] ||
                             0
@@ -671,7 +790,7 @@ function syncAllAccountingErrorHandling() {
             var vendorTableName = "";
             var vendorQueryField = "";
 
-            if (upperRequestId.indexOf("TT") === 0) {
+            if (upperRequestId.indexOf("TT") === 0 || upperRequestId.indexOf("DC") === 0) {
                 vendorTableName = "esdHTKTpaymentVendor";
                 vendorQueryField = "payment.id";
             } else {
@@ -764,6 +883,10 @@ function syncAllAccountingErrorHandling() {
                 targetRec['payment.created.at'] = paymentCreatedAt;
                 targetRec['department'] = department;
                 targetRec['request.unit.lv1'] = unitLv1;
+                // truong them: Gan entity cho phieu Tru so chinh.
+                if (String(unitLv1 || "").trim().indexOf("0999") === 0) {
+                    targetRec["entity.code"] = "1010098";
+                }
                 targetRec['request.unit.lv2'] = unitLv2;
                 targetRec['user.approver.kttc'] = currentExecutorKttc;
                 var updateRc = targetRec.doUpdate();
@@ -820,6 +943,10 @@ function syncAllAccountingErrorHandling() {
                 targetRec['payment.created.at'] = paymentCreatedAt;
                 targetRec['department'] = department;
                 targetRec['request.unit.lv1'] = unitLv1;
+                // truong them: Gan entity cho phieu Tru so chinh.
+                if (String(unitLv1 || "").trim().indexOf("0999") === 0) {
+                    targetRec["entity.code"] = "1010098";
+                }
                 targetRec['request.unit.lv2'] = unitLv2;
                 targetRec['user.approver.kttc'] = currentExecutorKttc;
                 var insertRc = targetRec.doInsert();
@@ -891,7 +1018,7 @@ function getPaymentDetailInfo(requestId, subType) {
 
     var type = String(subType || "").toUpperCase();
     var isTamUng = (type === "TAM_UNG" || requestId.indexOf("TU") === 0);
-    var isThanhToan = (type === "THANH_TOAN" || requestId.indexOf("TT") === 0);
+    var isThanhToan = (type === "THANH_TOAN" || type === "DU_CHI" || /^(TT|DC)/.test(requestId.toUpperCase()));
 
     // 1. LẤY THÔNG TIN PHIẾU TẠM ỨNG
     if (isTamUng) {
@@ -1364,6 +1491,23 @@ function retryAccountingErrorsResult(input) {
                 continue;
             }
 
+            // Bo hau to test aa cua amount AP truoc khi serialize va gui lai.
+            if (accountingType === "AP" && typeof currentPayload.amount === "string" &&
+                    /aa$/.test(currentPayload.amount)) {
+                var retryAmountText = currentPayload.amount.replace(/aa$/, "");
+                var retryAmount = Number(retryAmountText);
+                if (retryAmountText.trim() && isFinite(retryAmount) && retryAmount > 0) {
+                    currentPayload.amount = retryAmount;
+                } else {
+                    result.failed++;
+                    result.errors.push({
+                        requestId: targetRequestId,
+                        message: "Amount AP sau khi bo hau to aa khong hop le"
+                    });
+                    continue;
+                }
+            }
+
             var newRequestId = accountingType === "CORE"
                     ? targetRequestId
                     : String(lib.UUID.generateUUID() || "").trim().toLowerCase();
@@ -1652,7 +1796,7 @@ function retryAccountingErrorsResult(input) {
 
                     if (retryRequestPrefix === "TU") {
                         retryParentActivityTable = "activityHTKTprepayment";
-                    } else if (retryRequestPrefix === "TT") {
+                    } else if (retryRequestPrefix === "TT" || retryRequestPrefix === "DC") {
                         retryParentActivityTable = "activityHTKTpayment";
                     }
 
@@ -1924,12 +2068,6 @@ function saveAccountingErrorsResult(input) {
             return { success: false, message: "Người dùng khai báo không đồng nhất", updated: 0, failed: 1, errors: [{ message: "Người dùng khai báo không đồng nhất" }] };
         }
     }
-    var approverValidationStartedAt = new Date().getTime();
-    var approverValidation = validateAccountingErrorApproverKttc(handlingRequestIdFromPayload, authenticatedUser, approverKttc);
-    var approverValidationMs = new Date().getTime() - approverValidationStartedAt;
-    if (!approverValidation.success) {
-        return { success: false, message: approverValidation.message, updated: 0, failed: 1, errors: [{ message: approverValidation.message }] };
-    }
     var userContact = authenticatedUser;
 
     // Nếu Client gửi kèm clientTime thì ưu tiên dùng, nếu không mới lấy tod() của Server
@@ -1941,8 +2079,8 @@ function saveAccountingErrorsResult(input) {
         failed: 0,
         errors: [],
         performance: {
-            approverValidationMode: approverValidation.mode,
-            approverValidationMs: approverValidationMs,
+            approverValidationMode: "skipped",
+            approverValidationMs: 0,
             selectAndPrepareMs: 0,
             updateAndTriggerMs: 0,
             activityMs: 0,
@@ -2230,7 +2368,7 @@ function saveAccountingErrorsResult(input) {
                             var parentActivityTable = "";
                             if (requestPrefix === "TU") {
                                 parentActivityTable = "activityHTKTprepayment";
-                            } else if (requestPrefix === "TT") {
+                        } else if (requestPrefix === "TT" || requestPrefix === "DC") {
                                 parentActivityTable = "activityHTKTpayment";
                             }
 
@@ -2249,35 +2387,35 @@ function saveAccountingErrorsResult(input) {
 
                     // Gửi email S6_MAIL_02_02: Yêu cầu duyệt kết quả xử lý lỗi hạch toán
                     var emailStartedAt = new Date().getTime();
-                    try {
-                        if (lib.ESD_HTKT_ACTION_WF_SEND_EMAIL && lib.ESD_HTKT_ACTION_WF_SEND_EMAIL.sendAccountingApprovalRequestEmail) {
-                            if (declarerFullName === null) {
-                                declarerFullName = userLog;
-                                var declOp = null;
-                                try {
-                                    declOp = new SCFile("operator", SCFILE_READONLY);
-                                    declOp.setFields(["full.name"]);
-                                    if (declOp.doSelect('name="' + escapeQueryValue(userLog) + '"') === RC_SUCCESS) {
-                                        declarerFullName = declOp["full.name"] || userLog;
-                                    }
-                                } catch (eDeclOp) {
-                                } finally {
-                                    try { if (declOp) declOp.doClose(); } catch (eCloseDeclOp) {}
-                                }
-                            }
-
-                            print("[WF_ACC_ERR][S6_MAIL_02_02] Chuẩn bị gửi email duyệt cho: " + approverKttc + " (phiếu: " + (rec["prepayment.id"] || targetRequestId) + ")");
-                            lib.ESD_HTKT_ACTION_WF_SEND_EMAIL.sendAccountingApprovalRequestEmail(
-                                    rec,
-                                    approverKttc,
-                                    declarerFullName
-                            );
-                            print("[WF_ACC_ERR][S6_MAIL_02_02] Đã gọi xong hàm gửi email duyệt.");
-                        }
-                    } catch (eMailReq) {
-                        print("[WF_ACC_ERR][S6_MAIL_02_02] Lỗi khi gọi hàm gửi email: " + (eMailReq && eMailReq.message ? eMailReq.message : eMailReq));
-                    }
-                    rowTiming.emailMs = new Date().getTime() - emailStartedAt;
+//                    try {
+//                        if (lib.ESD_HTKT_ACTION_WF_SEND_EMAIL && lib.ESD_HTKT_ACTION_WF_SEND_EMAIL.sendAccountingApprovalRequestEmail) {
+//                            if (declarerFullName === null) {
+//                                declarerFullName = userLog;
+//                                var declOp = null;
+//                                try {
+//                                    declOp = new SCFile("operator", SCFILE_READONLY);
+//                                    declOp.setFields(["full.name"]);
+//                                    if (declOp.doSelect('name="' + escapeQueryValue(userLog) + '"') === RC_SUCCESS) {
+//                                        declarerFullName = declOp["full.name"] || userLog;
+//                                    }
+//                                } catch (eDeclOp) {
+//                                } finally {
+//                                    try { if (declOp) declOp.doClose(); } catch (eCloseDeclOp) {}
+//                                }
+//                            }
+//
+//                            print("[WF_ACC_ERR][S6_MAIL_02_02] Chuẩn bị gửi email duyệt cho: " + approverKttc + " (phiếu: " + (rec["prepayment.id"] || targetRequestId) + ")");
+//                            lib.ESD_HTKT_ACTION_WF_SEND_EMAIL.sendAccountingApprovalRequestEmail(
+//                                    rec,
+//                                    approverKttc,
+//                                    declarerFullName
+//                            );
+//                            print("[WF_ACC_ERR][S6_MAIL_02_02] Đã gọi xong hàm gửi email duyệt.");
+//                        }
+//                    } catch (eMailReq) {
+//                        print("[WF_ACC_ERR][S6_MAIL_02_02] Lỗi khi gọi hàm gửi email: " + (eMailReq && eMailReq.message ? eMailReq.message : eMailReq));
+//                    }
+//                    rowTiming.emailMs = new Date().getTime() - emailStartedAt;
                 } else {
                     result.failed++;
                     result.errors.push({
@@ -2302,12 +2440,12 @@ function saveAccountingErrorsResult(input) {
             });
         } finally {
             try { if (rec) rec.doClose(); } catch (eClose) {}
-            rowTiming.totalMs = new Date().getTime() - rowStartedAt;
-            result.performance.selectAndPrepareMs += rowTiming.selectAndPrepareMs;
-            result.performance.updateAndTriggerMs += rowTiming.updateAndTriggerMs;
-            result.performance.activityMs += rowTiming.activityMs;
-            result.performance.emailMs += rowTiming.emailMs;
-            result.performance.rows.push(rowTiming);
+//            rowTiming.totalMs = new Date().getTime() - rowStartedAt;
+//            result.performance.selectAndPrepareMs += rowTiming.selectAndPrepareMs;
+//            result.performance.updateAndTriggerMs += rowTiming.updateAndTriggerMs;
+//            result.performance.activityMs += rowTiming.activityMs;
+//            result.performance.emailMs += rowTiming.emailMs;
+//            result.performance.rows.push(rowTiming);
         }
     }
 
@@ -2652,7 +2790,7 @@ function approveAccountingErrorsResult(input) {
                         var rejectRequestPrefix = handlingRequestId.toUpperCase().slice(0, 2);
                         if (rejectRequestPrefix === "TU") {
                             rejectParentActivityTable = "activityHTKTprepayment";
-                        } else if (rejectRequestPrefix === "TT") {
+                        } else if (rejectRequestPrefix === "TT" || rejectRequestPrefix === "DC") {
                             rejectParentActivityTable = "activityHTKTpayment";
                         }
 
@@ -2838,7 +2976,7 @@ function approveAccountingErrorsResult(input) {
                             .slice(0, 2);
                     if (approvalRequestPrefix === "TU") {
                         approvalParentActivityTable = "activityHTKTprepayment";
-                    } else if (approvalRequestPrefix === "TT") {
+                    } else if (approvalRequestPrefix === "TT" || approvalRequestPrefix === "DC") {
                         approvalParentActivityTable = "activityHTKTpayment";
                     }
 
@@ -3125,7 +3263,7 @@ function getEntryDescription(reqId, prepaymentId) {
     // 1. Phân loại bảng Entry dựa vào Tiền tố của Prepayment/Payment ID (TT. hoặc TU.)
     if (pId.indexOf("TU.") === 0) {
         tableName = "esdHTKTprepaymentEntry";
-    } else if (pId.indexOf("TT.") === 0) {
+    } else if (pId.indexOf("TT.") === 0 || pId.indexOf("DC.") === 0) {
         tableName = "esdHTKTpaymentEntry";
     } else {
         // Dự phòng nếu không có pId thì thử kiểm tra theo reqId
@@ -3300,23 +3438,24 @@ function onAccountingInfoSavedTrigger(oldRec, newRec, eventType) {
     var tableName = "";
     if (upperPrepaymentId.indexOf('TU') === 0) {
         tableName = "esdHTKTprepayment";
-    } else if (upperPrepaymentId.indexOf('TT') === 0) {
+    } else if (upperPrepaymentId.indexOf('TT') === 0 || upperPrepaymentId.indexOf('DC') === 0) {
         tableName = "esdHTKTpayment";
     }
 
-    if (tableName) {
-        var requestRec = null;
-        try {
-            requestRec = new SCFile(tableName, SCFILE_READONLY);
-            if (requestRec.doSelect('id="' + escapeQueryValue(prepaymentId) + '"') === RC_SUCCESS) {
-                var prepStatus = String(requestRec['status'] || "").toLowerCase();
-                if (prepStatus !== "approved" && prepStatus !== "accounted") {
-                    return; // Dừng lại nếu phiếu chưa được phê duyệt hoặc kế toán
-                }
-            }
-        } finally {
-            try { if (requestRec) requestRec.doClose(); } catch (eRequestClose) {}
+    if (!tableName) return;
+
+    var requestRec = null;
+    try {
+        requestRec = new SCFile(tableName, SCFILE_READONLY);
+        if (requestRec.doSelect('id="' + escapeQueryValue(prepaymentId) + '"') !== RC_SUCCESS) {
+            return;
         }
+        var prepStatus = String(requestRec['status'] || "").toLowerCase();
+        if (prepStatus !== "approved" && prepStatus !== "accounted") {
+            return; // Dừng lại nếu phiếu chưa được phê duyệt hoặc kế toán
+        }
+    } finally {
+        try { if (requestRec) requestRec.doClose(); } catch (eRequestClose) {}
     }
 
     // Nhánh Lưu khai báo chỉ thay đổi ERROR -> PENDING_APPROVAL.
@@ -3631,7 +3770,8 @@ function processAccountingSync(newRec, prepaymentId, tableName) {
             var isAllAccountingCompleted =
                     totalTrans > 0 &&
                     totalCompletedTrans === totalTrans &&
-                    totalCoreTrans > 0 &&
+                    // Dự chi có thể chỉ phát sinh AP/GL, không có giao dịch CORE.
+                    (totalCoreTrans > 0 || upperPrepaymentId.indexOf('DC') === 0) &&
                     totalCoreCompletedTrans === totalCoreTrans;
 
             if (isAllAccountingCompleted) {
@@ -3666,7 +3806,8 @@ function processAccountingSync(newRec, prepaymentId, tableName) {
     // ------------------------------------------------------------------------
     // BƯỚC D: LẤY THÔNG TIN BỔ SUNG ĐỂ GHI VÀO ERROR HANDLING
     // ------------------------------------------------------------------------
-    var requestType = (upperPrepaymentId.indexOf('TT') === 0) ? "THANH_TOAN" : "TAM_UNG";
+    var requestType = upperPrepaymentId.indexOf('DC') === 0 ? "DU_CHI"
+            : (upperPrepaymentId.indexOf('TT') === 0 ? "THANH_TOAN" : "TAM_UNG");
     var extraInfo = {
         requestTypeLabel: "",
         contractCode: "",
@@ -3688,7 +3829,7 @@ function processAccountingSync(newRec, prepaymentId, tableName) {
         if (detailRec.doSelect('id="' + escapeQueryValue(prepaymentId) + '"') === RC_SUCCESS) {
             extraInfo.requestTypeLabel = detailRec['transaction.type'] || detailRec['transaction_type'] || "";
             extraInfo.contractCode = detailRec['contract.code'] || detailRec['contract_code'] || detailRec['contract_id'] || "";
-            extraInfo.amount = Number(detailRec['amount'] || detailRec['total_amount_paid'] || 0);
+            extraInfo.amount = Number(detailRec['total.amount.paid'] || detailRec['total.expense.amount'] || detailRec['amount'] || 0);
             extraInfo.requestUnitLv1 = detailRec['unit.lv1'] || detailRec['unit_lv1'] || "";
             extraInfo.requestUnitLv2 = detailRec['unit.lv2'] || detailRec['unit_lv2'] || "";
             extraInfo.paymentCreatedAt = detailRec['created.at'];
@@ -3700,8 +3841,8 @@ function processAccountingSync(newRec, prepaymentId, tableName) {
     }
 
     // Lấy Phương thức thanh toán từ Vendor
-    var vendorTableName = (upperPrepaymentId.indexOf('TT') === 0) ? "esdHTKTpaymentVendor" : "esdHTKTprepaymentVendor";
-    var vendorQueryField = (upperPrepaymentId.indexOf('TT') === 0) ? "payment.id" : "prepayment.id";
+    var vendorTableName = /^(TT|DC)/.test(upperPrepaymentId) ? "esdHTKTpaymentVendor" : "esdHTKTprepaymentVendor";
+    var vendorQueryField = /^(TT|DC)/.test(upperPrepaymentId) ? "payment.id" : "prepayment.id";
 
     if (vendorTableName) {
         var vendorRec = new SCFile(vendorTableName, SCFILE_READONLY);
@@ -3754,6 +3895,10 @@ function processAccountingSync(newRec, prepaymentId, tableName) {
         targetRec['updated.at'] = extraInfo.updatedAt;
         targetRec['payment.created.at'] = extraInfo.paymentCreatedAt;
         targetRec['request.unit.lv1'] = extraInfo.requestUnitLv1;
+        // truong them: Gan entity cho phieu Tru so chinh.
+        if (String(extraInfo.requestUnitLv1 || "").trim().indexOf("0999") === 0) {
+            targetRec["entity.code"] = "1010098";
+        }
         targetRec['request.unit.lv2'] = extraInfo.requestUnitLv2;
         targetRec['department'] = extraInfo.department;
         targetRec['user.approver.kttc'] = currentExecutorKttc;
@@ -3785,6 +3930,10 @@ function processAccountingSync(newRec, prepaymentId, tableName) {
         targetRec['updated.at'] = extraInfo.updatedAt;
         targetRec['payment.created.at'] = extraInfo.paymentCreatedAt;
         targetRec['request.unit.lv1'] = extraInfo.requestUnitLv1;
+        // truong them: Gan entity cho phieu Tru so chinh.
+        if (String(extraInfo.requestUnitLv1 || "").trim().indexOf("0999") === 0) {
+            targetRec["entity.code"] = "1010098";
+        }
         targetRec['request.unit.lv2'] = extraInfo.requestUnitLv2;
         targetRec['department'] = extraInfo.department;
         targetRec['user.approver.kttc'] = currentExecutorKttc;
@@ -4100,15 +4249,12 @@ function buildHTKTUnitFilter(dataPermission, hasView, currentUnitLv1) {
         return result;
     }
 
-    // KTTC Trụ sở chính: mở rộng từ đúng đơn vị 099917000 sang toàn bộ
-    // hồ sơ có đơn vị cấp 1 bắt đầu bằng 0999.
+    // KTTC Trụ sở chính: lọc theo mã entity của hồ sơ xử lý lỗi.
     var normalizedCurrentUnitLv1 = String(currentUnitLv1 || "").trim();
     if (normalizedCurrentUnitLv1 === "099917000") {
-        // Prefix 0999* duoc viet thanh khoang khoa de DB co the su dung index
-        // tren request.unit.lv1 thay vi quet wildcard.
-        result.defaultFilter = '(request.unit.lv1 >= "0999" AND request.unit.lv1 < "1000")';
-        result.dataScope = "Toàn bộ đơn vị Trụ sở chính 0999*";
-        result.dataScopeUnits = ["0999*"];
+        result.defaultFilter = 'entity.code="1010098"';
+        result.dataScope = "Toàn bộ đơn vị Trụ sở chính";
+        result.dataScopeUnits = ["1010098"];
         return result;
     }
 
