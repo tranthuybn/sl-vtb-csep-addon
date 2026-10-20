@@ -1,7 +1,5 @@
 // ================================================================
 // CẤU HÌNH SLA CHO PHIẾU TẠM ỨNG / THANH TOÁN / DỰ CHI
-// SLA được tính theo giờ làm việc 08:00-12:00 và 13:00-17:00,
-// từ thứ 2 đến thứ 6, loại trừ ngày nghỉ/lễ lấy từ bảng ngày lễ đã có.
 // ================================================================
 
 
@@ -35,7 +33,7 @@ Table esdHTKTSlaConfigDetail {
   "sla.hours" decimal // Số giờ làm việc cam kết của vai trò
   "alert.stage1.rate" decimal // Tỷ lệ cảnh báo mức 1; mặc định 0.7
   "alert.stage2.rate" decimal // Tỷ lệ cảnh báo mức 2; mặc định 0.9
-  "is.active" bool // Có áp dụng SLA cho vai trò này hay không
+  "is.active" bool // Có áp dụng SLA cho vai trò này hay không (mặc định là true)
   note text // Ghi chú cấu hình
 }
 
@@ -85,20 +83,6 @@ Table esdHTKTSlaTimeSegment {
   "created.at" datetime // Thời điểm tạo bản ghi
 }
 
-
-Ref: esdHTKTSlaAssignmentHistory."sla.tracking.id" > esdHTKTSlaTracking.id
-
-// Bảng lịch sử phân công xử lý SLA
-// Khi tái phân công, SLA tiếp tục chạy và không tính lại từ đầu.
-Table esdHTKTSlaAssignmentHistory {
-  id varchar [pk] // Khóa kỹ thuật lịch sử phân công
-  "sla.tracking.id" varchar // Mã theo dõi SLA
-  "assigned.from" varchar // Người xử lý trước khi tái phân công
-  "assigned.to" varchar // Người được giao xử lý mới
-  "assigned.by" varchar // Người thực hiện phân công
-  "assigned.at" datetime // Thời điểm phân công
-  reason text // Lý do phân công lại
-}
 
 
 Ref: esdHTKTSlaAlertHistory."sla.tracking.id" > esdHTKTSlaTracking.id
