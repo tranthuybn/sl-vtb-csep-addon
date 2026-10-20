@@ -222,7 +222,7 @@ function readPaymentApprovalValue(payment, field) {
             value == null ? "" : value
     ).trim();
 }
-function getPaymentApprovalAccess(payment, currentUser, resolvedIdentity) {
+function getPaymentApprovalAccess(payment, currentUser, resolvedIdentity, cachedLeaderAccess) {
     var phase = readPaymentApprovalValue(payment, "current.phase").toLowerCase();
     var role = readPaymentApprovalValue(payment, "initial.role").toLowerCase();
     var creator = readPaymentApprovalValue(payment, "created.by").toLowerCase();
@@ -253,7 +253,8 @@ function getPaymentApprovalAccess(payment, currentUser, resolvedIdentity) {
             status === "approved" ||
             status === "accounted";
 
-    var leaderAccess = getPaymentReassignmentRoleAccess(currentUser, resolvedIdentity);
+    var leaderAccess = cachedLeaderAccess ||
+            getPaymentReassignmentRoleAccess(currentUser, resolvedIdentity);
 
     /*
      * Xác định quyền lãnh đạo theo 2 nguồn:
@@ -579,8 +580,9 @@ function validateDuplicatePaymentApprovalUser(payment, currentField, newValue) {
     }
 }
 
-function createPaymentReassignmentHistory(paymentId, field, oldValue, newValue, reason, currentUser) {
+function createPaymentReassignmentHistory(paymentId, field, oldValue, newValue, reason, currentUser, cachedPayment, cachedLeaderAccess) {
     var payment = null;
+    var ownsPayment = false;
 
     try {
         var safePaymentId = String(paymentId == null ? "" : paymentId).trim();
@@ -614,7 +616,8 @@ function createPaymentReassignmentHistory(paymentId, field, oldValue, newValue, 
             return;
         }
 
-        var leadership = getPaymentReassignmentRoleAccess(safeCurrentUser);
+        var leadership = cachedLeaderAccess ||
+                getPaymentReassignmentRoleAccess(safeCurrentUser);
 
         if (
                 !leadership ||
@@ -626,15 +629,19 @@ function createPaymentReassignmentHistory(paymentId, field, oldValue, newValue, 
             return;
         }
 
-        payment = new SCFile("esdHTKTpayment", SCFILE_READONLY);
-        payment.setFields(["id", "initial.role", "transaction.type"]);
+        payment = cachedPayment || null;
+        if (!payment) {
+            payment = new SCFile("esdHTKTpayment", SCFILE_READONLY);
+            ownsPayment = true;
+            payment.setFields(["id", "initial.role", "transaction.type"]);
 
-        if (
-                payment.doSelect(
-                        'id="' + escapeSmQueryValue(safePaymentId) + '"'
-                ) !== RC_SUCCESS
-        ) {
-            return;
+            if (
+                    payment.doSelect(
+                            'id="' + escapeSmQueryValue(safePaymentId) + '"'
+                    ) !== RC_SUCCESS
+            ) {
+                return;
+            }
         }
 
         var initialRole = String(
@@ -718,7 +725,7 @@ function createPaymentReassignmentHistory(paymentId, field, oldValue, newValue, 
         );
     } finally {
         try {
-            if (payment) {
+            if (payment && ownsPayment) {
                 payment.doClose();
             }
         } catch (eClosePayment) {}
@@ -732,11 +739,13 @@ function savePaymentApprovalField(details) {
 function runPaymentApprovalApi(details, save) {
     details = details || {};
     var payment = null;
-    var timingStart = save ? 0 : new Date().getTime();
+    var timingStart = save ? new Date().getTime() : 0;
     var timingRecord = 0;
     var timingAccess = 0;
     var timingIdentity = 0;
     var timingOptions = 0;
+    var timingUpdate = 0;
+    var timingHistory = 0;
     try {
         var paymentId = String(details.paymentId || "").trim();
         var currentUser = String(details.currentUser || "").trim();
@@ -752,7 +761,16 @@ function runPaymentApprovalApi(details, save) {
         }
         if (timingStart) timingRecord = new Date().getTime();
         var resolvedIdentity = {};
-        var apiAccess = getPaymentApprovalAccess(payment, currentUser, resolvedIdentity);
+        var reassignmentRoleAccess = getPaymentReassignmentRoleAccess(
+                currentUser,
+                resolvedIdentity
+        );
+        var apiAccess = getPaymentApprovalAccess(
+                payment,
+                currentUser,
+                resolvedIdentity,
+                reassignmentRoleAccess
+        );
         if (timingStart) timingAccess = new Date().getTime();
         var apiEditable =
                 apiAccess &&
@@ -855,6 +873,7 @@ function runPaymentApprovalApi(details, save) {
             payment[clearedField] = "";
         }
         if (payment.doUpdate() !== RC_SUCCESS) throw new Error("Không lưu được thông tin phê duyệt.");
+        if (timingStart) timingUpdate = new Date().getTime();
 
         if (!isCheckbox) {
             createPaymentReassignmentHistory(
@@ -863,9 +882,12 @@ function runPaymentApprovalApi(details, save) {
                     previousApprovalValue,
                     value,
                     details.reason,
-                    currentUser
+                    currentUser,
+                    payment,
+                    reassignmentRoleAccess
             );
         }
+        if (timingStart) timingHistory = new Date().getTime();
 
         return {
             success: true,
@@ -887,6 +909,8 @@ function runPaymentApprovalApi(details, save) {
                         " access=" + (timingRecord && timingAccess ? timingAccess - timingRecord : -1) +
                         " identity=" + (timingAccess && timingIdentity ? timingIdentity - timingAccess : -1) +
                         " options=" + (timingIdentity && timingOptions ? timingOptions - timingIdentity : -1) +
+                        " update=" + (timingUpdate ? timingUpdate - (timingOptions || timingIdentity || timingAccess) : -1) +
+                        " history=" + (timingUpdate && timingHistory ? timingHistory - timingUpdate : -1) +
                         " total=" + (timingEnd - timingStart) + "ms"
                 );
             }
