@@ -1069,7 +1069,7 @@ function getHTKTApprovalActivePsCodesByEntityCode(entityCode, psPrefix, requestC
     return result;
 }
 
-function resolveHTKTApprovalDataDomain(targetLv1, requestContext) {
+function resolveHTKTApprovalDataDomain(targetLv1, requestContext, knownEntityCode, useHeadOfficePrefix) {
     var HEAD_OFFICE_PS_PREFIX = "0999";
     var HEAD_OFFICE_OGL_SEG1 = "1010098";
     var normalizedLv1 = normalizeHTKTApprovalUnitCode(targetLv1);
@@ -1096,8 +1096,29 @@ function resolveHTKTApprovalDataDomain(targetLv1, requestContext) {
         return result;
     }
 
-    var currentEntityCode = getHTKTApprovalActiveEntityCodeByPsCode(normalizedLv1);
+    var currentEntityCode = String(
+            knownEntityCode == null ? "" : knownEntityCode
+    ).trim();
+
+    // Với hồ sơ thanh toán, entity.code đã được lưu trực tiếp trên record.
+    // Chỉ query mapping ps.code -> entity.code để tương thích các record cũ
+    // chưa có entity.code hoặc các luồng không truyền được giá trị này.
+    if (!currentEntityCode) {
+        currentEntityCode = getHTKTApprovalActiveEntityCodeByPsCode(normalizedLv1);
+    }
     if (currentEntityCode !== HEAD_OFFICE_OGL_SEG1) {
+        return result;
+    }
+
+    // Nhánh save chỉ validate một cán bộ. Với hồ sơ Trụ sở chính, không cần
+    // tải toàn bộ PS cùng entity; contact.lv1.id bắt đầu 0999 là đủ xác định
+    // cán bộ thuộc miền Trụ sở chính.
+    if (useHeadOfficePrefix === true) {
+        result.valid = true;
+        result.type = "HEAD_OFFICE";
+        result.entityCode = HEAD_OFFICE_OGL_SEG1;
+        result.allowedLv1Prefix = HEAD_OFFICE_PS_PREFIX;
+        result.useContactLv1Prefix = true;
         return result;
     }
 
@@ -1517,7 +1538,15 @@ function loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField, apiO
         return output;
     }
 
-    resolvedTargetDomain = resolveHTKTApprovalDataDomain(output.targetLv1, requestContext);
+    var paymentEntityCode = normalizeValue(
+            safeFileGet(file, ["entity.code", "entity_code"])
+    );
+    resolvedTargetDomain = resolveHTKTApprovalDataDomain(
+            output.targetLv1,
+            requestContext,
+            paymentEntityCode,
+            !!(apiOptions && apiOptions.validationOnly)
+    );
     if (!resolvedTargetDomain.valid) {
         clearAllComboBoxes(configs);
         output.success = false;
@@ -1608,7 +1637,10 @@ function loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField, apiO
         try {
             var domain = resolvedTargetDomain || resolveHTKTApprovalDataDomain(targetLv1, requestContext);
             var allowedLv1List = domain.allowedLv1List || [];
-            if (!domain.valid || !allowedLv1List.length) {
+            if (
+                    !domain.valid ||
+                    (!domain.useContactLv1Prefix && !allowedLv1List.length)
+            ) {
                 validation.message = "Không xác định được miền dữ liệu hợp lệ của hồ sơ.";
                 return validation;
             }
@@ -1617,16 +1649,36 @@ function loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField, apiO
                 return validation;
             }
 
+            var assigneeRightFilter = {
+                "contact.name": [normalizedSelectedId]
+            };
+            if (!domain.useContactLv1Prefix) {
+                assigneeRightFilter["lv1.id"] = allowedLv1List;
+            }
+
             var matchedContacts = lib.ESD_PERMS_RIGHTS.listContactsByRightsAndFilter(
                     config.seedRights,
-                    {
-                        "lv1.id": allowedLv1List,
-                        "contact.name": [normalizedSelectedId]
-                    }
+                    assigneeRightFilter
             ) || [];
             if (matchedContacts.toArray) matchedContacts = matchedContacts.toArray();
             if (normalizeArray(matchedContacts).indexOf(normalizedSelectedId) < 0) {
                 validation.message = "Cán bộ không có đúng quyền hoặc không thuộc miền của hồ sơ.";
+                return validation;
+            }
+
+            if (domain.useContactLv1Prefix) {
+                var selectedContactLv1 = normalizeUnitCode(
+                        getHTKTApprovalContactLv1(normalizedSelectedId, requestContext)
+                );
+                if (
+                        selectedContactLv1.indexOf(domain.allowedLv1Prefix) !== 0
+                ) {
+                    validation.message = "Cán bộ không thuộc miền Trụ sở chính của hồ sơ.";
+                    return validation;
+                }
+
+                validation.valid = true;
+                validation.message = "Cán bộ hợp lệ.";
                 return validation;
             }
 
@@ -1907,6 +1959,21 @@ function loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField, apiO
         var targetDomain = resolvedDomain || resolveHTKTApprovalDataDomain(targetLv1, requestContext);
         if (!targetDomain.valid) {
             result.message = "Không xác định được miền dữ liệu hợp lệ của lv1 hồ sơ.";
+            return result;
+        }
+
+        if (targetDomain.useContactLv1Prefix) {
+            var approvalContactLv1 = normalizeUnitCode(
+                    getHTKTApprovalContactLv1(contactId, requestContext)
+            );
+            result.canAccessTargetLv1 =
+                    approvalContactLv1.indexOf(targetDomain.allowedLv1Prefix) === 0;
+            if (approvalContactLv1) {
+                result.resolvedLv1List = [approvalContactLv1];
+            }
+            result.message = result.canAccessTargetLv1 ?
+                    "User thuộc miền Trụ sở chính của hồ sơ." :
+                    "User không thuộc miền Trụ sở chính của hồ sơ.";
             return result;
         }
 
