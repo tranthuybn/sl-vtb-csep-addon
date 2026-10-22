@@ -535,7 +535,7 @@ function paymentApprovalFieldEditable(payment, currentUser, field) {
 }
 
 function getPaymentApprovalOptions(details) {
-    return runPaymentApprovalApi(details, false);
+    return loadPaymentApprovalOptions(details);
 }
 
 function validateDuplicatePaymentApprovalUser(payment, currentField, newValue) {
@@ -735,13 +735,13 @@ function createPaymentReassignmentHistory(paymentId, field, oldValue, newValue, 
 }
 
 function savePaymentApprovalField(details) {
-    return runPaymentApprovalApi(details, true);
+    return runSavePaymentApprovalApi(details);
 }
 
-function runPaymentApprovalApi(details, save) {
+function runSavePaymentApprovalApi(details) {
     details = details || {};
     var payment = null;
-    var timingStart = save ? new Date().getTime() : 0;
+    var timingStart = new Date().getTime();
     var timingRecord = 0;
     var timingAccess = 0;
     var timingIdentity = 0;
@@ -754,10 +754,10 @@ function runPaymentApprovalApi(details, save) {
         var field = String(details.field || "").trim();
         var fields = getPaymentApprovalFields();
         var isCheckbox = field === "require.check.level1" || field === "require.check.level2";
-        if (!paymentId || !currentUser || (fields.indexOf(field) < 0 && !(save && isCheckbox))) {
+        if (!paymentId || !currentUser || (fields.indexOf(field) < 0 && !isCheckbox)) {
             throw new Error("Thông tin phê duyệt không hợp lệ.");
         }
-        payment = save ? new SCFile("esdHTKTpayment") : new SCFile("esdHTKTpayment", SCFILE_READONLY);
+        payment = new SCFile("esdHTKTpayment");
         if (payment.doSelect('id="' + escapeSmQueryValue(paymentId) + '"') !== RC_SUCCESS) {
             throw new Error("Không tìm thấy phiếu thanh toán.");
         }
@@ -811,29 +811,20 @@ function runPaymentApprovalApi(details, save) {
         }
         var value = isCheckbox ? details.value : String(details.value == null ? "" : details.value).trim();
         if (isCheckbox && typeof value !== "boolean") throw new Error("Giá trị checkbox không hợp lệ.");
-        var page = Math.max(1, Math.floor(Number(details.page) || 1));
-        var pageSize = Math.max(1, Math.min(100, Math.floor(Number(details.pageSize) || 10)));
-        var result;
-        if (!save || (!isCheckbox && value)) {
+        if (!isCheckbox && value) {
             var permissionContactId = resolvedIdentity.contactName || resolvePaymentApprovalContactId(currentUser);
             if (resolvedIdentity.contactName && resolvedIdentity.contactLv1) {
                 requestContext.contactLv1["$" + resolvedIdentity.contactName] = resolvedIdentity.contactLv1;
             }
-            if (timingStart) timingIdentity = new Date().getTime();
-            var loaded = save ? validatePaymentApprovalAssignee(payment, field, value, {
+            timingIdentity = new Date().getTime();
+            var loaded = validatePaymentApprovalAssignee(payment, field, value, {
                 currentUser: permissionContactId,
                 requestContext: requestContext,
                 page: 1,
                 pageSize: 1,
                 keyword: ""
-            }) : loadPaymentApprovalComboBoxesInternal(payment, field, {
-                currentUser: permissionContactId,
-                page: page,
-                pageSize: pageSize,
-                keyword: String(details.keyword || "").trim(),
-                selectedId: ""
             });
-            if (timingStart) timingOptions = new Date().getTime();
+            timingOptions = new Date().getTime();
             if (!loaded.success) {
                 return {
                     success: false,
@@ -849,17 +840,7 @@ function runPaymentApprovalApi(details, save) {
                     }
                 };
             }
-            if (save) {
-                if (!loaded.valid) throw new Error("Cán bộ đã chọn không còn hợp lệ theo quyền và đơn vị.");
-            } else {
-                if (!loaded.configs.length) throw new Error("Không tìm thấy cấu hình trường phê duyệt.");
-                result = loaded[loaded.configs[0].key];
-            }
-        }
-        if (!save) {
-            var items = [];
-            for (var i = 0; i < result.ids.length; i++) items.push({ value: result.ids[i], label: result.names[i] });
-            return { success: true, data: { items: items, page: page, pageSize: pageSize, hasMore: result.hasMore === true } };
+            if (!loaded.valid) throw new Error("Cán bộ đã chọn không còn hợp lệ theo quyền và đơn vị.");
         }
 
         if (!isCheckbox) {
@@ -912,20 +893,137 @@ function runPaymentApprovalApi(details, save) {
         return { success: false, message: String(error.message || error) };
     } finally {
         try {
-            if (timingStart) {
-                var timingEnd = new Date().getTime();
-                print(
-                        "[PAY_APR][TIMING] field=" + String(details.field || "") +
-                        " record=" + (timingRecord ? timingRecord - timingStart : -1) +
-                        " access=" + (timingRecord && timingAccess ? timingAccess - timingRecord : -1) +
-                        " identity=" + (timingAccess && timingIdentity ? timingIdentity - timingAccess : -1) +
-                        " options=" + (timingIdentity && timingOptions ? timingOptions - timingIdentity : -1) +
-                        " update=" + (timingUpdate ? timingUpdate - (timingOptions || timingIdentity || timingAccess) : -1) +
-                        " history=" + (timingUpdate && timingHistory ? timingHistory - timingUpdate : -1) +
-                        " total=" + (timingEnd - timingStart) + "ms"
-                );
-            }
+            var timingEnd = new Date().getTime();
+            print(
+                    "[PAY_APR][TIMING] field=" + String(details.field || "") +
+                    " record=" + (timingRecord ? timingRecord - timingStart : -1) +
+                    " access=" + (timingRecord && timingAccess ? timingAccess - timingRecord : -1) +
+                    " identity=" + (timingAccess && timingIdentity ? timingIdentity - timingAccess : -1) +
+                    " options=" + (timingIdentity && timingOptions ? timingOptions - timingIdentity : -1) +
+                    " update=" + (timingUpdate ? timingUpdate - (timingOptions || timingIdentity || timingAccess) : -1) +
+                    " history=" + (timingUpdate && timingHistory ? timingHistory - timingUpdate : -1) +
+                    " total=" + (timingEnd - timingStart) + "ms"
+            );
         } catch (timingError) {}
+        if (payment) payment.doClose();
+    }
+}
+
+function loadPaymentApprovalOptions(details) {
+    details = details || {};
+    var payment = null;
+
+    try {
+        var paymentId = String(details.paymentId || "").trim();
+        var currentUser = String(details.currentUser || "").trim();
+        var field = String(details.field || "").trim();
+        var fields = getPaymentApprovalFields();
+
+        if (!paymentId || !currentUser || fields.indexOf(field) < 0) {
+            throw new Error("Thông tin phê duyệt không hợp lệ.");
+        }
+
+        payment = new SCFile("esdHTKTpayment", SCFILE_READONLY);
+        if (payment.doSelect('id="' + escapeSmQueryValue(paymentId) + '"') !== RC_SUCCESS) {
+            throw new Error("Không tìm thấy phiếu thanh toán.");
+        }
+
+        var resolvedIdentity = {};
+        var reassignmentRoleAccess = getPaymentReassignmentRoleAccess(
+                currentUser,
+                resolvedIdentity
+        );
+        var apiAccess = getPaymentApprovalAccess(
+                payment,
+                currentUser,
+                resolvedIdentity,
+                reassignmentRoleAccess
+        );
+        var apiEditable =
+                apiAccess &&
+                apiAccess.fieldAccess &&
+                apiAccess.fieldAccess[field] === true;
+
+        print(
+                "[PAY_APR][OPTIONS_API] u=" + currentUser +
+                " field=" + field +
+                " kttc=" + String(apiAccess && apiAccess.isApprovalKttc === true) +
+                " editable=" + String(apiEditable)
+        );
+
+        if (!apiEditable) {
+            return {
+                success: false,
+                code: "PAYMENT_APPROVAL_FORBIDDEN",
+                message: "Bạn không có quyền sửa thông tin phê duyệt tại bước hiện tại.",
+                accessContext: {
+                    paymentId: paymentId,
+                    field: field,
+                    currentUser: currentUser,
+                    createdBy: readPaymentApprovalValue(payment, "created.by"),
+                    initialRole: readPaymentApprovalValue(payment, "initial.role"),
+                    currentPhase: readPaymentApprovalValue(payment, "current.phase"),
+                    status: readPaymentApprovalValue(payment, "status"),
+                    userCheckerKttc: readPaymentApprovalValue(payment, "user.checker.kttc")
+                }
+            };
+        }
+
+        if ((field === "user.checker.dmms" && String(payment["require.check.level1"]) !== "true") ||
+                (field === "user.checker.final" && String(payment["require.check.level2"]) !== "true")) {
+            throw new Error("Chưa bật yêu cầu rà soát tương ứng.");
+        }
+
+        var permissionContactId = resolvedIdentity.contactName ||
+                resolvePaymentApprovalContactId(currentUser);
+        var page = Math.max(1, Math.floor(Number(details.page) || 1));
+        var pageSize = Math.max(1, Math.min(100, Math.floor(Number(details.pageSize) || 10)));
+        var loaded = loadPaymentApprovalComboBoxesInternal(payment, field, {
+            currentUser: permissionContactId,
+            page: page,
+            pageSize: pageSize,
+            keyword: String(details.keyword || "").trim(),
+            selectedId: ""
+        });
+
+        if (!loaded.success) {
+            return {
+                success: false,
+                code: loaded.currentUserScope && !loaded.currentUserScope.canAccessTargetLv1 ?
+                        "PAYMENT_APPROVAL_SCOPE_DENIED" : "PAYMENT_APPROVAL_OPTIONS_FAILED",
+                message: loaded.message || "Không tải được danh sách cán bộ.",
+                scopeContext: {
+                    tokenUser: currentUser,
+                    contactId: permissionContactId,
+                    targetLv1: loaded.targetLv1,
+                    targetLv1Source: loaded.targetLv1Source,
+                    permission: loaded.currentUserScope
+                }
+            };
+        }
+
+        if (!loaded.configs.length) {
+            throw new Error("Không tìm thấy cấu hình trường phê duyệt.");
+        }
+
+        var result = loaded[loaded.configs[0].key];
+        var items = [];
+        for (var i = 0; i < result.ids.length; i++) {
+            items.push({ value: result.ids[i], label: result.names[i] });
+        }
+
+        return {
+            success: true,
+            data: {
+                items: items,
+                page: page,
+                pageSize: pageSize,
+                hasMore: result.hasMore === true
+            }
+        };
+    } catch (error) {
+        return { success: false, message: String(error.message || error) };
+    } finally {
         if (payment) payment.doClose();
     }
 }
