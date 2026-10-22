@@ -137,7 +137,7 @@ function getPaymentReassignmentRoleAccess(currentUser, resolvedIdentity) {
 
     try {
         contactFile = new SCFile("contacts", SCFILE_READONLY);
-        contactFile.setFields(["contact.id", "contact.name", "lv1.id"]);
+        contactFile.setFields(["contact.name", "lv1.id"]);
 
         var contactRc = contactFile.doSelect(
                 'contact.name="' +
@@ -159,12 +159,6 @@ function getPaymentReassignmentRoleAccess(currentUser, resolvedIdentity) {
                             contactFile["contact.name"]
             ).trim();
 
-            var resolvedContactId = String(
-                    contactFile["contact.id"] == null ?
-                            "" :
-                            contactFile["contact.id"]
-            ).trim();
-
             var resolvedContactLv1 = normalizeHTKTApprovalUnitCode(contactFile["lv1.id"]);
             var hasDuplicate = false;
             try {
@@ -180,13 +174,6 @@ function getPaymentReassignmentRoleAccess(currentUser, resolvedIdentity) {
                 }
                 if (canonicalContactName) {
                     addRightsByIdentity(canonicalContactName);
-                }
-
-                if (
-                        resolvedContactId &&
-                        resolvedContactId !== canonicalContactName
-                ) {
-                    addRightsByIdentity(resolvedContactId);
                 }
             }
         }
@@ -811,6 +798,17 @@ function runSavePaymentApprovalApi(details) {
         }
         var value = isCheckbox ? details.value : String(details.value == null ? "" : details.value).trim();
         if (isCheckbox && typeof value !== "boolean") throw new Error("Giá trị checkbox không hợp lệ.");
+
+        var previousApprovalValue = isCheckbox ?
+                "" :
+                readPaymentApprovalValue(payment, field);
+
+        // Không có thay đổi dữ liệu: không cần query lại quyền/đơn vị của
+        // cán bộ đang được gán và cũng không cần doUpdate.
+        if (!isCheckbox && previousApprovalValue === value) {
+            return { success: true, data: { field: field, value: value, clearedField: "" } };
+        }
+
         if (!isCheckbox && value) {
             var permissionContactId = resolvedIdentity.contactName || resolvePaymentApprovalContactId(currentUser);
             if (resolvedIdentity.contactName && resolvedIdentity.contactLv1) {
@@ -851,13 +849,6 @@ function runSavePaymentApprovalApi(details) {
             );
         }
 
-        var previousApprovalValue = isCheckbox ?
-                "" :
-                readPaymentApprovalValue(payment, field);
-
-        if (!isCheckbox && previousApprovalValue === value) {
-            return { success: true, data: { field: field, value: value, clearedField: "" } };
-        }
         payment[field] = value;
         var clearedField = "";
         if (isCheckbox && !value) {
@@ -2193,20 +2184,6 @@ function loadPaymentApprovalComboBoxesInternal(paymentFile, requestedField, apiO
         if (lv1) {
             result.lv1 = lv1;
             result.source = "$L.file.unit.lv1";
-            return result;
-        }
-
-        var unitId = normalizeUnitCode(
-                safeFileGet(file, [
-                    "unit.id",
-                    "unit_id",
-                    "unit"
-                ])
-        );
-
-        if (unitId) {
-            result.lv1 = resolveLv1FromUnit(unitId);
-            result.source = "$L.file.unit.id";
             return result;
         }
 
