@@ -118,6 +118,9 @@ function mapExpenseRecord(expenseRec, expenseData, expenseId) {
     expenseRec['return.reason'] = "";
     expenseRec['unit.lv1'] = expenseData['unitLv1'] || expenseData['unit.lv1'] || "";
     expenseRec['unit.lv2'] = expenseData['unitLv2'] || expenseData['unit.lv2'] || "";
+    var unitLv1 = String(expenseRec['unit.lv1'] || "").replace(/^\s+|\s+$/g, "");
+    var entityInfo = lib.ESD_HTKT_ACCOUNTING_UTILS.mapPsToEntity(unitLv1);
+    expenseRec['entity.code'] = entityInfo && entityInfo.entity ? String(entityInfo.entity) : "";
     expenseRec['unit.lv1.name'] = expenseData['unitLv1Name'] || expenseData['unit.lv1.name'] ||
             htktCreateExpense_getUnitName(expenseRec['unit.lv1']);
     expenseRec['unit.lv2.name'] = expenseData['unitLv2Name'] || expenseData['unit.lv2.name'] ||
@@ -127,12 +130,11 @@ function mapExpenseRecord(expenseRec, expenseData, expenseId) {
     expenseRec['created.by'] = expenseData['createdBy'];
     expenseRec['total.transaction'] = 0;
     expenseRec['total.contract'] = 0;
-    expenseRec['total.vendor'] = 0;
     expenseRec['total.amount.paid'] = 0;
     expenseRec['total.contract.amount'] = 0;
     expenseRec['current.phase'] = "start";
     expenseRec['currency'] = "VND";
-    expenseRec['executor.payment'] = expenseData['currentUser'];
+    expenseRec['current.executor'] = expenseData['currentUser'];
 
     var creatorUser = String(expenseData['currentUser'] || "").replace(/^\s+|\s+$/g, "");
     if (!creatorUser) {
@@ -243,17 +245,17 @@ function generateDocumentCode(docType, branchCode) {
 
 function htktCreateExpense_detectInitialRoleByRights(contactId) {
     var RIGHT_VIEW_INVOICE = "0040040003000001";
-    var RIGHT_VIEW_PAYMENT = "0040040003000001";
-    var RIGHT_CREATE_PAYMENT = "0040040003000002";
-    var RIGHT_ACCOUNTING_INPUT = "0040040003000003";
-
+    var RIGHT_VIEW_EXPENSE = "0040040004000001";
+    var RIGHT_CREATE_EXPENSE = "0040040004000002";
+    var RIGHT_ACCOUNTING_INPUT = "0040040004000003";
+    
     var rights = htktCreateExpense_getRights(contactId);
 
     if (
             htktCreateExpense_hasAllRights(rights, [
                 RIGHT_VIEW_INVOICE,
-                RIGHT_VIEW_PAYMENT,
-                RIGHT_CREATE_PAYMENT,
+                RIGHT_VIEW_EXPENSE,
+                RIGHT_CREATE_EXPENSE,
                 RIGHT_ACCOUNTING_INPUT
             ])
     ) {
@@ -263,8 +265,8 @@ function htktCreateExpense_detectInitialRoleByRights(contactId) {
     if (
             htktCreateExpense_hasAllRights(rights, [
                 RIGHT_VIEW_INVOICE,
-                RIGHT_VIEW_PAYMENT,
-                RIGHT_CREATE_PAYMENT
+                RIGHT_VIEW_EXPENSE,
+                RIGHT_CREATE_EXPENSE
             ])
     ) {
         return "dmms";
