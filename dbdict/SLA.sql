@@ -118,15 +118,23 @@ Table esdHTKTslaTracking {
   "started.at" datetime // Thời điểm bắt đầu đo SLA của lần hiện tại
   "ended.at" datetime // Thời điểm kết thúc đo SLA; null nếu chưa kết thúc
   "due.at" datetime // Hạn xử lý dự kiến sau khi loại trừ ngoài giờ và ngày nghỉ/lễ
-  "sla.minutes" number // Tổng số phút làm việc cam kết, quy đổi từ sla.hours
-  "elapsed.minutes" number // Số phút làm việc đã sử dụng
-  "remaining.minutes" number // Số phút làm việc còn lại
+  "alert.stage1.rate" decimal // Chốt ngưỡng cảnh báo từ ConfigDetail khi bắt đầu lần đo
+  "alert.stage2.rate" decimal // Không thay đổi theo chỉnh sửa cấu hình sau này
+  "end.reason" varchar // COMPLETE/RETURN/CANCEL; null khi đang đo
+  result varchar // MET/BREACHED/NOT_EVALUATED; null khi chưa kết thúc
+  "sla.minutes" decimal // Tổng số phút làm việc cam kết, quy đổi từ sla.hours
+  "elapsed.minutes" decimal // Số phút làm việc đã sử dụng
+  "remaining.minutes" decimal // Số phút làm việc còn lại
   "current.assignee" varchar // Người đang được giao xử lý
   status varchar // Trạng thái SLA (Chưa tính/Trong thời gian/Vi phạm/Đã kết thúc)
   "alert.status" varchar // Trạng thái cảnh báo (NONE/STAGE_1/STAGE_2/STAGE_3)
   "last.calculated.at" datetime // Thời điểm gần nhất hệ thống tính lại SLA
   "created.at" datetime // Thời điểm tạo bản ghi theo dõi
   "updated.at" datetime // Thời điểm cập nhật gần nhất
+
+  indexes {
+    ("payment.id", "attempt.no", "role.code") [unique]
+  }
 }
 
 
@@ -144,11 +152,15 @@ Table esdHTKTslaTimeSegment {
   "segment.no" number // Số thứ tự khoảng thời gian trong một lần đo
   "started.at" datetime // Thời điểm bắt đầu khoảng tính
   "ended.at" datetime // Thời điểm kết thúc khoảng tính; null nếu đang chạy
-  "working.minutes" number // Số phút làm việc hợp lệ trong khoảng
+  "working.minutes" decimal // Số phút làm việc hợp lệ trong khoảng
   "start.event" varchar // START/RESET/REASSIGN/RESUME (Bắt đầu đo/Đo lại/Tái phân công/Tiếp tục)
   "end.event" varchar // COMPLETE/RETURN/REASSIGN/PAUSE/CANCEL/END (Hoàn thành/Trả sửa/Tái phân công/Tạm dừng/Xóa phiếu/Kết thúc SLA)
   "assignee" varchar // Người xử lý trong khoảng thời gian
   "created.at" datetime // Thời điểm tạo bản ghi
+
+  indexes {
+    ("sla.tracking.id", "segment.no") [unique]
+  }
 }
 
 
@@ -172,6 +184,10 @@ Table esdHTKTslaAlertHistory {
   "error.message" text // Nội dung lỗi gửi mail gần nhất
   "created.at" datetime // Thời điểm tạo cảnh báo
   "updated.at" datetime // Thời điểm cập nhật gần nhất
+
+  indexes {
+    ("sla.tracking.id", "alert.stage") [unique]
+  }
 }
 
 
@@ -183,7 +199,9 @@ Table esdHTKTslaEventLog {
   id varchar [pk] 
   "sla.tracking.id" varchar // Mã theo dõi SLA; có thể null nếu bước đích chưa bắt đầu đo
   "payment.id" varchar // Mã phiếu để tra cứu nhanh lịch sử
-  "event.type" varchar // Loại sự kiện (START/COMPLETE/RETURN/REASSIGN/RESET/PAUSE/RESUME/CANCEL)
+  "event.type" varchar // START/COMPLETE/RETURN/REASSIGN/RESET/PAUSE/RESUME/CANCEL; WORKFLOW là nhật ký áp dụng sự kiện
+  "event.key" varchar // ID thao tác nghiệp vụ ổn định khi retry; chỉ có trên dòng WORKFLOW
+  "processing.status" varchar // PREPARED/APPLIED cho WORKFLOW, null với nhật ký chi tiết
   "event.at" datetime // Thời điểm nghiệp vụ phát sinh
   "from.status" varchar // Trạng thái phiếu trước sự kiện
   "to.status" varchar // Trạng thái phiếu sau sự kiện
@@ -209,3 +227,24 @@ Table esdHTKTslaEventLog {
 // CANCEL phát sinh khi xóa nghiệp vụ thành công (to.status=cancelled), không xóa dữ liệu SLA.
 // Lưu timestamp theo một chuẩn thống nhất (khuyến nghị UTC); quy đổi sang timezone
 // của Calendar khi xác định thứ trong tuần, ca làm việc và ngày nghỉ.
+
+// BỔ SUNG CHO TRIỂN KHAI DỰ CHI
+// Dự chi do KTTC tạo: bỏ RS1 và PD ĐMMS; RS2 chỉ bắt đầu khi PD KTTC chuyển sang RS2.
+// Dự chi do ĐMMS tạo: RS2 bắt đầu từ PD ĐMMS, giữ nguyên mốc khi thực sự vào check_final.
+// Các trường phút dùng decimal để giữ giây lẻ; không làm tròn qua từng segment.
+// result dùng quy ước remaining.minutes <= 0 là BREACHED (thống nhất hiển thị và cảnh báo).
+// WORKFLOW.data chứa fingerprint + toàn bộ kế hoạch ghi JSON, cần text đủ lớn.
+// PREPARED phải được retry cùng event.key trước sự kiện tiếp theo trên cùng phiếu.
+// Phải tuần tự hóa xử lý sự kiện/job theo payment.id ở tầng vận hành; các upsert
+// nhiều bảng không tự tạo thành transaction. PK id và các unique index phải tồn tại trong SM.
+// AlertHistory.send.status bổ sung Đã hủy cho cảnh báo chưa gửi khi SLA đã kết thúc.
+
+// Khóa xử lý đồng thời theo phiếu: workflow, job và retry đều phải lấy cùng khóa.
+// Tạo bằng INSERT với PK payment.id (không SELECT rồi UPDATE); xóa khi xử lý xong.
+// Không tự cướp khóa theo timeout. Nếu tiến trình chết, vận hành kiểm tra owner/
+// acquired.at, bảo đảm tiến trình cũ đã dừng trước khi xóa khóa và retry PREPARED.
+Table esdHTKTslaLock {
+  "payment.id" varchar [pk] // Mã phiếu đang được khóa tính SLA
+  owner varchar [not null] // Token sở hữu khóa
+  "acquired.at" datetime [not null] // Thời điểm lấy khóa
+}

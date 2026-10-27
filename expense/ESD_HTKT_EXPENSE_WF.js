@@ -483,3 +483,19 @@ function isSignaturePhase(record) {
 
 
 // Kiểm tra quyền hiển thị Workflow Action Test ký.
+
+/* =============================================================================
+ * SLA tự đo cho Dự chi - entry points để gắn vào Rule Sets của workflow.
+ * Không gọi tại validateDataInPhase/On exit trước khi chuyển bước thành công.
+ * Xem sla/README.md để cấu hình After successful enter / update và operationId.
+ * Không tự động gắn trigger hoặc thay đổi workflow đang chạy.
+ * ============================================================================= */
+function captureExpenseSlaSnapshot(record) {
+    return lib.ESD_HTKT_SLA_RUNTIME.snapshot(record);
+}
+
+function recordCommittedExpenseSlaEvent(kind, beforeSnapshot, afterRecord, context, options) {
+    return lib.ESD_HTKT_SLA_RUNTIME.createRuntime(options || {}).onBusinessCommitted(
+        kind, beforeSnapshot, afterRecord, context
+    );
+}
