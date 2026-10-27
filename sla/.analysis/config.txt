@@ -1,0 +1,41 @@
+Create new table and define the field for SLA (I don’t know if that enough or not)
+
+
+
+
+
+Thêm 4 trường này nữa:
+
+
+
+Set variable in the Object ticket of the new table
+
+
+
+Define the status in the ModuleStatus table
+
+
+
+Configure the SLA Agreement and Module Control
+
+
+
+
+
+Create new the SLA Process Target
+
+
+
+Configure the Ruleset for get SLA
+
+
+
+
+
+
+
+
+
+
+
+4. Thêm các triggers và application tương ứng

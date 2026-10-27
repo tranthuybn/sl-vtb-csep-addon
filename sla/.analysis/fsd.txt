@@ -1,0 +1,3670 @@
+FSD Tạm ứng
+FSD Tạm ứng
+I. TỔNG QUAN
+1.1. Mục đích tài liệu
+1.2. Phạm vi tài liệu
+1.3. Thuật ngữ và từ viết tắt
+II. YÊU CẦU CHUNG
+2.1. Luồng quy trình
+2.1.1. Luồng 1 - Cán bộ ĐMMS khởi tạo (luồng chuẩn)
+2.1.2. Luồng 2 - Cán bộ KTTC khởi tạo
+2.2. Sơ đồ trạng thái phiếu
+2.3. Quy tắc điều hướng luồng
+2.4. Quy tắc sinh mã phiếu
+2.5. Phân quyền
+2.6. Danh mục dữ liệu tham chiếu
+2.7. Quy tắc sinh bút toán tự động
+2.7.1. Nguyên tắc chung
+2.7.2. Bảng quyết định
+2.7.3. Danh mục dòng bút toán
+2.8. Quy tắc ký số
+2.8.1. Nguyên tắc ký số
+2.8.2. Phương thức xác thực chữ ký số
+III. ĐẶC TẢ USE CASE
+3.1. Danh sách Chức năng chi tiết
+3.2. FS-TU-001 - Theo dõi và Tạo mới phiếu đề nghị tạm ứng
+3.2.1. Mô tả Chức năng chi tiết
+3.2.2. Luồng thực hiện
+3.2.3. Quy tắc nghiệp vụ
+3.2.4. Mô tả màn hình
+Màn hình danh sách
+Pop-up Tạo phiếu tạm ứng kiêm chứng từ hạch toán
+3.3. FS-TU-002 - Nhập liệu đề nghị tạm ứng (CB ĐMMS)
+3.3.1. Mô tả Chức năng chi tiết
+3.3.2. Luồng thực hiện
+3.3.3. Luồng thay thế
+3.3.4. Luồng ngoại lệ
+3.3.5. Quy tắc nghiệp vụ
+3.3.6. Mô tả màn hình
+Mục Thông tin chung - Màn hình cố định
+Tab Thông tin đề nghị
+Màn hình Chi tiết đề nghị theo NCC
+Tab Hoá đơn
+Pop-up Chọn hoá đơn
+Tab Thông tin công nợ
+Tab Thông tin phê duyệt
+Tab Tài liệu đính kèm
+Tab Lịch sử cập nhật
+3.4. FS-TU-003 - Rà soát và hoàn thiện phiếu hạch toán (CB KTTC)
+3.4.1. Mô tả Chức năng chi tiết
+3.4.2. Luồng thực hiện
+3.4.3. Luồng thay thế
+3.4.4. Luồng ngoại lệ
+3.4.5. Quy tắc nghiệp vụ
+3.4.6. Mô tả màn hình
+Tab Thông tin hạch toán
+Popup Chỉnh sửa thông tin hạch toán
+3.5. FS-TU-004 - Luồng rà soát và phê duyệt
+3.5.1. Mô tả chức năng chi tiết
+3.5.2. Luồng thực hiện
+3.5.3. Luồng thay thế
+3.5.4. Luồng ngoại lệ
+3.5.5. Quy tắc nghiệp vụ
+3.5.6. Mô tả màn hình
+Nút hành động chính của từng bước
+Header - Phần chung cho các bước
+Pop-up Ký số phiếu in
+Pop-up Chọn chữ ký
+Pop-up Đăng nhập HSM
+3.6. FS-TU-005 - Gửi thông tin giao dịch và cập nhật kết quả hạch toán
+3.6.1. Mô tả chức năng chi tiết
+3.6.2. Luồng thực hiện
+3.6.3. Quy tắc nghiệp vụ
+3.7. FS-TU-006 – Theo dõi và cập nhật kết quả xử lý giao dịch
+3.7.1. Mô tả chức năng chi tiết
+3.7.2. Luồng thực hiện
+3.7.3. Quy tắc nghiệp vụ
+3.7.4. Mô tả màn hình
+Tab Kết quả hạch toán
+3.8. FS-TU-007 - Yêu cầu chỉnh sửa / Trả lại đề nghị
+3.8.1. Mô tả Chức năng chi tiết
+3.8.2. Luồng thực hiện
+3.8.3. Luồng thay thế
+3.8.4. Luồng ngoại lệ
+3.8.5. Quy tắc nghiệp vụ
+3.8.6. Mô tả màn hình
+3.9. FS-TU-008 - Tái phân công người thực hiện
+3.9.1. Mô tả chức năng chi tiết
+3.9.2. Luồng thực hiện
+3.9.3. Luồng thay thế
+3.9.4. Luồng ngoại lệ
+3.9.5. Quy tắc nghiệp vụ
+3.9.6. Mô tả màn hình
+3.10. FS-TU-009 - Xóa đề nghị
+3.10.1. Mô tả Chức năng chi tiết
+3.10.2. Luồng thực hiện
+3.10.3. Luồng thay thế
+3.10.4. Luồng ngoại lệ
+3.10.5. Quy tắc nghiệp vụ
+3.10.6. Mô tả màn hình
+Nút Xóa tại Header
+Pop-up xác nhận Xóa
+IV. PHỤ LỤC
+4.1. Common Rule - Quy tắc chung áp dụng xuyên suốt
+4.2. Giao diện các pop-up dùng chung
+I. TỔNG QUAN
+1.1. Mục đích tài liệu
+Tài liệu Đặc tả yêu cầu chức năng (FSD) này được xây dựng nhằm trình bày tường minh các yêu cầu chức năng Đề nghị tạm ứng của phân hệ Kế toán – Hạch toán thuộc Hệ thống Quản lý tài sản (QLTS), triển khai cho Ngân hàng TMCP Công Thương Việt Nam (VietinBank).
+Tài liệu phục vụ hai mục đích chính:
+Làm căn cứ để đội phát triển xây dựng và kiểm thử chức năng
+Làm tài liệu để cán bộ nghiệp vụ VietinBank xác nhận và ký duyệt yêu cầu trước khi triển khai.
+Tài liệu được xây dựng dựa trên Tài liệu yêu cầu người dùng (URD-13) và các buổi làm việc trực tiếp với các bên liên quan.
+1.2. Phạm vi tài liệu
+Tài liệu này bao gồm các chức năng thuộc nhóm nghiệp vụ Tạm ứng (TU) trong phân hệ Kế toán - Hạch toán, cụ thể được liệt kê tại Mục III – Đặc tả Use Case.
+Tài liệu thể hiện yêu cầu nghiệp vụ của VietinBank tại thời điểm xây dựng và là cơ sở để xác định phạm vi công việc giữa các bên. Đối với các yêu cầu phát sinh sau thời điểm ký duyệt tài liệu, hai bên sẽ cùng đánh giá mức độ ảnh hưởng và thống nhất phương án xử lý phù hợp.
+1.3. Thuật ngữ và từ viết tắt
+STT
+Từ viết tắt
+Định nghĩa
+1
+QLTS
+Hệ thống Quản lý tài sản Vietinbank
+2
+TU
+Tạm ứng - nghiệp vụ đề nghị ứng trước tiền để thực hiện hợp đồng/khoản mua sắm
+3
+TT
+Thanh toán - nghiệp vụ đề nghị thanh toán sau khi đã có hàng hóa/dịch vụ
+4
+ĐNTU
+Đề nghị tạm ứng
+5
+ĐNTT
+Đề nghị thanh toán
+6
+HĐ/KMS
+Hợp đồng hoặc Khoản mua sắm
+7
+NCC
+Nhà cung cấp - đơn vị cung cấp hàng hóa, dịch vụ trong HĐ/KMS
+8
+CB ĐMMS
+Cán bộ đầu mối mua sắm - người khởi tạo đề nghị
+9
+CB KTTC
+Cán bộ kế toán tài chính
+10
+RS1
+Rà soát 1 - bước rà soát tuỳ chọn phía đơn vị đề nghị trước khi phê duyệt ĐMMS
+11
+RS2
+Rà soát 2 - bước rà soát tuỳ chọn phía KTTC trước khi phê duyệt Cấp thẩm quyền
+12
+OGL
+Oracle General Ledger - hệ thống kế toán tổng hợp của VietinBank
+13
+AP
+Accounts Payable - phân hệ thanh toán nhà cung cấp trong OGL
+14
+GL
+General Ledger - phân hệ sổ cái trong OGL
+15
+VATIN
+Hệ thống quản lý hóa đơn VAT Management
+16
+ECM
+Enterprise Content Management - hệ thống lưu trữ tài liệu điện tử
+17
+MST
+Mã số thuế
+18
+NSD
+Người sử dụng
+19
+PeopleSoft
+Hệ thống quản lý nhân sự và cơ cấu tổ chức của VietinBank
+20
+Core Banking
+Hệ thống lõi ngân hàng - nơi thực hiện lệnh chuyển tiền cho NCC
+21
+QLHĐ
+Phân hệ Quản lý hợp đồng từ hoạt động mua sắm hàng hóa dịch vụ (HHDV) và tài sản cố định (TSCĐ) trong hệ thống QLTS
+22
+TK
+Tài khoản
+23
+YCCS
+Yêu cầu chỉnh sửa
+II. YÊU CẦU CHUNG
+2.1. Luồng quy trình
+Nghiệp vụ Đề nghị tạm ứng thực hiện theo 2 luồng chính, phân biệt theo người khởi tạo phiếu
+2.1.1. Luồng 1 - Cán bộ ĐMMS khởi tạo (luồng chuẩn)
+Bước
+Tên bước
+Người thực hiện
+Mô tả
+1
+Tạo phiếu & Nhập liệu
+CB ĐMMS
+Tại danh sách quản lý ĐNTT/ĐNTU, Khởi tạo phiếu từ HĐ/KMS, nhập đầy đủ thông tin đề nghị (NCC, số tiền, phương thức thanh toán, hóa đơn), chọn cán bộ tiếp nhận và phê duyệt, đính kèm tài liệu. Lưu phiếu và nhấn Trình phiếu để chuyển sang bước tiếp theo. Trạng thái chuyển sang: Chờ KTTC xử lý.
+2
+Rà soát & Lập phiếu hạch toán
+CB KTTC
+Tiếp nhận phiếu, kiểm tra tính hợp lệ của hồ sơ, bổ sung thông tin OGL cho từng NCC, xác nhận bút toán hạch toán tự động, nhập bút toán bổ sung (nếu có), chọn luồng phê duyệt tiếp theo. Có thể Chuyển phê duyệt hoặc Yêu cầu chỉnh sửa. Khi Chuyển phê duyệt thành công, hệ thống chốt dữ liệu phiếu và tự động kết xuất bản trình ký PDF phục vụ luồng ký số (Mục 2.8). Trạng thái sau khi trình duyệt: Chờ phê duyệt đề nghị.
+3
+Rà soát ĐMMS (RS1)
+Cán bộ RS1
+Chỉ thực hiện nếu CB ĐMMS tích chọn Yêu cầu Rà soát 1 ở bước 1. Xem xét toàn bộ thông tin phiếu (chỉ đọc), có thể Xác nhận hoặc Yêu cầu chỉnh sửa.
+4
+Phê duyệt ĐMMS
+Lãnh đạo đơn vị ĐMMS
+Lãnh đạo đơn vị xem xét và phê duyệt phần thông tin đề nghị. Bước này bắt buộc ký số, thao tác Phê duyệt được thực hiện thông qua màn hình Ký số và chỉ được ghi nhận khi chữ ký số thành công. Có thể Phê duyệt hoặc Yêu cầu chỉnh sửa.
+5
+Phê duyệt KTTC
+Lãnh đạo KTTC
+Lãnh đạo kế toán tài chính phê duyệt toàn bộ hồ sơ (đề nghị và hạch toán). Bước này bắt buộc ký số. Có thể Phê duyệt hoặc Yêu cầu chỉnh sửa. Trạng thái sau khi phê duyệt: Chờ phê duyệt đề nghị (tiếp tục luồng).
+6
+Rà soát KTTC (RS2)
+Cán bộ RS2
+Chỉ thực hiện nếu CB KTTC tích chọn Yêu cầu Rà soát 2 ở bước 2. Xem xét toàn bộ thông tin phiếu, có thể Xác nhận hoặc Yêu cầu chỉnh sửa.
+7
+Phê duyệt Cấp thẩm quyền
+Cấp có thẩm quyền (được cấu hình)
+Người có thẩm quyền cuối cùng (lãnh đạo cấp cao, giám đốc chi nhánh... theo cấu hình hệ thống) phê duyệt. Bước này bắt buộc ký số và là chữ ký cuối cùng trên bản trình ký. Trạng thái chuyển sang: Đã phê duyệt.
+8
+Gửi thông tin giao dịch & Cập nhật kết quả
+Hệ thống (tự động)
+Ngay sau khi được phê duyệt ở bước 7, hệ thống tự động gửi thông tin giao dịch sang OGL và Core Banking. Kết quả đồng bộ được hiển thị tại Tab Kết quả hạch toán. Trạng thái cuối: Đã hạch toán (khi tất cả bút toán thành công).
+2.1.2. Luồng 2 - Cán bộ KTTC khởi tạo
+Trong trường hợp chính CB KTTC là người khởi tạo phiếu (đăng nhập với quyền CB KTTC và thực hiện tạo phiếu), luồng được rút gọn như sau:
+Bước 1: CB KTTC vừa nhập liệu thông tin đề nghị (như CB ĐMMS ở Luồng 1) vừa lập phiếu hạch toán trong cùng 1 phiên làm việc.
+Bước 3 và 4 (RS1 và Phê duyệt ĐMMS) được bỏ qua  chuyển thẳng từ bước 2 sang bước 5 (Phê duyệt KTTC).
+Các bước còn lại (RS2, Cấp thẩm quyền, Gửi thông tin giao dịch) thực hiện như Luồng 1.
+2.2. Sơ đồ trạng thái phiếu
+Phiếu đề nghị tạm ứng có 7 trạng thái. Bảng dưới mô tả điều kiện chuyển vào/ra mỗi trạng thái:
+Trạng thái
+Màu badge
+Điều kiện vào
+Điều kiện ra / Hành động tiếp theo
+Tạo mới
+Xám
+Phiếu vừa được khởi tạo thành công (sau khi nhấn “Khởi tạo phiếu” ở pop-up xác nhận Tạo phiếu tạm ứng kiêm chứng từ hạch toán - Tham chiếu Hình 3.2.5)
+Lưu phiếu lần đầu → vẫn Tạo mới; Trình phiếu → Chờ KTTC xử lý; Xóa phiếu → Đã xóa
+Chờ KTTC xử lý
+Vàng
+CB ĐMMS nhấn Trình phiếu thành công
+CB KTTC nhấn Chuyển phê duyệt → Chờ phê duyệt đề nghị; CB KTTC nhấn Yêu cầu chỉnh sửa → Chờ chỉnh sửa đề nghị
+Chờ chỉnh sửa đề nghị
+Vàng
+Người phê duyệt ở bất kỳ bước nào nhấn Yêu cầu chỉnh sửa. Khi vào trạng thái này, toàn bộ chữ ký đã ghi nhận và bản trình ký hiện hành bị hủy hiệu lực (BR-004-07).
+CB ĐMMS/CB KTTC chỉnh sửa và Trình phiếu lại → Chờ KTTC xử lý (quay lại từ đầu luồng)
+Chờ phê duyệt đề nghị
+Cam
+CB KTTC nhấn Chuyển phê duyệt; hoặc phiếu đang chờ ở bất kỳ cấp nào trong luồng RS1→LDĐMMS→LDKTTC→RS2→Thẩm quyền. Khi vào trạng thái này, hệ thống kết xuất bản trình ký PDF và gắn vào phiếu.
+Được phê duyệt ở tất cả cấp → Đã phê duyệt; Bất kỳ cấp nào Yêu cầu chỉnh sửa → Chờ chỉnh sửa đề nghị
+Đã phê duyệt
+Xanh dương
+Cấp có thẩm quyền cuối cùng phê duyệt
+Hệ thống tự động gửi thông tin giao dịch → Đã hạch toán (khi tất cả thành công)
+Đã hạch toán
+Xanh lá
+Toàn bộ thông tin giao dịch gửi OGL và Core Banking thành công
+Trạng thái cuối - không chuyển tiếp
+Đã xóa
+Đỏ
+CB ĐMMS/CB KTTC (cb khởi tạo) xóa phiếu khi trạng thái = “Tạo mới”, “Chờ chỉnh sửa”
+Trạng thái cuối - không phục hồi
+2.3. Quy tắc điều hướng luồng
+STT
+Điều kiện
+Kết quả xử lý
+1
+CB ĐMMS tích chọn Yêu cầu Rà soát 1 = BẬT
+Luồng bao gồm bước RS1 (trước Phê duyệt ĐMMS). CB ĐMMS phải chọn người thực hiện RS1.
+2
+CB ĐMMS tích chọn Yêu cầu Rà soát 1 = TẮT (mặc định)
+Bỏ qua bước RS1. Sau khi CB KTTC chuyển phê duyệt → chuyển thẳng sang bước Phê duyệt ĐMMS.
+3
+CB KTTC tích chọn Yêu cầu Rà soát 2 = BẬT
+Luồng bao gồm bước RS2 (sau Phê duyệt KTTC, trước Cấp thẩm quyền). CB KTTC phải chọn người thực hiện RS2.
+4
+CB KTTC tích chọn Yêu cầu Rà soát 2 = TẮT (mặc định)
+Bỏ qua bước RS2. Sau Phê duyệt KTTC → chuyển thẳng sang Cấp có thẩm quyền.
+5
+Người khởi tạo phiếu là CB KTTC (Luồng 2)
+Bỏ qua RS1 và Phê duyệt ĐMMS. Sau khi CB KTTC hoàn thiện phiếu → chuyển thẳng sang Phê duyệt KTTC.
+6
+Người phê duyệt tại bất kỳ bước nào nhấn Yêu cầu chỉnh sửa
+Phiếu chuyển về Chờ chỉnh sửa đề nghị. CB ĐMMS (hoặc CB KTTC tùy nội dung yêu cầu) chỉnh sửa và trình lại từ đầu luồng. Toàn bộ chữ ký số đã ghi nhận trên phiếu và bản trình ký hiện hành bị hủy hiệu lực.
+7
+Lãnh đạo khối thực hiện Tái phân công (FS-TU-008)
+Chỉ thay đổi người thực hiện của bước đích. Cấu hình luồng giữ nguyên: không bật hoặc tắt Yêu cầu Rà soát 1 và Yêu cầu Rà soát 2 thông qua thao tác này, không thêm hoặc bớt bước, không đổi thứ tự bước.
+2.4. Quy tắc sinh mã phiếu
+Hệ thống tự động sinh mã phiếu đề nghị tạm ứng khi người dùng xác nhận tạo phiếu.
+Thành phần
+Mô tả
+Cấu trúc
+[Loại chứng từ].[Mã chi nhánh].[Năm].[Số thứ tự]
+Phần 1 – Loại chứng từ
+2 ký tự viết hoa, ký hiệu loại chứng từ được khởi tạo (TU đối với Tạm ứng, TT đối với Thanh toán…).
+Phần 2 - Mã chi nhánh
+3 ký tự số, lấy theo chi nhánh của NSD khởi tạo phiếu. Ví dụ: 100.
+Phần 3 - Năm
+2 ký tự, định dạng YY. Lấy theo năm hệ thống tại thời điểm nhấn Tạo phiếu. Ví dụ: 26 (năm 2026).
+Phần 4 - Số thứ tự
+7 ký tự, tự động tăng dần từ 0000001 đến 9999999. Tịnh tiến +1 so với số lớn nhất đã tồn tại của cùng Loại chứng từ, chạy chung toàn hàng (không phân biệt chi nhánh). Reset về 0000001 lúc 00:00:00 ngày 01/01 hàng năm.
+Ví dụ
+TU.100.26.0000001 = Phiếu tạm ứng đầu tiên trong năm 2026 trên toàn hàng, do chi nhánh 100 khởi tạo.
+2.5. Phân quyền
+Bảng dưới tóm tắt các nhóm quyền và chức năng tương ứng trong module Tạm ứng. Phạm vi dữ liệu của mỗi nhóm quyền được xác định theo hai tầng:
+Danh sách cần xử lý: các phiếu mà người dùng đang là người thực hiện của bước hiện hành. Đây là nội dung mặc định của màn hình danh sách.
+Phạm vi tra cứu: các phiếu người dùng được phép xem khi chuyển màn hình danh sách sang chế độ hiển thị toàn bộ. Nhóm quyền cán bộ chỉ tra cứu được phiếu có mình tham gia tại ít nhất một bước trong luồng. Nhóm quyền lãnh đạo tra cứu được toàn bộ phiếu thuộc đơn vị hoặc phòng ban của mình, không phụ thuộc việc có tham gia luồng hay không.
+Cách vận hành của màn hình danh sách theo hai tầng phạm vi này được mô tả tại mục 3.2.4.
+Nhóm quyền
+Chức năng được phép
+Ký số
+Phạm vi tra cứu
+CB ĐMMS - Lập đề nghị
+Xem danh sách; Tạo mới phiếu; Nhập liệu; Lưu; Trình phiếu; Xóa phiếu (khi Tạo mới); Phiếu in; Xuất danh sách
+Không
+Phiếu thuộc đơn vị của mình và có mình tham gia tại ít nhất một bước trong luồng
+CB KTTC - Tiếp nhận và Hạch toán
+Xem danh sách; Xem chi tiết phiếu; Nhập thông tin OGL cho NCC; Nhập bút toán hạch toán; Nhập bút toán bổ sung; Chuyển phê duyệt; Yêu cầu chỉnh sửa; Phiếu in
+Không
+Phiếu thuộc phòng KTTC của mình và có mình tham gia tại ít nhất một bước trong luồng
+CB hậu kiểm KTTC
+Xem danh sách; Xem chi tiết phiếu; Phiếu in
+Không
+Toàn bộ phiếu trên hệ thống, giới hạn theo đơn vị hoặc phân công, chỉ các phiếu có trạng thái Đã hạch toán
+Rà soát 1 (RS1)
+Xem danh sách; Xem chi tiết phiếu (chỉ đọc); Xác nhận; Yêu cầu chỉnh sửa; Phiếu in
+Không
+Phiếu thuộc đơn vị của mình và có mình tham gia tại ít nhất một bước trong luồng
+Lãnh đạo ĐMMS - Phê duyệt
+Xem danh sách; Xem chi tiết phiếu (chỉ đọc); Phê duyệt (Ký số); Yêu cầu chỉnh sửa; Tái phân công người thực hiện các bước thuộc khối ĐMMS; Phiếu in
+Có
+Toàn bộ phiếu thuộc đơn vị ĐMMS của mình, không yêu cầu được chỉ định trên phiếu. Thao tác Phê duyệt chỉ thực hiện được trên phiếu được chỉ định
+Lãnh đạo KTTC - Phê duyệt
+Xem danh sách; Xem chi tiết phiếu (chỉ đọc); Phê duyệt (Ký số); Yêu cầu chỉnh sửa; Tái phân công người thực hiện các bước thuộc khối KTTC; Phiếu in
+Có
+Toàn bộ phiếu thuộc phòng KTTC của mình, không yêu cầu được chỉ định trên phiếu. Thao tác Phê duyệt chỉ thực hiện được trên phiếu được chỉ định
+Rà soát 2 (RS2)
+Xem danh sách; Xem chi tiết phiếu (chỉ đọc); Xác nhận; Yêu cầu chỉnh sửa; Phiếu in
+Không
+Phiếu thuộc phòng KTTC của mình và có mình tham gia tại ít nhất một bước trong luồng
+Cấp có thẩm quyền
+Xem danh sách; Xem chi tiết phiếu (chỉ đọc); Phê duyệt (Ký số); Yêu cầu chỉnh sửa; Phiếu in
+Có
+Toàn bộ phiếu thuộc phạm vi phân cấp thẩm quyền được cấu hình trong hệ thống, không yêu cầu được chỉ định trên phiếu
+2.6. Danh mục dữ liệu tham chiếu
+Phần này liệt kê toàn bộ danh mục dữ liệu sử dụng trong module Tạm ứng.
+Mã danh mục
+Tên danh mục
+Nguồn dữ liệu
+Phương thức đồng bộ
+LOAITIEN
+Danh mục Loại tiền
+Dùng chung
+Danh mục dùng chung - mặc định VND cho Giai đoạn 1
+TAIKHOANGL
+Danh mục Tài khoản
+OGL → QLTS
+Không mặc định - đồng bộ từ OGL
+ENTITY
+Danh mục Mã đơn vị (Entity)
+OGL → QLTS
+Không mặc định - đồng bộ từ OGL
+COSTCENTER
+Danh mục Phòng ban (Cost Center)
+OGL → QLTS
+Không mặc định - đồng bộ từ OGL
+HTTHANHTOAN
+Hình thức thanh toán
+Hệ thống QLTS
+Mặc định hệ thống
+NGANHANG
+Danh mục Ngân hàng
+Corebanking → QLTS
+Không mặc định - đồng bộ từ Corebanking
+LOAIKHAUTRU
+Loại khấu trừ thuế
+Hệ thống QLTS
+Mặc định hệ thống
+TRANGTHAIDENGHI
+Trạng thái đề nghị
+Hệ thống QLTS
+Mặc định hệ thống
+NHACUNGCAP
+Danh mục Nhà cung cấp
+Hợp đồng HHDV → QLTS
+Không mặc định - lấy theo HĐ/KMS
+SITENCC
+Danh mục Site Nhà cung cấp
+OGL → QLTS
+Không mặc định - đồng bộ từ OGL
+2.7. Quy tắc sinh bút toán tự động
+Phần này mô tả quy tắc sinh bút toán kế toán, được áp dụng tại tab Thông tin hạch toán (Mục 3.4 – FS-TU-003) khi NSD xem và hoàn thiện bút toán trước khi trình duyệt, và được áp dụng lại khi gửi chính thức sang OGL sau khi phiếu Tạm ứng được phê duyệt (Mục 3.6 – FS-TU-005).
+2.7.1. Nguyên tắc chung
+Mỗi phiếu tạm ứng, theo từng nhà cung cấp (NCC), luôn phát sinh tối thiểu hai khối bút toán: ghi nhận khoản tạm ứng và trả tiền cho NCC. Khối ghi nhận thuế GTGT chỉ phát sinh khi hóa đơn của NCC có thuế
+Hai điều kiện sau xác định theo từng NCC trong phiếu, quyết định khối bút toán nào được kích hoạt:
+Mã điều kiện
+Tên điều kiện
+Nguồn - Đầu vào
+Giá trị - Đầu ra
+TU_BR_01
+Có thuế?
+Số tiền thuế của NCC, Mục 3.3.6, tab Tài liệu đính kèm – hóa đơn đã gắn
+Loại khấu trừ thuế
+Có / Không
+TU_BR_02
+Phương thức thanh toán
+Trường Phương thức thanh toán tại màn hình Chi tiết đề nghị theo NCC (Mục 3.3.6)
+Chuyển khoản / Tiền mặt
+TU_BR_01: Quy tắc Xác định giá trị Điều kiện 1: Có/Không có thuế
+Logic: Các trường hợp trả Giá trị = “Không”, gồm
+Đề nghị tham ứng không gắn hóa đơn, hoặc
+Đề nghị tạm ứng có gắn hóa đơn và Loại khấu trừ = Không khấu trừ, hoặc
+Đề nghị tạm ứng có gắn hóa đơn, và Loại khấu trừ # Không khấu trừ, và Số tiền thuế trên hóa đơn = 0
+TU_BR_02: Quy tắc Xác định giá trị Điều kiện 2: Chuyển khoản/Tiền mặt
+Logic: Kiểm tra giá trị trường “Phương thức thanh toán”
+2.7.2. Bảng quyết định
+Bốn trường hợp phát sinh từ tổ hợp Có thuế × Phương thức thanh toán:
+#
+TU_BR_01: Có thuế?
+TU_BR_02: Phương thức thanh toán
+TU-BT-01
+TU-BT-02
+TU-BT-03
+1
+Không
+Chuyển khoản
+✓
+✓
+2
+Có
+Chuyển khoản
+✓
+✓
+✓
+3
+Không
+Tiền mặt
+✓
+✓
+4
+Có
+Tiền mặt
+✓
+✓
+✓
+2.7.3. Danh mục dòng bút toán
+Mã dòng
+Tên dòng
+Ghi nợ / Ghi có
+Điều kiện sinh
+Số tiền
+Tài khoản
+TU-BT-01
+Ghi nhận tạm ứng
+Nợ
+Luôn sinh
+Số tiền tạm ứng
+Mặc định theo Site NCC (OGL) đã chọn (Mục 3.3.6); NSD có thể chọn lại tài khoản khác (BR-003-09).
+TU-BT-02
+Dòng thuế GTGT
+Nợ
+Dựa trên Đầu ra (Có/Không) của Điều kiện 1, mục 2.7.1
+Số tiền thuế
+Chọn theo Loại khấu trừ thuế: Khấu trừ toàn bộ / Khấu trừ tỷ lệ (trường do CB KTTC nhập, Mục 3.4.5 – BR-003-05).
+TU-BT-03
+Chuyển tiền tạm ứng
+Có
+Luôn sinh
+Số tiền tạm ứng cộng Số tiền thuế
+Khi Phương thức = Chuyển khoản: Tài khoản thụ hưởng đã nhập của NCC (Mục 3.3.6), kích hoạt xử lý qua Core Banking. Khi Phương thức = Tiền mặt: Tài khoản tiền mặt, không kích hoạt xử lý qua Core Banking.
+2.8. Quy tắc ký số
+Mục này quy định cách thức ký số và quản lý bản trình ký áp dụng cho các bước phê duyệt được cấu hình yêu cầu ký số trong luồng rà soát/phê duyệt của phiếu Đề nghị tạm ứng kiêm chứng từ hạch toán (Mục 3.5 – FS-TU-004).
+2.8.1. Nguyên tắc ký số
+Ký số gắn liền với hành động Phê duyệt: tại các bước được cấu hình yêu cầu ký số, hệ thống chỉ ghi nhận bước đó là đã phê duyệt khi chữ ký số được hệ thống ký số xác nhận thành công. Bước chỉ yêu cầu rà soát thực hiện thao tác Xác nhận thông thường, không phát sinh chữ ký.
+Đối tượng ký là bản trình ký định dạng PDF của phiếu. Bản trình ký được hệ thống tự động kết xuất khi CB KTTC nhấn Chuyển phê duyệt; không có thao tác tạo hoặc hủy bản trình ký thủ công trên giao diện.
+Mỗi phiếu chỉ tồn tại duy nhất một bản trình ký còn hiệu lực tại một thời điểm. Mỗi lần một bước ký số hoàn tất, chữ ký được nhúng vào bản trình ký và lưu thành phiên bản kế tiếp; người thực hiện ở bước sau nhìn thấy đầy đủ chữ ký của các bước trước.
+Khi có Yêu cầu chỉnh sửa ở bất kỳ bước rà soát hoặc phê duyệt nào, toàn bộ chữ ký đã ghi nhận và bản trình ký hiện hành bị hủy hiệu lực, không phụ thuộc số bước đã ký thành công. Phiếu quay về bước lập/hoàn thiện phiếu; bản trình ký mới được kết xuất khi phiếu được trình phê duyệt lại.
+Mỗi bước phê duyệt được gán cho đúng một người thực hiện, do đó không phát sinh trường hợp nhiều người ký đồng thời trên cùng một phiếu và hệ thống không cần cơ chế khóa phiên ký.
+Bản trình ký đã đủ chữ ký theo yêu cầu (từ trạng thái Đã phê duyệt trở đi) là bản hiển thị khi người dùng nhấn Phiếu in (CR-09).
+2.8.2. Phương thức xác thực chữ ký số
+Phương thức
+Cách xác thực
+Mô tả
+HSM
+Tài khoản và mật khẩu HSM
+Sau khi người ký nhấn Gửi ký số, hệ thống hiển thị pop-up Đăng nhập HSM để nhập tài khoản và mật khẩu. Xác thực thành công thì hệ thống thực hiện ký và trả kết quả.
+VNPT SmartCA
+Ứng dụng di động VNPT SmartCA
+Sau khi người ký nhấn Gửi ký số, hệ thống hiển thị nội dung chờ xác thực. Người ký mở ứng dụng VNPT SmartCA trên thiết bị di động và xác nhận yêu cầu ký; hệ thống nhận kết quả và cập nhật lên giao diện.
+Phương thức xác thực áp dụng cho từng người dùng được xác định theo cấu hình tài khoản đăng nhập của họ.
+III. ĐẶC TẢ USE CASE
+3.1. Danh sách Chức năng chi tiết
+Mã UC
+Tên Chức năng chi tiết
+Phạm vi
+FS-TU-001
+Theo dõi và Tạo mới phiếu đề nghị tạm ứng
+Danh sách phiếu, bộ lọc, xuất file, pop-up tạo phiếu từ HĐ/KMS
+FS-TU-002
+Nhập liệu đề nghị tạm ứng (CB ĐMMS)
+Các tab nhập liệu: Thông tin chung, Thông tin đề nghị, Thông tin phê duyệt, Tài liệu đính kèm, Lịch sử cập nhật (chỉ xem).
+FS-TU-003
+Rà soát và hoàn thiện phiếu hạch toán (CB KTTC)
+Xem lại toàn bộ thông tin, bổ sung thông tin NCC OGL, lập bút toán hạch toán, bút toán bổ sung
+FS-TU-004
+Rà soát/Phê duyệt phiếu hạch toán
+Xem toàn bộ phiếu (chỉ đọc), Xác nhận tại các bước rà soát, Phê duyệt kèm ký số tại các bước phê duyệt, hoặc Yêu cầu chỉnh sửa
+FS-TU-005
+Gửi thông tin giao dịch
+Ngay sau khi phiếu được phê duyệt, hệ thống tự động tạo và gửi giao dịch sang OGL và Core Banking. Hoàn toàn tự động, không có thao tác người dùng.
+FS-TU-006
+Theo dõi và cập nhật kết quả xử lý giao dịch
+Người dùng theo dõi trạng thái từng giao dịch tại tab Kết quả xử lý giao dịch; chủ động Thử lại khi có giao dịch Gửi thất bại.
+FS-TU-007
+Yêu cầu chỉnh sửa - Trả lại đề nghị
+Thực hiện tại các bước xử lý, rà soát và phê duyệt (từ Bước 2 đến Bước 7). Cho phép Cán bộ KTTC và các Cấp rà soát/phê duyệt trả lại hồ sơ. Trạng thái phiếu được đẩy lùi về Bước 1 để Cán bộ ĐMMS tiến hành bổ sung, chỉnh sửa.
+FS-TU-008
+Tái phân công người thực hiện
+Cho phép lãnh đạo khối tái phân công người thực hiện tại các bước chưa hoàn thành trong phạm vi quản lý, ghi nhận lịch sử và thông báo cho người cũ/người mới.
+FS-TU-009
+Xóa đề nghị
+Thực hiện bởi Cán bộ ĐMMS/KTTC khi phiếu ở trạng thái Tạo mới hoặc Chờ chỉnh sửa đề nghị. Thao tác hủy bỏ hoàn toàn phiếu đề nghị và kết thúc luồng quy trình ngay lập tức. Chi tiết điều kiện tại BR-009-01.
+3.2. FS-TU-001 - Theo dõi và Tạo mới phiếu đề nghị tạm ứng
+3.2.1. Mô tả Chức năng chi tiết
+FS-TU-001: Theo dõi và Tạo mới phiếu đề nghị tạm ứng
+Tóm tắt nghiệp vụ
+Cán bộ truy cập màn hình danh sách để xem tất cả phiếu đề nghị tạm ứng mà mình có quyền theo dõi, thực hiện tìm kiếm, lọc, xuất file, và khởi tạo phiếu mới từ Hợp đồng/Khoản mua sắm đang thực hiện.
+Người thực hiện
+CB ĐMMS (có quyền Lập đề nghị tạm ứng) và CB KTTC (có quyền Lập đề nghị tạm ứng)
+Điều kiện thực hiện
+Người dùng đã đăng nhập hệ thống và có quyền truy cập menu Đề nghị tạm ứng. Với tạo mới: tồn tại ít nhất 1 HĐ/KMS ở trạng thái Đang thực hiện thuộc phạm vi phân quyền của NSD.
+Kết quả sau khi thực hiện
+Người dùng xem được danh sách phiếu theo quyền của mình, hoặc khởi tạo thành công 1 phiếu mới ở trạng thái Tạo mới và được điều hướng sang màn hình nhập liệu.
+Điều kiện kích hoạt
+Người dùng chọn menu Đề nghị tạm ứng từ thanh điều hướng chính, Tại màn Danh sách đề nghị, người dùng khởi tạo ĐN = cách chọn 1 HĐ/KMS
+Bước tại luồng quy trình
+Bước 1 của https://vietinbank.atlassian.net/wiki/spaces/DX/pages/342949907/FSD+T+m+ng#2.1.1.-Lu%E1%BB%93ng-1---C%C3%A1n-b%E1%BB%99-%C4%90MMS-kh%E1%BB%9Fi-t%E1%BA%A1o-(lu%E1%BB%93ng-chu%E1%BA%A9n)
+Bước 1 của https://vietinbank.atlassian.net/wiki/spaces/DX/pages/342949907/FSD+T+m+ng#2.1.2.-Lu%E1%BB%93ng-2---C%C3%A1n-b%E1%BB%99-KTTC-kh%E1%BB%9Fi-t%E1%BA%A1o
+3.2.2. Luồng thực hiện
+Xem danh sách và lọc:
+Hệ thống hiển thị màn hình danh sách phiếu tạm ứng, danh sách mặc định sắp xếp theo Ngày lập giảm dần.
+CB ĐMMS/ CB KTTC có thể nhập từ khóa vào ô tìm kiếm để tìm nhanh theo Mã chứng từ, Mã HĐ/KMS, Tên HĐ/KMS hoặc Số tiền tạm ứng.
+Nhấn Lọc để mở bộ lọc nâng cao; người dùng chọn điều kiện rồi nhấn Áp dụng; danh sách được cập nhật.
+Nhấn Xuất file, chọn định dạng (Excel hoặc PDF) và tải về.
+Nhấn vào Mã chứng từ để mở màn hình chi tiết phiếu.
+Tạo phiếu mới:
+CB ĐMMS/ CB KTTC nhấn Thêm mới để mở pop-up Tạo phiếu tạm ứng kiêm chứng từ hạch toán.
+Người dùng tìm kiếm/lọc và chọn một HĐ/KMS, sau đó nhấn Tạo phiếu và xác nhận Khởi tạo phiếu.
+Hệ thống tạo phiếu mới, sinh mã tự động (theo Mục 2.4) và điều hướng sang màn hình nhập liệu ở trạng thái Tạo mới.
+3.2.3. Quy tắc nghiệp vụ
+STT
+Mô tả Rule
+Áp dụng tại bước
+Nội dung chi tiết
+BR-001-01
+Phạm vi phiếu hiển thị theo chế độ hiển thị
+Tải danh sách
+Màn hình danh sách vận hành theo hai chế độ. Chế độ Cần tôi xử lý là mặc định, chỉ hiển thị các phiếu mà NSD đang là người thực hiện của bước hiện hành. Chế độ Tất cả hiển thị theo phạm vi tra cứu của nhóm quyền quy định tại mục 2.5: nhóm quyền cán bộ chỉ thấy phiếu có mình tham gia tại ít nhất một bước trong luồng, nhóm quyền lãnh đạo thấy toàn bộ phiếu thuộc đơn vị hoặc phòng ban của mình.
+BR-001-02
+Sắp xếp mặc định theo Ngày lập giảm dần
+Tải danh sách
+Phiếu mới nhất hiển thị đầu tiên. Người dùng có thể thay đổi sắp xếp bằng cách nhấn vào tiêu đề cột.
+BR-001-03
+Badge màu theo trạng thái
+Cột Trạng thái
+Xem bảng trạng thái tại 2.2. Mỗi trạng thái có màu badge riêng biệt.
+BR-001-04
+Giới hạn xuất file
+Nhấn Tải về
+File xuất tối đa 50.000 bản ghi. Nếu vượt quá → hệ thống tách thành nhiều file. Bắt buộc chọn 1 định dạng (PDF hoặc Excel) trước khi tải.
+BR-001-05
+Chỉ hiển thị HĐ/KMS hợp lệ trong pop-up
+Mở pop-up Tạo phiếu tạm ứng kiêm chứng từ hạch toán
+Chỉ hiển thị HĐ/KMS ở trạng thái Đang thực hiện, đã đến ngày hiệu lực, và thuộc phạm vi phân quyền của NSD.
+Cụ thể ở đây: unit_level_1 bảng esdHDcontract = unit_level_1 của người khởi tạo (curent user)
+Không hiển thị Nếu Số tiền còn lại của hợp đồng = 0
+BR-001-06
+Quy tắc sinh mã phiếu
+Xác nhận tạo phiếu
+Xem chi tiết tại 2.4.
+BR-001-07
+Chỉ chọn 1 HĐ/KMS mỗi phiếu
+Pop-up - chọn dòng
+Ô đánh dấu trong danh sách HĐ/KMS chỉ cho phép chọn 1 dòng tại 1 thời điểm. Chọn dòng mới → bỏ chọn dòng cũ.
+BR-001-08
+Hiển thị người thực hiện hiện hành
+Tải danh sách
+Các cột CB ĐNTU và Người đang xử lý luôn hiển thị giá trị hiện hành tại thời điểm tải danh sách. Khi một bước được tái phân công theo FS-TU-008, danh sách phản ánh ngay người thực hiện mới.
+3.2.4. Mô tả màn hình
+Màn hình danh sách
+STT
+Tên trường
+Kiểu hiển thị
+Kiểu dữ liệu
+Bắt buộc
+Nguồn
+Mô tả
+Ví dụ
+Header & Hành động
+1
+Làm mới
+Button
+BUTTON
+N/A
+Tải lại danh sách về trạng thái mặc định
+2
+Thêm mới
+Button
+BUTTON
+N/A
+Mở pop-up để chọn HĐ/KMS và tạo phiếu mới
+3
+Ô tìm kiếm
+TextInput
+TEXT(255)
+Không bắt buộc
+NSD nhập
+Tìm kiếm gần đúng theo Mã chứng từ / Mã HĐ/KMS / Tên HĐ/KMS / Số tiền tạm ứng. Không phân biệt hoa thường. Tự cắt khoảng trắng đầu/cuối.
+Tìm kiếm...
+4
+Xuất file
+Button
+BUTTON
+N/A
+Mở dialog chọn định dạng để xuất danh sách hiện tại
+5
+Lọc
+Button
+BUTTON
+N/A
+Mở bộ lọc nâng cao
+6
+Chế độ hiển thị
+SegmentedControl
+ENUM
+N/A
+Hệ thống
+Bộ chọn hai giá trị đặt phía trên bảng danh sách: Cần tôi xử lý và Tất cả. Mặc định: Cần tôi xử lý. Phạm vi phiếu của từng chế độ theo BR-001-01.
+Cần tôi xử lý
+Bộ lọc nâng cao
+7
+Ngày lập - Từ ngày
+DatePicker
+DATE
+Không bắt buộc
+NSD nhập
+Lọc phiếu theo khoảng Ngày lập. Mặc định: trống
+dd/mm/yyyy
+8
+Ngày lập - Đến ngày
+DatePicker
+DATE
+Không bắt buộc
+NSD nhập
+Đến ngày ≥ Từ ngày
+dd/mm/yyyy
+9
+Trạng thái
+SingleSelect
+ENUM
+Không bắt buộc
+Hệ thống
+Có ô tìm kiếm trong danh sách chọn. Mặc định: Tất cả. Giá trị: Tạo mới / Chờ KTTC xử lý / Chờ phê duyệt đề nghị / Chờ chỉnh sửa đề nghị / Đã phê duyệt / Đã hạch toán / Đã xóa
+10
+CB ĐNTU
+SingleSelect
+USERREF
+Không bắt buộc
+PeopleSoft
+Mặc định: Tất cả
+11
+Phòng ban/TT ĐNTU
+SingleSelect
+ORGREF
+Không bắt buộc
+PeopleSoft
+Mặc định: Tất cả
+12
+Người đang xử lý
+SingleSelect
+USERREF
+Không bắt buộc
+PeopleSoft
+Lọc theo người thực hiện của bước hiện hành. Mặc định: Tất cả.
+13
+Đặt lại
+Button
+BUTTON
+N/A
+Xóa toàn bộ điều kiện lọc về mặc định
+14
+Áp dụng
+Button
+BUTTON
+N/A
+Áp dụng bộ lọc và tải lại danh sách
+Bảng danh sách
+15
+Mã đề nghị
+Link
+TEXT(255)
+Tự động điền
+Hệ thống
+Hiển thị dạng link. Nhấn vào → mở chi tiết phiếu. Pattern: DNTU_
+DNTU.100.250326.0010
+16
+Mã HĐ/KMS
+Link
+TEXT(255)
+Tự động điền
+QLHĐ
+Hiển thị dạng link. Nhấn vào → mở chi tiết HĐ/KMS
+HĐMS_1_25_00010
+17
+Tên HĐ/KMS
+OutputText
+TEXT(255)
+Tự động điền
+QLHĐ
+Hiển thị tên của hợp đồng đã chọn
+18
+Bước xử lý
+OutputText
+TEXT(255)
+Tự động điền
+Hệ thống
+Tên bước hiện hành của phiếu trên luồng.
+KTTC tiếp nhận
+19
+Người đang xử lý
+OutputText
+USERREF
+Tự động điền
+Hệ thống
+Người thực hiện của bước hiện hành.
+Nguyễn Văn B
+20
+Số tiền tạm ứng
+OutputText
+MONEY
+Tự động điền
+QLTS
+Tổng số tiền tạm ứng của phiếu, quy đổi VND
+100,230,000
+1,250.75 (đối với ngoại tệ)
+21
+Loại tiền
+OutputText
+ENUM
+Tự động điền
+QLHĐ
+Kế thừa từ HĐ/KMS
+VND
+22
+Ngày lập
+OutputText
+DATE
+Tự động điền
+Hệ thống
+Ngày tạo phiếu. Định dạng DD/MM/YYYY
+12/12/2024
+23
+Ngày hoàn thành
+OutputText
+DATE
+Tự động điền
+Hệ thống
+Trống khi chưa hoàn thành
+12/12/2024
+24
+Phòng ban/TT ĐNTU
+OutputText
+TEXT(255)
+Tự động điền
+PeopleSoft
+Theo phòng ban NSD tạo phiếu
+TT Quản lý hạ tầng CNTT
+25
+CB ĐNTU
+OutputText
+USERREF
+Tự động điền
+PeopleSoft
+Cán bộ đang chịu trách nhiệm nhập liệu và trình phiếu, lấy theo giá trị hiện hành của trường CB Đề nghị tại mục Thông tin chung.
+Nguyễn Văn A
+26
+Trạng thái
+Badge
+ENUM
+Tự động điền
+Hệ thống
+Màu badge theo trạng thái - xem bảng 2.2
+Chờ KTTC xử lý
+Footer danh sách
+27
+Thông tin phân trang
+OutputText
+COMPUTED
+Computed
+Hệ thống
+Định dạng: "x - y của z bản ghi"
+1 - 10 của 288 bản ghi
+28
+Điều hướng trang
+Button
+BUTTON
+N/A
+Nút Trước / số trang / Sau
+Pop-up Tạo phiếu tạm ứng kiêm chứng từ hạch toán
+Danh sách HĐ/KMS hiển thị trong pop-up chỉ bao gồm các HĐ/KMS thỏa mãn BR-001-05.
+STT
+Tên trường
+Kiểu hiển thị
+Kiểu dữ liệu
+Bắt buộc
+Nguồn
+Mô tả
+Ví dụ
+Bộ lọc
+1
+Phân loại
+SingleSelect
+ENUM
+Không bắt buộc
+Hệ thống
+Lọc theo loại HĐ/KMS. Giá trị: Tất cả / Hợp đồng / Khoản mua sắm. Mặc định: Tất cả
+Tất cả
+2
+Mã/Tên Hợp đồng/Khoản mua sắm
+TextInput
+TEXT(255)
+Không bắt buộc
+NSD nhập
+Tìm kiếm gần đúng theo Mã hoặc Tên HĐ/KMS. Không phân biệt hoa thường. Tự cắt khoảng trắng đầu/cuối.
+3
+Ngày hiệu lực/Ngày phê duyệt (đối với KMS)
+DatePicker
+DATE
+Không bắt buộc
+NSD nhập
+Lọc theo ngày hiệu lực HĐ/KMS. Lọc theo: Từ ngày - Đến ngày. Mặc định: trống
+2026-12-31
+4
+Áp dụng bộ lọc
+Button
+BUTTON
+N/A
+Tải lại danh sách theo điều kiện đã chọn
+Bảng danh sách HĐ/KMS
+5
+Ô đánh dấu chọn
+Toggle
+BOOLEAN
+N/A
+Chọn 1 dòng để tạo phiếu. Giai đoạn 1: chỉ cho phép chọn 1 tại 1 thời điểm
+6
+Mã HĐ/KMS
+Link
+TEXT(255)
+Tự động điền
+QLHĐ
+Hiển thị dạng link. Nhấn vào → mở chi tiết HĐ/KMS (tab mới)
+HD.025000103.19
+7
+Phân loại
+OutputText
+ENUM
+Tự động điền
+QLHĐ
+Hợp đồng / Khoản mua sắm
+Hợp đồng
+8
+Tên HĐ/KMS
+OutputText
+TEXT(255)
+Tự động điền
+QLHĐ
+Tên đầy đủ của HĐ/KMS
+Hợp đồng mua sắm máy tính
+9
+Ngày hiệu lực
+OutputText
+DATE
+Tự động điền
+QLHĐ
+Ngày hiệu lực
+31/12/2026
+10
+Tổng giá trị HĐ/KMS
+OutputText
+MONEY
+Tự động điền
+QLHĐ
+Tổng số tiền bao gồm thuế cả HĐ/KMS
+40,000,000
+11
+Loại tiền
+OutputText
+ENUM
+Tự động điền
+QLHĐ
+Loại tiền của HĐ/KMS
+VND
+12
+CB phụ trách HĐ/KMS
+OutputText
+USERREF
+Tự động điền
+PeopleSoft/QLHĐ
+Người phụ trách HĐ/KMS phía VietinBank
+VT2.TEST
+13
+Trạng thái
+Badge
+ENUM
+Tự động điền
+QLHĐ
+Đang thực hiện (xanh) / Hoàn thành (xanh nhạt) / các trạng thái khác
+Đang thực hiện
+Footer pop-up
+14
+Hủy
+Button
+BUTTON
+N/A
+Đóng pop-up, không tạo phiếu
+15
+Tạo phiếu
+Button
+BUTTON
+N/A
+Tạo phiếu TU mới từ HĐ/KMS đã chọn, sinh mã DNTU và điều hướng sang. Chỉ enable khi đã chọn 1 dòng.
+3.3. FS-TU-002 - Nhập liệu đề nghị tạm ứng (CB ĐMMS)
+3.3.1. Mô tả Chức năng chi tiết
+FS-TU-002: Nhập liệu đề nghị tạm ứng
+Tóm tắt nghiệp vụ
+Sau khi tạo phiếu mới, cán bộ ĐMMS nhập đầy đủ thông tin đề nghị tạm ứng: thông tin chung của phiếu, thông tin từng nhà cung cấp kèm hóa đơn, chọn người phê duyệt, đính kèm tài liệu. Sau khi hoàn tất, nhấn Trình phiếu để chuyển sang CB KTTC xử lý.
+Người thực hiện
+CB ĐMMS có quyền Lập đề nghị tạm ứng
+Điều kiện thực hiện
+Phiếu đã được tạo thành công từ FS-TU-001, đang ở trạng thái Tạo mới. Người dùng đang thao tác trên đúng phiếu được phân công.
+Kết quả sau khi thực hiện
+Phiếu được lưu với đầy đủ thông tin và trạng thái chuyển sang Chờ KTTC xử lý. Hệ thống gửi thông báo đến CB KTTC được chỉ định.
+Điều kiện kích hoạt
+CB ĐMMS nhấn vào Mã chứng từ của phiếu ở trạng thái Tạo mới từ danh sách.
+Tham chiếu luồng
+Bước 1 của https://vietinbank.atlassian.net/wiki/spaces/DX/pages/342949907/FSD+T+m+ng#2.1.1.-Lu%E1%BB%93ng-1---C%C3%A1n-b%E1%BB%99-%C4%90MMS-kh%E1%BB%9Fi-t%E1%BA%A1o-(lu%E1%BB%93ng-chu%E1%BA%A9n)
+Bước 1 của https://vietinbank.atlassian.net/wiki/spaces/DX/pages/342949907/FSD+T+m+ng#2.1.2.-Lu%E1%BB%93ng-2---C%C3%A1n-b%E1%BB%99-KTTC-kh%E1%BB%9Fi-t%E1%BA%A1o
+3.3.2. Luồng thực hiện
+Hệ thống mở màn hình chi tiết phiếu, mặc định hiển thị Tab Thông tin chung. Các thông tin cơ bản từ HĐ/KMS được tự động điền vào.
+CB ĐMMS nhập Nội dung giao dịch (bắt buộc).
+Chuyển sang tab Thông tin đề nghị: nhấn Chọn NCC để điều hướng sang màn hình Chi tiết đề nghị theo NCC, chọn NCC, nhập số tiền và phương thức thanh toán, thông tin tài khoản/giấy tờ, gắn hóa đơn (nếu có) rồi Lưu để quay lại. Lặp lại cho mỗi NCC cần đề nghị.
+Tại bước chọn NCC, CB DMMS chọn Hóa đơn (nếu có), khi gán Hóa đơn bấm Lưu, các Hóa đơn được chọn sẽ được kiểm tra nếu đã quá T+2, đồng thời kiểm tra tổng tiền trong ngày của NCC ( kiểm tra 5 triệu - tham chiếu BR-002_17)
+Chuyển sang tab Thông tin phê duyệt: chọn CB KTTC tiếp nhận, bật/tắt Yêu cầu Rà soát 1, chọn cán bộ RS1 và Lãnh đạo ĐMMS.
+Chuyển sang tab Tài liệu đính kèm: chọn các tài liệu cần thiết từ kho tài liệu đã số hóa của HĐ/KMS.
+Nhấn Lưu ở bất kỳ thời điểm nào để lưu nháp. Hệ thống kiểm tra các trường bắt buộc và lưu dữ liệu.
+Nhấn Trình phiếu: hệ thống kiểm tra toàn bộ trường bắt buộc trên mọi tab; nếu hợp lệ, phiếu chuyển sang Chờ KTTC xử lý và gửi thông báo đến CB KTTC.
+3.3.3. Luồng thay thế
+Lưu nháp và tiếp tục sau: CB ĐMMS có thể lưu nháp phiếu chưa đầy đủ và quay lại nhập tiếp, miễn là phiếu còn ở trạng thái Tạo mới hoặc Chờ chỉnh sửa đề nghị. Thao tác Trình phiếu chỉ thực hiện được khi tất cả trường bắt buộc đã được điền.
+3.3.4. Luồng ngoại lệ
+Trình phiếu khi thiếu thông tin bắt buộc: hệ thống hiển thị lỗi tại từng trường còn thiếu và không cho chuyển trạng thái. CB ĐMMS phải hoàn thiện thông tin trước khi thử lại.
+Trình phiếu khi có hóa đơn đã hết hiệu lực (BR-002-16): ngay khi nhấn Trình phiếu, hệ thống tái kiểm tra trạng thái hiện tại của toàn bộ hóa đơn đã gắn ở mọi NCC trong phiếu - không dùng lại kết quả kiểm tra tại thời điểm chọn hóa đơn (chỉ kiểm tra lại đối với hóa đơn quá T+2 so với ngày kiểm tra gần nhất. Nếu phát hiện hóa đơn nào không còn ở trạng thái Hợp lệ (đã chuyển sang Hết hạn kiểm tra, Đang kiểm tra hoặc Không hợp lệ), hệ thống chặn Trình phiếu và hiển thị lỗi nêu rõ Số hóa đơn cùng NCC tương ứng, yêu cầu CB ĐMMS gỡ hoặc thay hóa đơn đó trước khi trình lại.
+3.3.5. Quy tắc nghiệp vụ
+STT
+Mô tả Rule
+Áp dụng tại bước
+Nội dung chi tiết
+BR-002-01
+Không thể sửa phiếu đã trình
+Toàn bộ màn hình
+Sau khi phiếu chuyển sang trạng thái Chờ KTTC xử lý, tất cả các trường chuyển sang chỉ đọc đối với CB ĐMMS. CB ĐMMS chỉ được sửa lại khi phiếu được trả về trạng thái Chờ chỉnh sửa đề nghị.
+BR-002-02
+Số tiền đề nghị không vượt quá hạn mức còn lại
+Màn hình Chi tiết đề nghị theo NCC – Số tiền đề nghị tạm ứng
+Số tiền đề nghị tạm ứng của NCC phải nhỏ hơn hoặc bằng Số tiền còn lại của HĐ/KMS. Khi HĐ/KMS có bảo lãnh tạm ứng, tổng số tiền đề nghị tạm ứng lũy kế gồm cả lần này không được vượt quá Giá trị bảo lãnh còn hiệu lực. Nếu nhập vượt, hệ thống cảnh báo và không cho lưu dữ liệu NCC.
+BR-002-03
+Loại tiền kế thừa từ HĐ/KMS
+Toàn bộ phiếu
+Loại tiền của phiếu, của từng NCC và của các hóa đơn gắn với phiếu được kế thừa theo HĐ/KMS nguồn hoặc hóa đơn nguồn. Người dùng không được sửa Loại tiền tại màn hình nhập liệu đề nghị.
+BR-002-04
+Chuyển khoản: bắt buộc thông tin tài khoản thụ hưởng
+Màn hình Chi tiết đề nghị theo NCC
+Khi Phương thức thanh toán = Chuyển khoản, các trường Số tài khoản thụ hưởng, Ngân hàng thụ hưởng và Tên chủ tài khoản thụ hưởng là bắt buộc. Hệ thống không cho lưu NCC nếu thiếu một trong các trường này.
+BR-002-05
+Tiền mặt: bắt buộc thông tin người thụ hưởng
+Màn hình Chi tiết đề nghị theo NCC
+Khi Phương thức thanh toán = Tiền mặt, các trường Họ tên người thụ hưởng, Số GTTT, Ngày cấp, Nơi cấp và Số điện thoại là bắt buộc. Hệ thống không cho lưu NCC nếu thiếu một trong các trường này.
+BR-002-06
+Điều kiện hiển thị hóa đơn trong pop-up chọn
+Pop-up Chọn hóa đơn
+Pop-up chỉ hiển thị hóa đơn thỏa đồng thời: MST người bán trùng MST của NCC đang thao tác; MST người mua là MST VietinBank; hóa đơn chưa gắn với ĐNTU/ĐNTT khác; thuộc nguồn hóa đơn hợp lệ của hệ thống. Trạng thái kiểm tra và thời hạn kiểm tra được hiển thị để người dùng nhận biết, xử lý theo BR-002-16 và BR-002-18.
+BR-002-07
+Thông tin bảo lãnh là chỉ đọc
+Màn hình Chi tiết đề nghị theo NCC – Thông tin bảo lãnh
+Các trường Số/Ký hiệu bảo lãnh, Ngân hàng bảo lãnh, Giá trị bảo lãnh và Ngày hết hiệu lực được lấy từ QLHĐ với điều kiện Loại bảo lãnh = Bảo lãnh tạm ứng. Người dùng không nhập thủ công. Nếu không có bảo lãnh tạm ứng, hệ thống để trống các trường này.
+BR-002-08
+Xóa phiếu chỉ khi Tạo mới hoặc Chờ chỉnh sửa
+Header – nút Xóa
+Nút Xóa chỉ hiển thị khi phiếu ở trạng thái Tạo mới hoặc Chờ chỉnh sửa đề nghị và người dùng là cán bộ đang chịu trách nhiệm chỉnh sửa phiếu. Sau khi xác nhận xóa, phiếu chuyển trạng thái Đã xóa và không phục hồi.
+BR-002-09
+Tài liệu chỉ theo đúng HĐ/KMS
+Pop-up Lựa chọn tài liệu đính kèm
+Pop-up chỉ hiển thị tài liệu thuộc đúng Mã HĐ/KMS của phiếu đang thao tác; không hiển thị tài liệu của HĐ/KMS khác. Nếu tài liệu gốc bên QLHĐ đã bị xóa, khi tải xuống hệ thống thông báo tài liệu không còn trong danh sách tài liệu đã số hóa thành công bên phân hệ QLHĐ.
+BR-002-10
+Không chọn trùng NCC trong một phiếu
+Màn hình Chi tiết đề nghị theo NCC – Tên NCC
+Dropdown Tên NCC chỉ hiển thị các NCC thuộc HĐ/KMS mà chưa có trong danh sách đề nghị của phiếu. Khi xóa một NCC khỏi danh sách, NCC đó xuất hiện trở lại trong dropdown.
+BR-002-11
+Cơ chế đồng bộ OGL
+Site NCC (OGL)
+Luồng 1: khi CB ĐMMS nhấn Trình phiếu, hệ thống tự gọi API OGL để đồng bộ danh sách site cho tất cả NCC trong phiếu. Luồng 2: nếu người khởi tạo là CB KTTC, CB KTTC chủ động nhấn Đồng bộ OGL cho từng NCC. Trường Site NCC chỉ hiển thị và cho phép thao tác với vai trò CB KTTC.
+BR-002-12
+Tự động tra cứu tên chủ tài khoản thụ hưởng
+Khi Phương thức = Chuyển khoản
+Khi Số tài khoản thụ hưởng và Ngân hàng thụ hưởng đã được nhập đầy đủ, hệ thống gọi service tra cứu tên chủ tài khoản. Tra cứu thành công: trường Tên chủ tài khoản tự điền và khóa. Tra cứu thất bại hoặc không tìm thấy: trường để trống và mở cho người dùng tự nhập.
+BR-002-13
+Nội dung giao dịch NCC kế thừa mặc định
+Màn hình Chi tiết đề nghị theo NCC – Nội dung giao dịch
+Giá trị khởi tạo lấy theo Nội dung giao dịch đã nhập tại tab Thông tin chung. Người dùng được phép sửa riêng cho từng NCC; việc sửa riêng không đồng bộ ngược lại tab Thông tin chung.
+BR-002-14
+Ẩn/hiện khối Đề nghị và Tiếp nhận theo luồng khởi tạo
+Tab Thông tin phê duyệt
+Khối Đề nghị và Tiếp nhận chỉ hiển thị khi phiếu được khởi tạo bởi CB ĐMMS (Luồng 1), ẩn hoàn toàn ở Luồng 2 vì không phát sinh bước tiếp nhận. Tại bước nhập liệu, chỉ CB ĐMMS chọn và sửa được các trường trong khối.
+Sau khi phiếu đã trình, các trường trong khối chỉ sửa được qua thao tác Tái phân công (FS-TU-008): Lãnh đạo ĐMMS đối với Rà soát đầu mối mua sắm (Rà soát 1) và Phê duyệt ĐMMS, Lãnh đạo KTTC đối với KTTC tiếp nhận.
+BR-002-15
+Ẩn khối Phê duyệt và Ban hành với CB ĐMMS
+Tab Thông tin phê duyệt
+Khối Phê duyệt và Ban hành không hiển thị với CB ĐMMS ở bất kỳ trạng thái nào của phiếu. Tại bước hoàn thiện phiếu hạch toán, chỉ CB KTTC chọn hoặc sửa được các trường trong khối.
+Sau khi phiếu đã trình, Lãnh đạo KTTC sửa được các trường qua thao tác Tái phân công (FS-TU-008); Lãnh đạo ĐMMS chỉ xem, không sửa.
+BR-002-16
+Tái kiểm tra hiệu lực hóa đơn khi Trình phiếu
+Header – nút Trình phiếu
+Tại thời điểm Trình phiếu, hệ thống kiểm tra lại trạng thái hiện tại của toàn bộ hóa đơn đã gắn ở mọi NCC, không dùng lại kết quả kiểm tra tại thời điểm chọn hóa đơn. Nếu có hóa đơn không còn Hợp lệ hoặc đang ở trạng thái cần kiểm tra lại, hệ thống chặn Trình phiếu, hiển thị Số hóa đơn/NCC liên quan và yêu cầu người dùng gỡ, thay hoặc kiểm tra lại hóa đơn.
+BR-002-17
+Kiểm tra logic 5 triệu khi gắn hóa đơn
+Pop-up Chọn hóa đơn – nút Lưu
+Khi người dùng chọn hóa đơn và nhấn Lưu, hệ thống gọi API /invoice/check-amount để kiểm tra tổng số tiền thanh toán trong các hóa đơn thuộc cùng một NCC trong cùng một ngày. Nếu tổng từ 5 triệu đồng trở lên, hệ thống hiển thị cảnh báo: “Hóa đơn [X] của nhà cung cấp [A] có tổng trong ngày [B] từ 5 triệu đồng trở lên phải có chứng từ thanh toán không dùng tiền mặt”. Người dùng vẫn được tiếp tục sau khi xác nhận cảnh báo.
+BR-002-18
+Thời hạn kiểm tra hóa đơn T+2
+Pop-up Chọn hóa đơn, Tab Hóa đơn, Tab Tài liệu đính kèm
+Hệ thống tính Thời hạn kiểm tra dựa trên last_check_date của hóa đơn. Nếu ngày hiện tại - last_check_date > 2 ngày, hiển thị “Quá hạn”; ngược lại hiển thị “Còn hạn”. Khi nhấn Lưu hoặc Trình phiếu với hóa đơn Quá hạn, hệ thống gọi API /invoice/check-invoice để kiểm tra lại. Nếu kết quả không hợp lệ, hệ thống chặn thao tác theo BR-002-16.
+3.3.6. Mô tả màn hình
+Mục Thông tin chung - Màn hình cố định
+STT
+Tên trường
+Kiểu hiển thị
+Kiểu dữ liệu
+Bắt buộc
+Nguồn
+Mô tả
+Ví dụ
+Header - Hành động
+1
+Quay lại
+Button
+BUTTON
+N/A
+Trở về. Nếu có thay đổi chưa lưu → hiện hộp xác nhận
+2
+Xóa
+Button
+BUTTON
+N/A
+Chỉ hiển thị khi trạng thái = Tạo mới/Chờ chỉnh sửa đề nghị. Hiện hộp xác nhận trước khi xóa
+3
+Lưu
+Button
+BUTTON
+N/A
+Lưu nháp phiếu. Kiểm tra các trường bắt buộc trước khi lưu (hiển thị cảnh báo nhưng vẫn cho lưu)
+4
+Trình phiếu
+Button
+BUTTON
+N/A
+Gửi phiếu sang CB KTTC. Chỉ cho phép khi tất cả trường bắt buộc hợp lệ
+5
+Phiếu in
+Button
+BUTTON
+N/A
+Xuất biểu mẫu in ra PDF
+Thông tin chung
+6
+Mã Hợp đồng/Khoản mua sắm
+OutputText
+TEXT(255)
+Tự động điền
+QLHĐ
+Lấy nguyên trạng từ HĐ/KMS được chọn khi tạo phiếu; cố định trong suốt vòng đời phiếu, không đồng bộ lại nếu bên QLHĐ có thay đổi sau đó.
+HĐMS_1_25_00010
+7
+Tên Hợp đồng/Khoản mua sắm
+OutputText
+TEXT(255)
+Tự động điền
+QLHĐ
+Lấy từ HĐ/KMS được chọn khi tạo phiếu
+Hợp đồng mua sắm máy tính
+8
+Phòng ban/Trung tâm thực hiện
+OutputText
+TEXT(255)
+Tự động điền
+PeopleSoft
+Lấy theo phòng ban của NSD đang đăng nhập
+TT Quản lý hạ tầng CNTT
+9
+CB Đề nghị
+OutputText
+USERREF
+Tự động điền
+PeopleSoft
+Lấy theo NSD đang đăng nhập. Hiển thị kèm icon xem chi tiết
+Nguyễn Văn A
+11
+Loại tiền
+OutputText
+ENUM
+Tự động điền
+QLHĐ
+Lấy theo loại tiền của HĐ/KMS. Mặc định VND
+VND
+10
+Tổng giá trị Hợp đồng/Khoản mua sắm
+OutputText
+MONEY
+Tự động điền
+QLHĐ
+Giá trị sau thuế lấy nguyên trạng từ HĐ/KMS bên QLHĐ.
+90,000,000
+Bổ sung
+Tổng giá trị đã tạm ứng
+OutputText
+MONEY
+Tự động điền
+Hệ thống
+Tổng giá trị tất cả các ĐNTU có trạng thái = “Đã hạch toán” gắn với Mã HĐ/KMS đang được chọn
+10,000,000
+Bổ sung
+Tổng giá trị đã thanh toán
+OutputText
+MONEY
+Tự động điền
+Hệ thống
+Tổng giá trị tất cả các ĐNTT có trạng thái = “Đã hạch toán” gắn với Mã HĐ/KMS đang được chọn
+30,000,000
+Bổ sung
+Tổng giá trị HĐ/KMS còn lại
+OutputText
+MONEY
+Tự động điền
+Hệ thống
+= Tổng giá trị hợp đồng - Tổng giá trị đã tạm ứng - Tổng giá trị đã thanh toán
+50,000,000
+11
+Ngày lập giao dịch
+OutputText
+DATE
+Tự động điền
+Hệ thống
+Ngày hệ thống tại thời điểm tạo phiếu
+26/03/2025
+12
+Ngày hoàn thành
+OutputText
+DATE
+Tự động điền
+Hệ thống
+Trống khi tạo mới. Hệ thống tự gán khi phiếu đạt trạng thái Đã hạch toán
+26/03/2025
+13
+Nội dung giao dịch
+TextInput
+TEXT(255)
+Bắt buộc
+NSD nhập
+Nội dung truyền vào giao dịch chuyển tiền, áp dụng cho toàn phiếu
+Nhập nội dung giao dịch
+Tab Thông tin đề nghị
+STT
+Tên trường
+Kiểu hiển thị
+Kiểu dữ liệu
+Bắt buộc
+Nguồn
+Mô tả
+Ví dụ
+Header khu vực
+1
+Tiêu đề khu vực
+OutputText
+TEXT(255)
+Tự động điền
+Hiển thị nhãn "Đề nghị theo nhà cung cấp"
+2
+Badge đếm NCC
+Badge
+COMPUTED
+Computed
+QLTS
+Định dạng "Số NCC được đề nghị: x/y": x là số NCC đã được thêm vào danh sách đề nghị và có Số tiền tạm ứng lớn hơn 0; y là tổng số NCC thuộc HĐ/KMS này theo QLHĐ. Badge hiển thị đúng ngay cả khi phiếu chưa thêm NCC nào, ví dụ "0/2".
+2/2
+3
+Chọn NCC
+Button
+BUTTON
+N/A
+Điều hướng sang màn hình Chi tiết đề nghị theo NCC ở chế độ thêm mới. Bật khi phiếu ở Tạo mới hoặc Chờ chỉnh sửa đề nghị.
+Bảng danh sách NCC
+4
+Mã NCC
+Link
+TEXT(255)
+Tự động điền
+OGL
+Hiển thị dạng link; nhấn vào để điều hướng sang màn hình Chi tiết đề nghị theo NCC.
+NCC-00001
+5
+Tên NCC
+OutputText
+TEXT(255)
+Tự động điền
+OGL
+Tự động theo Mã NCC, lấy nguyên trạng từ danh sách NCC của HĐ/KMS bên QLHĐ.
+Công ty TNHH ABC
+6
+Mã số thuế
+OutputText
+TEXT(255)
+Tự động điền
+OGL
+Tự động theo Mã NCC.
+012023034
+7
+Số tiền tạm ứng
+OutputText
+MONEY
+Computed
+QLTS
+Số tiền đề nghị tạm ứng đã nhập tại màn hình Chi tiết đề nghị theo NCC của NCC này.
+45,000,000
+8
+Loại tiền
+OutputText
+ENUM
+Tự động điền
+QLHĐ
+Kế thừa từ HĐ/KMS
+VND
+9
+Số hóa đơn đã gắn
+OutputText
+NUMBER
+Computed
+QLTS
+Số lượng hóa đơn đã gắn với NCC này
+1
+10
+Phương thức thanh toán
+OutputText
+ENUM
+Tự động điền
+QLTS
+Phương thức đã chọn tại màn hình Chi tiết đề nghị theo NCC: Chuyển khoản hoặc Tiền mặt.
+Chuyển khoản
+11
+Trạng thái đồng bộ OGL
+Badge
+ENUM
+Tự động điền
+OGL
+Chưa đồng bộ OGL / Đã đồng bộ OGL
+Chưa đồng bộ OGL
+12
+Hành động - Xóa
+Button
+BUTTON
+N/A
+Xóa NCC khỏi danh sách; có pop-up xác nhận. Bật khi phiếu ở Tạo mới hoặc Chờ chỉnh sửa đề nghị. Sau khi xóa, NCC này xuất hiện trở lại trong dropdown Tên NCC khi mở + Chọn NCC.
+Footer bảng
+13
+Tổng số tiền đề nghị
+OutputText
+MONEY
+Computed
+QLTS
+Tổng số tiền tạm ứng của tất cả NCC. Hiển thị đậm, màu xanh
+90,000,000
+Màn hình Chi tiết đề nghị theo NCC
+STT
+Tên trường
+Kiểu hiển thị
+Kiểu dữ liệu
+Bắt buộc
+Nguồn
+Mô tả
+Ví dụ
+Header
+1
+Quay lại
+Button
+BUTTON
+N/A
+Về lại tab Thông tin đề nghị. Nếu có thay đổi chưa Lưu, hiện hộp xác nhận theo CR-05.
+2
+Xóa
+Button
+BUTTON
+N/A
+Xóa NCC này khỏi phiếu và quay về tab Thông tin đề nghị; có hộp xác nhận (CR-04). Bật khi phiếu ở Tạo mới hoặc Chờ chỉnh sửa đề nghị.
+3
+Lưu
+Button
+BUTTON
+N/A
+Validate các trường bắt buộc của màn hình này, lưu dữ liệu NCC vào danh sách tại tab Thông tin đề nghị rồi tự động quay về tab đó.
+4
+Đồng bộ OGL
+Button
+BUTTON
+N/A
+Chỉ hiển thị với CB KTTC, CB ĐMMS không thấy nút này. Gọi API OGL để lấy danh sách site hợp lệ của NCC đang mở; dùng để đồng bộ thủ công khi cần (Luồng 2, hoặc đồng bộ lại khi lần tự động trước đó thất bại). Xem cơ chế kích hoạt tại BR-002-11.
+5
+Trạng thái đồng bộ OGL
+Badge
+ENUM
+Tự động điền
+OGL
+Chỉ có 2 giá trị: Chưa đồng bộ OGL / Đã đồng bộ OGL, không có trạng thái trung gian. Đây là nơi duy nhất hiển thị trạng thái này trên màn hình.
+Chưa đồng bộ OGL
+Thông tin tạm ứng
+6
+Tên NCC
+SingleSelect
+TEXT(255)
+Bắt buộc
+QLHĐ
+Dropdown liệt kê các NCC thuộc HĐ/KMS này theo QLHĐ, tự động loại trừ các NCC đã có trong danh sách đề nghị của phiếu (BR-002-10) để tránh chọn trùng. Khi chọn, hệ thống tự điền Mã NCC, MST và Loại tiền theo đúng thông tin bên QLHĐ.
+Công ty TNHH ABC
+7
+Mã NCC
+OutputText
+TEXT(255)
+Tự động điền
+QLHĐ
+Tự động theo Tên NCC đã chọn.
+NCC-00001
+8
+Mã số thuế
+OutputText
+TEXT(255)
+Tự động điền
+QLHĐ
+Tự động theo Tên NCC đã chọn.
+012023034
+9
+Site NCC (OGL)
+SingleSelect
+TEXT(255)
+Bắt buộc (chỉ CB KTTC)
+OGL
+Trống hẳn và khóa (disable) hoàn toàn cho đến khi NCC này được đồng bộ OGL lần đầu. Chỉ CB KTTC được chọn; với CB ĐMMS trường ẩn/khóa. Danh sách site lấy theo kết quả lần Đồng bộ OGL gần nhất của đúng Mã NCC này (BR-002-11).
+126150610
+10
+Số tiền còn lại
+OutputText
+MONEY
+Computed
+QLTS (tab Thông tin công nợ)
+Chỉ đọc. Lấy đúng bằng Số dư lũy kế còn lại của NCC này tại tab Thông tin công nợ (Mục 3.4.6): Giá trị HĐ/KMS phân bổ cho NCC trừ Tổng đã tạm ứng và Tổng đã thanh toán trước đó.
+45,000,000
+11
+Số tiền đề nghị tạm ứng
+NumberInput
+MONEY
+Bắt buộc
+NSD nhập / QLTS
+Cho phép nhập tay, phải nhỏ hơn hoặc bằng Số tiền còn lại. Ngay khi NCC được gắn từ một hóa đơn trở lên tại sub-tab Hóa đơn bên dưới, trường tự động chuyển sang chỉ đọc (disable) và lấy giá trị bằng tổng giá trị các hóa đơn đã gắn; gỡ hết hóa đơn thì trường mở lại cho nhập tay.
+0
+12
+Loại tiền
+OutputText
+ENUM
+Tự động điền
+QLHĐ
+Kế thừa từ HĐ/KMS; chỉ đọc.
+VND
+13
+Phương thức thanh toán
+SingleSelect
+ENUM
+Bắt buộc
+NSD nhập
+Chuyển khoản hoặc Tiền mặt. Mặc định: Thanh toán chuyển khoản. Quyết định nhóm trường hiển thị bên dưới.
+Thanh toán chuyển khoản
+Khi Phương thức = Chuyển khoản
+14
+Số tài khoản thụ hưởng
+TextInput
+TEXT(255)
+Bắt buộc
+QLHĐ (nếu có) / NSD nhập
+Nếu HĐ/KMS bên QLHĐ đã có sẵn thông tin tài khoản của NCC, hệ thống tự điền cho phép người dùng chỉnh sửa; nếu không có, người dùng tự nhập. Mỗi lần Số tài khoản hoặc Ngân hàng thụ hưởng thay đổi, hệ thống tự động gọi lại tra cứu Tên chủ tài khoản (BR-002-12).
+6868686868
+15
+Ngân hàng thụ hưởng
+SingleSelect
+TEXT(255)
+Bắt buộc
+QLHĐ (nếu có) / NSD nhập
+Tương tự Số tài khoản thụ hưởng: tự điền nếu QLHĐ đã có sẵn, cho phép chọn lại nếu không có hoặc cần đổi.
+VietinBank
+16
+Tên chủ tài khoản thụ hưởng
+TextInput
+TEXT(255)
+Bắt buộc
+Service tra cứu tài khoản / NSD nhập
+Khi đã có đủ Số tài khoản và Ngân hàng thụ hưởng, hệ thống tự động gọi service tra cứu tên chủ tài khoản. Tra cứu thành công: trường tự điền và chuyển sang chỉ đọc (disable), không cho sửa. Tra cứu không thành công (không tìm thấy/lỗi service): trường để trống và mở cho người dùng tự nhập tay (BR-002-12).
+Thông tin API Tra cứu tên chủ tài khoản tham chiếu Đặc tả tích hợp Core Banking - chuyển tiền
+NGUYEN VAN ABC
+17
+Nội dung giao dịch
+TextInput
+TEXT(255)
+Bắt buộc
+Tab Thông tin chung / NSD nhập
+Giá trị khởi tạo mặc định lấy theo Nội dung giao dịch đã nhập tại tab Thông tin chung; người dùng có thể sửa riêng cho từng NCC (BR-002-13). Nội dung sau khi sửa được dùng làm nội dung lệnh chuyển tiền gửi sang Core Banking.
+Khi Phương thức = Tiền mặt
+18
+Họ tên người thụ hưởng
+TextInput
+TEXT(255)
+Bắt buộc
+NSD nhập
+Họ tên người nhận tiền mặt.
+NGUYEN VAN ABC
+19
+Số GTTT
+TextInput
+TEXT(255)
+Bắt buộc
+NSD nhập
+Số giấy tờ tùy thân (CMND/CCCD/Hộ chiếu).
+6868686868
+20
+Ngày cấp
+DatePicker
+DATE
+Bắt buộc
+NSD nhập
+Ngày cấp giấy tờ tùy thân.
+10/10/2021
+21
+Nơi cấp
+TextInput
+TEXT(255)
+Bắt buộc
+NSD nhập
+Nơi cấp giấy tờ tùy thân.
+Việt Nam
+22
+Số điện thoại
+TextInput
+TEXT(10)
+Bắt buộc
+NSD nhập
+Số điện thoại người thụ hưởng.
+0987654321
+Thông tin tạm ứng (tiếp)
+23
+Số/Ký hiệu bảo lãnh
+OutputText
+TEXT(255)
+Tự động điền
+QLHĐ
+Lấy từ văn bản bảo lãnh tạm ứng gắn với HĐ/KMS. Với điều kiện Loại bảo lãnh = “Bảo lãnh tạm ứng”
+BL002/PH0312/NHABC
+24
+Ngân hàng bảo lãnh
+OutputText
+TEXT(255)
+Tự động điền
+QLHĐ
+Lấy từ văn bản bảo lãnh.
+Ngân hàng ABCD
+25
+Giá trị bảo lãnh
+OutputText
+MONEY
+Tự động điền
+QLHĐ
+Lấy từ văn bản bảo lãnh.
+45,000,000
+26
+Ngày hết hiệu lực
+OutputText
+DATE
+Tự động điền
+QLHĐ
+Lấy từ văn bản bảo lãnh.
+01/01/2025
+Tab Hoá đơn
+STT
+Tên trường
+Kiểu hiển thị
+Kiểu dữ liệu
+Bắt buộc
+Nguồn
+Mô tả
+Ví dụ
+Hóa đơn đã gắn
+1
+Chọn hóa đơn
+Button
+BUTTON
+N/A
+Mở pop-up Chọn hóa đơn; có thể nhấn nhiều lần để gắn thêm hóa đơn.
+2
+Số hóa đơn
+Link
+TEXT(255)
+Tự động điền
+QLTS
+Hiển thị dạng link; nhấn để xem chi tiết hóa đơn.
+0001234
+3
+Ký hiệu
+OutputText
+TEXT(255)
+Tự động điền
+QLTS
+Ký hiệu hóa đơn.
+ABC789
+4
+Phân loại hóa đơn
+OutputText
+TEXT(255)
+Tự động điền
+QLTS
+Hóa đơn / Phiếu thu / Biên lai…
+Phiếu thu
+5
+Tính chất hóa đơn
+OutputText
+TEXT(255)
+Tự động điền
+QLTS
+Gốc / Điều chỉnh / Thay thế.
+Hóa đơn gốc
+6
+Mã số thuế
+OutputText
+TEXT(255)
+Tự động điền
+QLTS
+MST của NCC phát hành.
+012023034
+7
+Nhà cung cấp
+OutputText
+TEXT(255)
+Tự động điền
+QLTS
+Chỉ hiển thị hóa đơn có MST trùng MST của NCC đang mở pop-up.
+Công ty TNHH ABC
+8
+Tổng tiền sau thuế
+OutputText
+MONEY
+Tự động điền
+QLTS
+Tổng tiền sau thuế VAT.
+40,000,000
+9
+Tiền thuế VAT
+OutputText
+MONEY
+Tự động điền
+QLTS
+Số tiền thuế VAT.
+0
+10
+Loại tiền
+OutputText
+ENUM
+Tự động điền
+QLTS
+Loại tiền của hóa đơn.
+VND
+11
+Ngày hóa đơn
+OutputText
+DATE
+Tự động điền
+QLTS
+Ngày phát hành hóa đơn.
+21/05/2025
+12
+Trạng thái kiểm tra
+OutputText
+TEXT(255)
+Tự động điền
+QLTS
+Trạng thái kiểm tra của hóa đơn.
+bổ sung
+Thời hạn kiểm tra
+OutputText
+TEXT(255)
+Tính toán
+Tham chiếu BR-002_18
+QLTS
+Hiển thị Còn hạn hay Quá hạn kiểm tra T+2.Tham chiếu BR-002_18
+Lưu giá trị khi đã qua bước Trình phiếu của Kế toán
+13
+Xóa
+Icon
+Icon
+N/A
+Xóa một dòng hóa đơn sẽ cập nhật lại ngay Số tiền đề nghị tạm ứng.
+14
+Xem
+Icon
+Icon
+N/A
+Mở màn chi tiết Hóa đơn bên module quản lý hóa đơn
+Pop-up Chọn hoá đơn
+STT
+Tên trường
+Kiểu hiển thị
+Kiểu dữ liệu
+Bắt buộc
+Nguồn
+Mô tả
+Ví dụ
+Bộ lọc
+1
+Từ ngày
+DatePicker
+DATE
+Không bắt buộc
+NSD nhập
+Lọc theo Ngày hóa đơn.
+01/01/2025
+2
+Đến ngày
+DatePicker
+DATE
+Không bắt buộc
+NSD nhập
+Lọc theo Ngày hóa đơn.
+31/12/2026
+3
+Áp dụng bộ lọc
+Button
+BUTTON
+N/A
+Tải lại danh sách hóa đơn theo điều kiện đã điền.
+Bảng hoá đơn
+4
+Ô đánh dấu chọn tất cả
+Toggle
+BOOLEAN
+N/A
+Chọn hoặc bỏ chọn toàn bộ dòng đang hiển thị.
+5
+Số hóa đơn
+Link
+TEXT(255)
+Tự động điền
+VATIN
+Hiển thị dạng link; nhấn để xem chi tiết hóa đơn.
+0001234
+6
+Ký hiệu
+OutputText
+TEXT(255)
+Tự động điền
+VATIN
+Ký hiệu hóa đơn.
+ABC789
+7
+Phân loại hóa đơn
+OutputText
+TEXT(255)
+Tự động điền
+VATIN
+Hóa đơn / Phiếu thu / Biên lai…
+Phiếu thu
+8
+Tính chất hóa đơn
+OutputText
+TEXT(255)
+Tự động điền
+VATIN
+Gốc / Điều chỉnh / Thay thế.
+Hóa đơn gốc
+9
+Mã số thuế
+OutputText
+TEXT(255)
+Tự động điền
+VATIN
+MST của NCC phát hành.
+012023034
+10
+Nhà cung cấp
+OutputText
+TEXT(255)
+Tự động điền
+VATIN / OGL
+Chỉ hiển thị hóa đơn có MST trùng MST của NCC đang mở pop-up.
+Công ty TNHH ABC
+11
+Tổng tiền sau thuế
+OutputText
+MONEY
+Tự động điền
+VATIN
+Tổng tiền sau thuế VAT.
+40,000,000
+12
+Tiền thuế VAT
+OutputText
+MONEY
+Tự động điền
+VATIN
+Số tiền thuế VAT.
+0
+13
+Loại tiền
+OutputText
+ENUM
+Tự động điền
+VATIN
+Loại tiền của hóa đơn.
+VND
+14
+Ngày hóa đơn
+OutputText
+DATE
+Tự động điền
+VATIN
+Ngày phát hành hóa đơn.
+21/05/2025
+15
+Trạng thái kiểm tra
+OutputText
+TEXT(255)
+Tự động điền
+VATIN
+Trạng thái kiểm tra của hóa đơn.
+bổ sung
+Thời hạn kiểm tra
+OutputText
+TEXT(255)
+Tính toán
+Tham chiếu BR-002_18
+QLTS
+Hiển thị Còn hạn hay Quá hạn kiểm tra T+2. Tham chiếu BR-002_18
+Lưu giá trị khi đã qua bước Trình phiếu của Kế toán
+Footer pop-up
+16
+Hủy
+Button
+BUTTON
+N/A
+Đóng pop-up, không gắn hóa đơn nào.
+17
+Lưu
+Button
+BUTTON
+N/A
+Gắn các hóa đơn đã chọn vào NCC hiện tại và cập nhật Số tiền đề nghị tạm ứng theo BR-002-06; BR-002_17
+Tab Thông tin công nợ
+STT
+Tên trường
+Kiểu hiển thị
+Kiểu dữ liệu
+Bắt buộc
+Nguồn
+Mô tả
+Ví dụ
+Thông tin tóm tắt
+1
+Tổng phải trả
+Readonly
+NUMBER
+N/A
+Hệ thống
+Tổng số tiền phải trả = tổng giá trị hóa đơn chấp nhận trong tất cả các phiếu ĐNTU thuộc HĐ/KMS đang được chọn để khởi tạo phiếu, đã hạch toán thành công của NCC đang được chọn
+Công ty TNHH ABC
+2
+Tổng đã thanh toán
+Readonly
+NUMBER
+N/A
+Hệ thống
+Tổng số tiền đã thanh toán = (tổng số tiền đề nghị thanh toán trong tất cả các phiếu ĐNTT thuộc HĐ/KMS đang được chọn để khởi tạo phiếu, đã hạch toán thành công, của NCC đang được chọn) + (tổng số tiền thuế trong tất cả các phiếu ĐNTƯ thuộc HĐ/KMS đang được chọn để khởi tạo phiếu, đã hạch toán thành công, của NCC đang được chọn)
+3
+3
+Tổng phải trả còn lại
+Readonly
+NUMBER
+N/A
+Hệ thống
+Tổng phải trả còn lại = tổng số tiền phải trả còn lại tại mục “Các khoản phải trả NCC” trên tất cả các phiếu ĐNTT thuộc HĐ/KMS đang được chọn để khởi tạo phiếu, của NCC đang được chọn
+4
+Tổng tiền đã tạm ứng
+Readonly
+NUMBER
+N/A
+Hệ thống
+Tổng tiền đã tạm ứng = tổng số tiền tạm ứng không bao gồm thuế trên tất cả các phiếu ĐNTƯ thuộc HĐ/KMS đang được chọn để khởi tạo phiếu, đã hạch toán thành công, của NCC đang được chọn
+5
+Tổng tiền đã hoàn ứng
+Readonly
+NUMBER
+N/A
+Hệ thống
+Tổng tiền đã hoàn ứng = tổng số tiền đã hoàn ứng trên tất cả các phiếu ĐNTT thuộc HĐ/KMS đang được chọn để khởi tạo phiếu, đã hạch toán thành công, của NCC đang được chọn
+6
+Tổng tiền có thể hoàn ứng
+Readonly
+NUMBER
+N/A
+Hệ thống
+Tổng tiền có thể hoàn ứng = tổng số tiền còn lại tại mục “Các khoản tạm ứng của NCC” trên tất cả các phiếu ĐNTT thuộc HĐ/KMS đang được chọn để khởi tạo phiếu, đã hạch toán thành công, của NCC đang được chọn
+Các khoản tạm ứng của nhà cung cấp
+Điều kiện hiển thị: Các khoản tạm ứng có số tiền còn lại > 0 (Đã hoàn ứng không hiển thị)
+7
+Số khoản tạm ứng
+Readonly
+NUMBER
+N/A
+Hệ thống QLTS
+Tổng số khoản tạm ứng có số tiền còn lại có thể hoàn ứng > 0
+8
+STT
+Readonly
+NUMBER
+N/A
+Hệ thống
+Thứ tự khoản tạm ứng, mặc định sắp xếp theo khoản tạm ứng có ngày hạch toán mới nhất
+9
+Mã giao dịch
+Readonly
+TEXT
+Mã AP OGL trả về lưu tại hệ thống QLTS
+Số yêu cầu thanh toán do OGL trả về khi gửi hạch toán, lưu tại hệ thống QLTS
+10
+Mã đề nghị
+Readonly
+TEXT
+Hệ thống QLTS
+Mã phiếu ĐNTƯ của hệ thống QLTS
+11
+Ngày hạch toán
+Readonly
+DATE
+Hệ thống QLTS
+Ngày hạch toán thành công
+12
+Loại tiền
+Readonly
+TEXT
+Hệ thống QLTS
+Loại tiền của ĐNTƯ
+13
+Số tiền tạm ứng trước thuế
+Readonly
+NUMBER
+Hệ thống QLTS
+Số tiền tạm ứng trên khoản tạm ứng không bao gồm thuế, đã hạch toán thành công
+14
+Số tiền đã hoàn ứng
+Readonly
+NUMBER
+Hệ thống QLTS
+Tổng số tiền đã hoàn ứng phát sinh trên mã giao dịch của khoản tạm ứng
+15
+Số tiền còn lại
+Readonly
+NUMBER
+Hệ thống QLTS
+Số tiền đã tạm ứng chưa hoàn hết trên ĐNTƯ của NCC
+Số tiền còn lại = Số tiền đã tạm ứng trước thuế (13) - Số tiền đã hoàn ứng (14) - số tiền hoàn ứng lần này chưa phê duyệt trên các ĐNTT khác ĐNTT hiện tại nhưng có cùng mã giao dịch (nếu có)
+16
+Số tiền hoàn ứng lần này
+Readonly
+NUMBER
+Hệ thống QLTS
+Mặc định = 0
+Số tiền hoàn ứng của từng ĐNTƯ tại ĐNTT hiện tại
+17
+Nội dung diễn giải
+Readonly
+TEXT
+Hệ thống QLTS
+Nội dung diễn giải của ĐNTƯ
+Các khoản phải trả nhà cung cấp (Tham chiếu bên DNTT)
+Điều kiện hiển thị: Các khoản phải trả có số tiền phải trả còn lại > 0
+18
+Số khoản phải trả
+Chỉ đọc
+N/A
+NUMBER
+Hệ thống QLTS
+Tổng số khoản phải trả có số tiền phải trả còn lại > 0
+19
+STT
+Chỉ đọc
+N/A
+NUMBER
+Hệ thống
+Thứ tự khoản phải trả, mặc định sắp xếp theo khoản phải trả có ngày hạch toán mới nhất
+20
+Mã giao dịch
+Chỉ đọc
+N/A
+TEXT
+Mã AP OGL trả về lưu tại hệ thống QLTS
+Số yêu cầu thanh toán do OGL trả về khi gửi hạch toán, lưu tại hệ thống QLTS
+21
+Mã đề nghị
+Hyperlink
+N/A
+TEXT
+Hệ thống QLTS
+Mã phiếu ĐNTT của hệ thống QLTS
+22
+Ngày hạch toán
+Chỉ đọc
+N/A
+DATE
+Hệ thống QLTS
+Ngày hạch toán thành công
+23
+Loại tiền
+Chỉ đọc
+N/A
+TEXT
+Hệ thống QLTS
+Loại tiền của ĐNTT - Mặc định VND
+24
+Thuế
+Chỉ đọc
+N/A
+NUMBER
+Hệ thống QLTS
+Số tiền thuế của ĐNTT
+25
+Số tiền thanh toán sau thuế
+Chỉ đọc
+N/A
+NUMBER
+Hệ thống QLTS
+Giá trị hóa đơn chấp nhận trên ĐNTT của NCC
+26
+Số tiền đã thanh toán
+Chỉ đọc
+N/A
+NUMBER
+Hệ thống QLTS
+Tổng số tiền đã thanh toán phát sinh trên mã giao dịch của khoản phải trả
+27
+Số tiền phải trả còn lại
+Chỉ đọc
+N/A
+NUMBER
+Hệ thống QLTS
+Số tiền phải trả còn lại chưa thanh toán trên ĐNTT của NCC
+Số tiền phải trả còn lại = Số tiền thanh toán sau thuế (24) - số tiền đã thanh toán (25) - số tiền thanh toán lần này chưa phê duyệt trên các ĐNTT khác ĐNTT hiện tại nhưng có cùng mã giao dịch (nếu có)
+28
+Số tiền thanh toán lần này
+Chỉ đọc
+N/A
+NUMBER
+Hệ thống QLTS
+Mặc định =0
+Số tiền thanh toán của từng giao dịch thanh toán tại ĐNTT hiện tại
+Tab Thông tin phê duyệt
+STT
+Tên trường
+Kiểu hiển thị
+Kiểu dữ liệu
+Bắt buộc
+Nguồn
+Mô tả
+Ví dụ
+Điều kiện luồng
+1
+Yêu cầu Rà soát 1
+Toggle
+BOOLEAN
+Không bắt buộc
+NSD nhập (CB ĐMMS)
+Bật để bổ sung bước Rà soát 1 vào luồng và bắt buộc chọn cán bộ RS1. Mặc định: Tắt. Chỉ CB ĐMMS thao tác được.
+2
+Yêu cầu Rà soát 2
+Toggle
+BOOLEAN
+Không bắt buộc
+NSD nhập (KTTC)
+Bật để bổ sung bước Rà soát 2 vào luồng. Mặc định: Tắt. Chỉ CB KTTC thao tác được.
+Đề nghị và Tiếp nhận - chỉ hiện khi Luồng 1, chỉ CB ĐMMS nhập (tham chiếu BR-002-14)
+3
+Các trường: KTTC tiếp nhận, Rà soát đầu mối mua sắm (Rà soát 1), Phê duyệt ĐMMS
+SingleSelect
+USERREF
+Bắt buộc (trừ không chọn Yêu cầu RS1 → ẩn trường RS1)
+PeopleSoft
+Cấu trúc hiển thị: [Tên cán bộ] - [Vị trí công việc]
+Tên cán bộ: CB ĐMMS được chọn. Danh sách lọc theo role từng bước
+Vị trí công việc: Tự động lấy theo chức vụ của user được chọn.
+Nguyễn Văn A - Cán bộ Kế toán tài chính
+KTTC tiếp nhận: Chỉ hiển thị danh sách user có role = KTTC
+Phê duyệt và Ban hành - ẩn với CB ĐMMS, chỉ CB KTTC nhập (tham chiếu BR-002-15)
+4
+Các trường: Phê duyệt KTTC, Rà soát KTTC (Rà soát 2), Cấp có thẩm quyền
+SingleSelect
+USERREF
+Bắt buộc (trừ không chọn Yêu cầu RS2 → ẩn trường RS2 )
+PeopleSoft
+Cấu trúc hiển thị: [Tên cán bộ] - [Vị trí công việc]
+Tên cán bộ: Chỉ CB KTTC được nhập. Danh sách lọc theo role từng bước
+Vị trí công việc: Tự động lấy theo chức vụ của user được chọn.(1) Lãnh đạo phòng KTTC / (2) Kiểm soát viên phòng KTTC / (3) Giám đốc chi nhánh
+Nguyễn Văn A - Cán bộ Kế toán tài chính
+KTTC tiếp nhận: Chỉ hiển thị danh sách user có role = KTTC
+Tab Tài liệu đính kèm
+STT
+Tên trường
+Kiểu hiển thị
+Kiểu dữ liệu
+Bắt buộc
+Nguồn
+Mô tả
+Ví dụ
+Hóa đơn - Chỉ đọc, đồng bộ từ hóa đơn đã gắn với NCC tại tab Thông tin đề nghị
+1
+Số hóa đơn
+OutputText
+TEXT(255)
+Tự động điền
+Tab Thông tin đề nghị
+Số hóa đơn điện tử
+HD012642
+2
+Mã số thuế
+OutputText
+TEXT(255)
+Tự động điền
+Chức năng quản lý hoá đơn
+MST của NCC phát hành
+012023034
+3
+Phân loại hóa đơn
+OutputText
+TEXT(255)
+Tự động điền
+Chức năng quản lý hoá đơn
+Hóa đơn / Biên lai...
+Hóa đơn
+4
+Ngày hóa đơn
+OutputText
+DATE
+Tự động điền
+Chức năng quản lý hoá đơn
+Ngày phát hành
+21/05/2025
+5
+Tổng tiền sau thuế
+OutputText
+MONEY
+Tự động điền
+Chức năng quản lý hoá đơn
+Tổng tiền sau thuế
+40,000,000
+6
+Thuế suất
+OutputText
+MONEY
+Tự động điền
+Chức năng quản lý hoá đơn
+Số tiền thuế VAT
+2,000,000
+7
+Loại tiền
+OutputText
+ENUM
+Tự động điền
+Chức năng quản lý hoá đơn
+Loại tiền của hóa đơn
+VND
+8
+Loại khấu trừ thuế
+SingleSelect
+ENUM
+Bắt buộc
+NSD nhập (KTTC)
+CB KTTC chọn. Giá trị: Khấu trừ toàn bộ / Không khấu trừ / Khấu trừ tỷ lệ
+Khấu trừ toàn bộ
+9
+Trạng thái kiểm tra
+Badge
+ENUM
+Tự động điền
+QLTS
+Hiển thị các mã kiểm tra → Cảnh báo người dùng
+E06 - Hóa đơn từ 05 trđ trở lên hoặc Tổng trong ngày của 01 NCC từ 05 trđ trở lên phải có chứng từ thanh toán không dùng tiền mặt
+bổ sung
+Thời hạn kiểm tra
+OutputText
+TEXT(255)
+Tính toán
+Tham chiếu BR-002_18
+QLTS
+Hiển thị Còn hạn hay Quá hạn kiểm tra T+2. Tham chiếu BR-002_18
+Lưu giá trị khi đã qua bước Trình phiếu của Kế toán
+10
+Thao tác - Xem
+Button
+BUTTON
+N/A
+Mở xem chi tiết hóa đơn
+11
+Thao tác - Xóa
+Button
+BUTTON
+N/A
+Gỡ hóa đơn khỏi phiếu. Hiện hộp xác nhận. Chỉ enable khi phiếu chưa trình
+Tài liệu khác
+12
+Chọn tài liệu
+Button
+BUTTON
+N/A
+Mở dialog Lựa chọn tài liệu đính kèm. Chỉ hiển thị khi phiếu chưa trình
+13
+Tên tài liệu
+OutputText
+TEXT(255)
+Tự động điền
+Hệ thống
+Tên file khi được upload
+ScanHoaDon_ABC.pdf
+14
+Người thực hiện
+OutputText
+USERREF
+Tự động điền
+PeopleSoft
+Người upload tài liệu gốc bên phân hệ QLHĐ.
+Trần Văn B
+15
+Kích thước
+OutputText
+TEXT(255)
+Tự động điền
+Hệ thống
+Đơn vị KB
+1,000 kB
+16
+Ngày tải lên
+OutputText
+DATE
+Tự động điền
+Hệ thống
+Ngày tài liệu được số hóa bên phân hệ QLHĐ.
+26/03/2026
+17
+Tải xuống
+Button
+Icon
+N/A
+Tải file về máy
+TH Tài liệu ở bên HĐ/KMS đã xóa. Khi ấn download sẽ hiển thị thông báo “Không còn trong danh sách tài liệu đã số hóa thành công bên phân hệ QLHĐ.”
+18
+Xem
+Button
+Icon
+N/A
+Mở xem nội dung file
+TH Tài liệu ở bên HĐ/KMS đã xóa. Khi ấn xem sẽ hiển thị thông báo “Tài liệu đã bị xóa.”
+19
+Xóa
+Icon
+BUTTON
+N/A
+Chỉ gỡ liên kết khỏi phiếu, không xóa tài liệu gốc bên phân hệ Hợp đồng. Có hộp xác nhận, chỉ bật khi phiếu chưa trình.
+Pop-up Lựa chọn tài liệu đính kèm - chỉ hiển thị tài liệu thuộc đúng HĐ/KMS của phiếu
+20
+Checkbox
+Button
+Cho phép chọn nhiều tài liệu
+21
+Tìm kiếm theo Tên tài liệu, Người thực hiện
+Quick Search
+Quick Search
+Không bắt buộc
+Cho phép NSD nhập dữ liệu tìm kiếm theo các trường: Tên tài liệu, Người thực hiện. Không phân biệt hoa thường. Tự cắt khoảng trắng đầu/cuối.
+22
+Ngày tải lên (Từ ngày - Đến ngày)
+Datepicker
+Date
+Không bắt buộc
+Cho phép NSD nhập hoặc chọn từ ngày đến ngày. Lọc theo ngày tải lên
+Hiển thị theo định dạng dd/mm/yyyy - dd/mm/yyyy. Mặc định: trống
+Từ ngày phải nhỏ hơn hoặc bằng đến ngày, đến ngày không vượt quá ngày hiện tại
+23
+Tên tài liệu
+OutputText
+TEXT(255)
+Tự động điền
+Phân hệ Hợp đồng
+Tên file tài liệu từ phía HĐ/KMS
+HopDong_KMS.pdf
+24
+Người thực hiện
+OutputText
+USERREF
+Tự động điền
+Phân hệ Hợp đồng
+NSD upload từ phía HĐ/KMS
+Trần Văn A
+25
+Kích thước
+OutputText
+TEXT(255)
+Tự động điền
+Phân hệ Hợp đồng
+Đơn vị KB
+1,000 kB
+26
+Ngày tải lên
+OutputText
+DATE
+Tự động điền
+Phân hệ Hợp đồng
+Ngày upload từ phía HĐ/KMS
+26/03/2026
+27
+Lưu
+Button
+BUTTON
+N/A
+Lưu tài liệu đã chọn → Hiển thị trên cụm Tài liệu khác tab Tài liệu đính kèm
+28
+Hủy
+Button
+BUTTON
+N/A
+Đóng pop-up mà không lưu dữ liệu đang nhập
+Tab Lịch sử cập nhật
+STT
+Tên trường
+Kiểu hiển thị
+Kiểu dữ liệu
+Bắt buộc
+Nguồn
+Mô tả
+Ví dụ
+Bộ lọc
+1
+Phân loại
+SingleSelect
+ENUM
+Không bắt buộc
+Hệ thống
+Lọc theo loại hành động. Mặc định: hiển thị tất cả
+Tạo mới phiếu
+2
+Người cập nhật
+SingleSelect
+USERREF
+Không bắt buộc
+PeopleSoft
+Lọc theo người thực hiện. Mặc định: hiển thị tất cả
+NGUYEN VAN ABCD
+Danh sách lịch sử - Timeline, sắp xếp thời gian giảm dần
+3
+Thời gian
+OutputText
+DATETIME
+Tự động điền
+Hệ thống
+Định dạng: DD/MM/YYYY HH:mm:ss
+07/12/2022 14:41:16
+4
+Chấm trạng thái
+Badge
+ENUM
+Tự động điền
+Hệ thống
+Chấm tròn màu phản ánh loại hành động. Xanh lá = hoàn thành/xác nhận
+●
+5
+Ảnh đại diện
+OutputText
+IMAGE
+Tự động điền
+PeopleSoft
+Ảnh đại diện của người thực hiện
+0
+6
+Tên người cập nhật
+OutputText
+TEXT(255)
+Tự động điền
+PeopleSoft
+Hiển thị chữ in hoa
+NGUYEN VAN ABCD
+7
+Tên hành động
+OutputText
+TEXT(255)
+Tự động điền
+Hệ thống
+Hiển thị đậm. Giá trị: Tạo mới phiếu / Tiếp nhận phiếu / Rà soát RS1 / Phê duyệt ĐMMS / Phê duyệt KTTC / Rà soát RS2 / Cấp có thẩm quyền / Yêu cầu chỉnh sửa / Tái phân công / Đã xóa
+Tạo mới phiếu
+8
+Mô tả hành động
+OutputText
+TEXT(255)
+Tự động điền
+Hệ thống
+Dòng mô tả ngắn bên dưới tên hành động
+TH nếu có nội dung Yêu cầu chỉnh sửa: hiển thị nội dung ng dùng nhập
+Cán bộ ĐMMS tạo phiếu tạm ứng
+3.4. FS-TU-003 - Rà soát và hoàn thiện phiếu hạch toán (CB KTTC)
+3.4.1. Mô tả Chức năng chi tiết
+FS-TU-003: Rà soát và hoàn thiện phiếu hạch toán
+Tóm tắt nghiệp vụ
+Cán bộ KTTC nhận phiếu từ CB ĐMMS, kiểm tra tính hợp lệ hồ sơ, bổ sung thông tin OGL cho từng nhà cung cấp, xác nhận hoặc điều chỉnh bút toán hạch toán tự động, nhập bút toán bổ sung nếu cần, sau đó chuyển phiếu sang luồng phê duyệt.
+Người thực hiện
+CB KTTC có quyền Tiếp nhận & Hạch toán đề nghị tạm ứng
+Điều kiện thực hiện
+Phiếu đang ở trạng thái Chờ KTTC xử lý. CB KTTC là người được chỉ định tại bước "KTTC tiếp nhận" trong Tab.
+Kết quả sau khi thực hiện
+Phiếu được hoàn thiện với đầy đủ thông tin hạch toán và chuyển sang trạng thái Chờ phê duyệt đề nghị. Hệ thống gửi thông báo đến người phê duyệt tiếp theo.
+Điều kiện kích hoạt
+CB KTTC nhận thông báo và nhấn vào Mã chứng từ từ danh sách phiếu cần xử lý.
+3.4.2. Luồng thực hiện
+CB KTTC mở phiếu. Tab Thông tin chung, Thông tin đề nghị, Thông tin phê duyệt, Tài liệu đính kèm, Lịch sử cập nhật hiển thị như CB ĐMMS đã nhập chỉ đọc, không sửa được.
+Tại tab Thông tin đề nghị: hệ thống đã tự động đồng bộ OGL cho toàn bộ NCC ngay khi CB ĐMMS Trình phiếu (BR-002-11); CB KTTC kiểm tra Trạng thái đồng bộ OGL của từng NCC, với NCC còn Chưa đồng bộ OGL (do đồng bộ tự động thất bại, hoặc phiếu thuộc Luồng 2 nên chưa từng được đồng bộ), mở màn hình Chi tiết đề nghị theo NCC và chủ động nhấn Đồng bộ OGL.
+Tại tab Thông tin phê duyệt: bật/tắt Yêu cầu Rà soát 2 và chọn cán bộ cho các bước Phê duyệt KTTC, RS2 (nếu có) và Cấp thẩm quyền.
+Tại tab Tài liệu đính kèm: xác nhận Loại khấu trừ thuế cho từng hóa đơn.
+Tại Tab Thông tin hạch toán: xem xét bút toán tự động, điều chỉnh Số tài khoản và Nội dung hạch toán nếu cần. Nhập bút toán bổ sung nếu có.
+Nhấn Lưu để lưu nháp. Nhấn Chuyển phê duyệt để hoàn tất và chuyển sang luồng phê duyệt.
+3.4.3. Luồng thay thế
+Yêu cầu CB ĐMMS chỉnh sửa: CB KTTC nhấn Yêu cầu chỉnh sửa và nhập lý do; phiếu chuyển về Chờ chỉnh sửa đề nghị và CB ĐMMS nhận thông báo.
+3.4.4. Luồng ngoại lệ
+Bút toán mất cân đối: nếu Tổng ghi nợ khác Tổng ghi có, hệ thống cảnh báo và không cho Chuyển phê duyệt cho đến khi CB KTTC điều chỉnh cân đối.
+3.4.5. Quy tắc nghiệp vụ
+STT
+Mô tả Rule
+Áp dụng tại bước
+Nội dung chi tiết
+BR-003-01
+CB ĐMMS không thể sửa khi đang ở bước KTTC
+Toàn bộ màn hình
+Tất cả trường mà CB ĐMMS đã nhập chuyển sang chỉ đọc khi phiếu ở Chờ KTTC xử lý.
+BR-003-02
+CB KTTC bắt buộc đồng bộ OGL trước khi Chuyển phê duyệt
+Tab
+Mỗi NCC trong danh sách phải có Trạng thái đồng bộ OGL = "Đã đồng bộ", tức là Mã NCC và Site NCC đều tồn tại trên OGL trước khi hệ thống cho phép Chuyển phê duyệt.
+BR-003-03
+Thông tin giao dịch chỉ sửa một số trường
+Màn hình Chỉnh sửa thông tin hạch toán – Thông tin giao dịch
+Dòng Ghi nợ (TK tạm ứng, TK thuế nếu có): cho phép chọn lại Số tài khoản. Dòng Ghi có (TK thụ hưởng/tiền mặt): Số tài khoản cố định, không cho phép chọn lại. Nội dung hạch toán sửa được ở mọi dòng. Số tiền Ghi nợ/Ghi có do hệ thống tự tính, không sửa tay.
+BR-003-04
+Bút toán bổ sung phải cân đối
+Tab - bút toán bổ sung
+Tổng ghi nợ phải = Tổng ghi có trong mỗi bút toán bổ sung. Hệ thống hiển thị cảnh báo ngay khi mất cân đối.
+BR-003-05
+Loại khấu trừ thuế chỉ CB KTTC được chọn
+Tab - cột Loại khấu trừ thuế
+Trường này ẩn với CB ĐMMS, chỉ hiển thị và cho phép nhập khi NSD có quyền CB KTTC.
+BR-003-06
+Số dòng Thông tin giao dịch theo thuế và khấu trừ
+Thông tin giao dịch – theo từng NCC
+Panel của một NCC có 3 dòng (Ghi nợ TK tạm ứng, Ghi nợ TK thuế, Ghi có) khi hóa đơn của NCC có phát sinh thuế VÀ Loại khấu trừ thuế là Khấu trừ toàn bộ hoặc Khấu trừ tỷ lệ. Các trường hợp còn lại: không phát sinh thuế, hoặc có thuế nhưng Loại khấu trừ là Không khấu trừ thì chỉ có 2 dòng (Ghi nợ TK tạm ứng, Ghi có), không có dòng thuế riêng.
+BR-003-07
+Đơn vị bút toán bổ sung mặc định theo CB khởi tạo
+Bút toán bổ sung – GL
+Đơn vị luôn lấy theo đơn vị của CB khởi tạo phiếu và khóa không cho sửa với nghiệp vụ Tạm ứng.
+BR-003-08
+Phòng ban bút toán bổ sung mặc định
+Bút toán bổ sung – GL
+Phòng ban mặc định "000000 – Không xác định" và khóa không cho sửa với nghiệp vụ Tạm ứng.
+BR-003-09
+Tự động điền Số tài khoản Thông tin giao dịch, cho phép chọn lại (trừ dòng Ghi có)
+Thông tin giao dịch – theo từng NCC
+Dòng Ghi nợ TK tạm ứng: mặc định theo Site NCC đã chọn tại màn hình Chi tiết đề nghị theo NCC, cho phép chọn lại tài khoản khác. Dòng Ghi nợ TK thuế (nếu có): mặc định theo mapping Loại khấu trừ thuế → Tài khoản GL (Khấu trừ tỷ lệ → 126120210, Khấu trừ toàn bộ → 126120220), cho phép chọn lại. Dòng Ghi có: mặc định theo Số tài khoản thụ hưởng đã điền nếu Phương thức = Chuyển khoản, hoặc theo tài khoản đi tiền mặt mặc định của hệ thống nếu Phương thức = Tiền mặt; KHÔNG cho phép chọn lại.
+BR-003-10
+Loại tiền bút toán bổ sung độc lập theo từng bút toán
+Bút toán bổ sung – GL
+Trong một bút toán bổ sung, Loại tiền chỉ chọn được ở dòng đầu tiên; các dòng khác trong CÙNG bút toán đó tự động khóa (disable) và nhận cùng giá trị. Mặc định VND. Mỗi bút toán bổ sung độc lập với các bút toán khác, không dùng chung một loại tiền cho toàn khối.
+BR-003-11
+Ghi nợ/Ghi có bút toán bổ sung khóa lẫn nhau
+Bút toán bổ sung – GL
+Trên mỗi dòng, khi đã điền giá trị ở Ghi nợ thì Ghi có tự khóa (và ngược lại); xóa trắng giá trị đã điền để mở lại cả hai cột.
+BR-003-12
+Tab Thông tin hạch toán chỉ hiển thị với CB KTTC
+Toàn tab
+Tab này ẩn hoàn toàn với CB ĐMMS ở mọi trạng thái của phiếu; chỉ CB KTTC nhìn thấy trong thanh tab.
+BR-003-13
+Kết xuất bản trình ký khi Chuyển phê duyệt
+Header – nút Chuyển phê duyệt
+Ngay khi CB KTTC nhấn Chuyển phê duyệt thành công, hệ thống chốt dữ liệu phiếu và tự động kết xuất bản trình ký PDF gắn vào phiếu, phục vụ luồng ký số tại FS-TU-004. Hệ thống kết xuất theo đúng mẫu biểu ứng với Hình thức thanh toán của phiếu: Mẫu số 01/TƯTM (Tiền mặt) hoặc Mẫu số 03/TƯCK (Chuyển khoản).
+3.4.6. Mô tả màn hình
+Tab Thông tin chung, Thông tin đề nghị, Thông tin phê duyệt, Tài liệu đính kèm, Lịch sử cập nhật: hiển thị như CB ĐMMS nhập (xem mục 3.3.6), chỉ đọc. Trường Loại khấu trừ thuế tại tab Tài liệu đính kèm được kích hoạt cho CB KTTC.
+Tab Thông tin hạch toán
+STT
+Tên trường
+Kiểu hiển thị
+Kiểu dữ liệu
+Bắt buộc
+Nguồn
+Mô tả
+Ví dụ
+Thông tin tóm tắt
+1
+Tổng số tiền tạm ứng
+OutputText
+MONEY
+Computed
+Tab Thông tin đề nghị
+Tổng Số tiền tạm ứng của tất cả NCC trong phiếu, quy đổi VND.
+75,000,000
+2
+Tổng số tiền thuế
+OutputText
+MONEY
+Computed
+Tab Thông tin đề nghị (hóa đơn đã gắn)
+Tổng tiền thuế VAT từ tất cả hóa đơn đã gắn tại
+75,000,000
+3
+Loại tiền
+OutputText
+ENUM
+Tự động điền
+QLHĐ
+Mặc định VND
+VND
+4
+Số NCC tạm ứng
+OutputText
+NUMBER
+Computed
+Tab Thông tin đề nghị
+Số lượng NCC trong danh sách
+2
+Thông tin giao dịch - bảng tổng hợp
+5
+STT
+OutputText
+NUMBER
+Tự động điền
+Hệ thống
+Số thứ tự dòng.
+1
+6
+Nhà cung cấp
+OutputText
+TEXT(255)
+Tự động điền
+Tab Thông tin đề nghị
+Tên NCC.
+Công ty TNHH ABC
+7
+Site NCC
+OutputText
+TEXT(255)
+Tự động điền
+OGL
+Site đã đồng bộ OGL của NCC này.
+126150610
+8
+Tổng ghi nợ / Tổng ghi có
+OutputText
+MONEY
+Computed
+Màn hình Chỉnh sửa thông tin hạch toán
+Tổng theo từng NCC, cộng các dòng tài khoản của NCC đó tại màn hình Chỉnh sửa thông tin hạch toán.
+33,000,000
+9
+Tổng cộng bút toán
+OutputText
+MONEY
+Computed
+Hệ thống
+Tổng toàn bộ dòng NCC trong bảng Thông tin giao dịch, đặt ngay cuối bảng.
+73,000,000
+Bút toán bổ sung – GL - bảng tổng hợp
+10
+STT
+OutputText
+NUMBER
+Tự động điền
+Hệ thống
+Số thứ tự dòng.
+1
+11
+Diễn giải
+OutputText
+TEXT(255)
+Tự động điền
+Màn hình Chỉnh sửa thông tin hạch toán
+Diễn giải của bút toán bổ sung.
+Thuế bổ sung cho Công ty ABC
+12
+Loại tiền
+OutputText
+ENUM
+Tự động điền
+Màn hình Chỉnh sửa thông tin hạch toán
+Bút toán GL giữ nguyên tệ, không quy đổi VND như Thông tin giao dịch.
+VND
+13
+Tổng ghi nợ / Tổng ghi có
+OutputText
+MONEY
+Computed
+Màn hình Chỉnh sửa thông tin hạch toán
+Tổng theo từng bút toán bổ sung.
+2,000,000
+14
+Tổng cộng bút toán bổ sung
+OutputText
+MONEY
+Computed
+Hệ thống
+Tổng toàn bộ dòng trong bảng Bút toán bổ sung, đặt ngay cuối bảng.
+2,000,000
+Hành động
+15
+Chỉnh sửa
+Button
+BUTTON
+N/A
+Mở màn hình Chỉnh sửa thông tin hạch toán (full-screen) để sửa chi tiết từng tài khoản. Luôn hiển thị.
+Popup Chỉnh sửa thông tin hạch toán
+STT
+Tên trường
+Kiểu hiển thị
+Kiểu dữ liệu
+Bắt buộc
+Nguồn
+Mô tả
+Ví dụ
+Thông tin giao dịch: số panel tương ứng với số NCC được tạm ứng, mỗi panel: "Nhà cung cấp: [Tên] - Site: [Site NCC]"
+1
+STT
+OutputText
+NUMBER
+N/A
+Hệ thống
+Số thứ tự dòng trong panel: 2 hoặc 3 dòng tùy điều kiện thuế/khấu trừ (BR-003-06).
+1
+2
+Số tài khoản
+SingleSelect
+TEXT(255)
+Bắt buộc
+OGL / Danh mục TK / Danh mục khấu trừ / Thông tin đề nghị
+Tự động điền theo từng dòng, cho phép chọn lại riêng dòng Ghi nợ (BR-003-09): dòng Ghi nợ TK tạm ứng theo Site NCC; dòng Ghi nợ TK thuế theo mapping Loại khấu trừ thuế; dòng Ghi có theo Số TK thụ hưởng (Chuyển khoản) hoặc TK tiền mặt mặc định (Tiền mặt), dòng Ghi có KHÔNG cho phép chọn lại.
+Khi chọn droplist hiển thị theo cấu trúc: [Số tài khoản] - [Tên tài khoản]
+126150610
+3
+Tên tài khoản
+OutputText
+TEXT(255)
+N/A
+Danh mục TK hệ thống
+Tự động cập nhật ngay khi Số tài khoản đổi giá trị.
+TK Tạm ứng cho NCC hàng hóa, dịch vụ
+4
+Ngân hàng
+OutputText
+TEXT(255)
+N/A
+Danh mục TK / Thông tin đề nghị
+Dòng Ghi có lấy theo Ngân hàng thụ hưởng đã nhập; các dòng còn lại theo ngân hàng nội bộ mặc định.
+VietinBank - Chi nhánh Đống Đa
+5
+Nội dung hạch toán
+TextInput
+TEXT(255)
+Bắt buộc
+Tab Thông tin chung / NSD nhập
+Mặc định lấy trường Nội dung giao dịch tại tab Thông tin chung, cho phép sửa riêng từng dòng.
+Tạm ứng hợp đồng mua máy tính
+6
+Ghi nợ (TK tạm ứng)
+OutputText
+MONEY
+N/A
+Computed
+Bằng Số tiền đề nghị tạm ứng của NCC trừ đi Tổng tiền thuế các hóa đơn đã gắn (nếu có dòng Ghi nợ TK thuế); nếu không có dòng thuế thì bằng nguyên Số tiền đề nghị tạm ứng.
+30,000,000
+7
+Ghi nợ (TK thuế)
+OutputText
+MONEY
+N/A
+Computed
+Chỉ có khi đủ điều kiện BR-003-06. Bằng Tổng tiền thuế của các hóa đơn đã gắn với NCC này.
+3,000,000
+8
+Ghi có (TK thụ hưởng/tiền mặt)
+OutputText
+MONEY
+N/A
+Computed
+Bằng tổng của Ghi nợ TK tạm ứng và Ghi nợ TK thuế (nếu có); nếu không có dòng thuế thì bằng đúng Ghi nợ TK tạm ứng.
+33,000,000
+9
+Tổng ghi nợ / Tổng ghi có (panel)
+OutputText
+MONEY
+Computed
+Hệ thống
+Tổng theo panel NCC hiện tại, hiển thị cuối mỗi panel.
+33,000,000
+10
+Tổng cộng bút toán
+OutputText
+MONEY
+Computed
+Hệ thống
+Tổng Ghi nợ/Ghi có của tất cả panel NCC, đặt ngay dưới danh sách panel AP.
+73,000,000
+Bút toán bổ sung – GL, mỗi bút toán một panel (Header: "Bút toán #N")
+11
+Thêm bút toán
+Button
+BUTTON
+N/A
+Tạo panel mới, khởi tạo mặc định một dòng để KTTC điền. Khi xóa hết dòng, panel tự biến mất.
+12
+STT
+OutputText
+NUMBER
+N/A
+Hệ thống
+Số thứ tự dòng.
+1
+13
+Số tài khoản
+SingleSelect
+TEXT(255)
+Bắt buộc
+Danh mục TK hệ thống
+CB KTTC tự chọn, không có giá trị mặc định gợi ý sẵn.
+012345678
+14
+Tên tài khoản
+OutputText
+TEXT(255)
+N/A
+Danh mục TK hệ thống
+Tự cập nhật theo Số tài khoản.
+TK ghi nợ A
+15
+Đơn vị
+OutputText
+TEXT(255)
+N/A
+PeopleSoft / Cơ cấu tổ chức
+Mặc định theo đơn vị CB khởi tạo phiếu, cho phép người dùng thay đổi khóa với nghiệp vụ Tạm ứng (BR-003-07).
+1012698 – CN Đông Đa
+16
+Phòng ban
+OutputText
+TEXT(255)
+N/A
+PeopleSoft / Cơ cấu tổ chức
+Mặc định "000000 – Không xác định", khóa với nghiệp vụ Tạm ứng (BR-003-08).
+000000 – Không xác định
+bổ sung
+Phòng giao dịch
+OutputText
+TEXT(255)
+N/A
+PeopleSoft / Cơ cấu tổ chức
+Mặc định theo đơn vị CB khởi tạo phiếu, có giá trị đối với Chi nhánh
+17
+Diễn giải
+TextInput
+TEXT(255)
+Bắt buộc
+NSD nhập (CB KTTC)
+Nội dung diễn giải bút toán bổ sung.
+Thuế bổ sung cho Công ty ABC
+18
+Loại tiền
+SingleSelect
+ENUM
+Bắt buộc
+NSD nhập (CB KTTC)
+Chỉ chọn được ở dòng đầu tiên của bút toán; các dòng khác trong CÙNG bút toán tự khóa và nhận cùng giá trị (BR-003-10). Mặc định VND.
+VND
+19
+Ghi nợ
+NumberInput
+MONEY
+Bắt buộc (một trong hai)
+NSD nhập
+Khi đã điền Ghi có thì trường này tự khóa; xóa Ghi có để mở lại (BR-003-11).
+2,000,000
+20
+Ghi có
+NumberInput
+MONEY
+Bắt buộc (một trong hai)
+NSD nhập
+Khi đã điền Ghi nợ thì trường này tự khóa; xóa Ghi nợ để mở lại (BR-003-11).
+21
++ Thêm dòng
+Button
+BUTTON
+N/A
+Thêm một dòng mới vào panel bút toán hiện tại.
+22
+Xóa (dòng)
+Icon
+BUTTON
+N/A
+Xóa dòng này khỏi panel. Khi xóa hết dòng của một panel, panel đó tự biến mất (BR-003-12).
+23
+Tổng ghi nợ / Tổng ghi có (panel)
+OutputText
+MONEY
+Computed
+Hệ thống
+Tổng theo từng panel bút toán bổ sung; phải cân đối mới Lưu được (BR-003-04).
+2,000,000
+24
+Tổng cộng bút toán bổ sung
+OutputText
+MONEY
+Computed
+Hệ thống
+Tổng Ghi nợ/Ghi có của tất cả panel bút toán bổ sung, đặt ngay dưới danh sách panel - là điểm kết thúc màn hình.
+2,000,000
+Mapping Loại khấu trừ thuế → Tài khoản GL (áp dụng cho dòng Ghi nợ TK thuế trong Thông tin giao dịch):
+STT
+Loại khấu trừ thuế
+Tài khoản GL
+1
+Khấu trừ tỷ lệ
+126120210
+2
+Khấu trừ toàn bộ
+126120220
+3
+Không khấu trừ
+Không áp dụng, không phát sinh dòng Ghi nợ TK thuế (xem BR-003-06)
+3.5. FS-TU-004 - Luồng rà soát và phê duyệt
+3.5.1. Mô tả chức năng chi tiết
+FS-TU-004: Luồng rà soát và phê duyệt phiếu tạm ứng
+Tóm tắt nghiệp vụ
+Sau khi CB KTTC hoàn thiện phiếu hạch toán và nhấn Chuyển phê duyệt, hệ thống kết xuất bản trình ký và phiếu đi qua tối đa 5 bước rà soát và phê duyệt tuần tự (RS1 → Lãnh đạo ĐMMS → Lãnh đạo KTTC → RS2 → Cấp thẩm quyền). Người được phân công tại mỗi bước xem toàn bộ thông tin phiếu ở chế độ chỉ xem, sau đó thực hiện hành động phù hợp với vai trò: Xác nhận tại bước rà soát, hoặc Phê duyệt kèm ký số trên bản trình ký tại bước phê duyệt. Luồng kết thúc khi Cấp có thẩm quyền ký số thành công – hệ thống tự động gửi thông tin giao dịch sang OGL.
+Người thực hiện (theo từng bước)
+Bước 1 - Rà soát RS1: Cán bộ RS1 (được CB ĐMMS chỉ định tại Thông tin phê duyệt) Bước 2 - Phê duyệt Lãnh đạo ĐMMS: Lãnh đạo đơn vị ĐMMS (được CB ĐMMS chỉ định)
+Bước 3 - Phê duyệt Lãnh đạo KTTC: Lãnh đạo phòng KTTC (được CB KTTC chỉ định)
+Bước 4 - Rà soát RS2: Cán bộ RS2 (được CB KTTC chỉ định tại Thông tin phê duyệt)
+Bước 5 - Phê duyệt Cấp thẩm quyền: Người có thẩm quyền cuối cùng (được KTTC chỉ định)
+Điều kiện thực hiện (theo từng bước)
+Bước 1 (RS1): Phiếu ở trạng thái Chờ phê duyệt đề nghị VÀ bật Yêu cầu RS1 = BẬT. Chỉ người được chỉ định trong bước RS1 mới thao tác được.
+Bước 2 (Lãnh đạo ĐMMS): Bước RS1 đã Xác nhận hoặc được bỏ qua (RS1 = TẮT). Không áp dụng với Luồng 2 (CB KTTC khởi tạo).
+Bước 3 (Lãnh đạo KTTC): Bước 2 đã Phê duyệt (hoặc Luồng 2 - bỏ qua Bước 2).
+Bước 4 (RS2): Bước 3 đã Phê duyệt VÀ bật Yêu cầu RS2 = BẬT.
+Bước 5 (Cấp thẩm quyền): Tất cả bước trước đã hoàn thành hoặc được bỏ qua theo điều kiện.
+Điều kiện bỏ qua (theo từng bước)
+Bước 1 (RS1): Yêu cầu RS1 = TẮT (mặc định) → bỏ qua, chuyển thẳng sang Bước 2.
+Bước 2 (Lãnh đạo ĐMMS): Luồng 2 (CB KTTC khởi tạo phiếu) → bỏ qua Bước 1 và 2, chuyển thẳng sang Bước 3.
+Bước 3 và 5 (Lãnh đạo KTTC, Cấp thẩm quyền): Bắt buộc trong mọi luồng - không có điều kiện bỏ qua.
+Bước 4 (RS2): Yêu cầu RS2 = TẮT (mặc định) → bỏ qua, chuyển thẳng sang Bước 5.
+Kết quả sau khi thực hiện
+Nếu Xác nhận: phiếu chuyển sang bước tiếp theo.
+Nếu Phê duyệt: chữ ký số được nhúng vào bản trình ký và phiếu chuyển sang bước tiếp theo.
+Khi Bước 5 hoàn thành → trạng thái chuyển sang Đã phê duyệt, hệ thống tự động gửi thông tin giao dịch.
+Nếu Yêu cầu chỉnh sửa: bản trình ký và toàn bộ chữ ký bị hủy hiệu lực, phiếu chuyển về Chờ chỉnh sửa đề nghị, CB ĐMMS/CB KTTC nhận thông báo và trình lại từ đầu luồng.
+Điều kiện kích hoạt
+Người được chỉ định tại từng bước nhận thông báo hệ thống và truy cập phiếu từ danh sách chờ xử lý. Mỗi người chỉ thấy phiếu thuộc bước mình được phân công.
+3.5.2. Luồng thực hiện
+Quy trình chung áp dụng cho tất cả 5 bước:
+Hệ thống gửi thông báo đến người được phân công khi đến lượt xử lý.
+Người dùng mở phiếu từ danh sách chờ. Toàn bộ màn hình hiển thị chế độ chỉ xem (tất cả tab: Thông tin chung, Thông tin đề nghị, Thông tin phê duyệt, Tài liệu đính kèm, Thông tin hạch toán, Lịch sử cập nhật).
+Người dùng xem xét thông tin và chọn một trong các hành động tại header:
+Bước RS1, RS2 - Xác nhận: Nhấn Xác nhận → pop-up xác nhận (CR-04) → chuyển bước tiếp theo.
+Bước Lãnh đạo ĐMMS, Lãnh đạo KTTC, Cấp thẩm quyền - Phê duyệt kèm ký số:
+Bước 1
+Nhấn Phê duyệt → mở màn hình Ký số, hiển thị bản trình ký kèm chữ ký của các bước trước.
+Bước 2
+Chọn chữ ký → kéo thả vào vị trí mong muốn (Xóa vị trí này nếu cần đặt lại)
+Bước 3
+Nhấn Gửi ký số → xác thực theo HSM (nhập tài khoản/mật khẩu) hoặc VNPT SmartCA (xác nhận trên ứng dụng di động).
+Bước 4
+Ký thành công → nhúng chữ ký, ghi nhận phê duyệt, chuyển bước tiếp theo (riêng Bước 5 → trạng thái Đã phê duyệt).
+Bước 5
+Ký không thành công → thông báo lỗi, giữ nguyên bước hiện tại, không ghi nhận phê duyệt.
+Mọi hành động đều được ghi vào Lịch sử cập nhật: thời gian, người thực hiện, loại hành động, lý do (nếu có).
+Tóm tắt nghiệp vụ
+Nhấn Phê duyệt → mở màn hình Ký số, hiển thị bản trình ký kèm chữ ký của các bước trước
+Người thực hiện (theo từng bước)
+Chọn chữ ký → kéo thả vào vị trí mong muốn (Xóa vị trí này nếu cần đặt lại)
+3.5.3. Luồng thay thế
+Luồng 2 (CB KTTC khởi tạo): Bước 1 và Bước 2 được bỏ qua. Phiếu chuyển thẳng sang Bước 3.
+Yêu cầu RS1 = TẮT (mặc định): bỏ qua Bước 1, tiếp tục Bước 2.
+Yêu cầu RS2 = TẮT (mặc định): bỏ qua Bước 4, tiếp tục Bước 5.
+3.5.4. Luồng ngoại lệ
+Người được phân công yêu cầu chỉnh sửa: Phiếu trả về Chờ chỉnh sửa đề nghị. CB ĐMMS hoặc CB KTTC chỉnh sửa và trình lại từ đầu luồng.
+Ký số không thành công: Khi hệ thống ký số trả về kết quả không thành công (xác thực HSM không hợp lệ, người ký không xác nhận trên ứng dụng VNPT SmartCA trong thời gian chờ, hoặc lỗi kết nối), hệ thống hiển thị thông báo lỗi tương ứng. Phiếu giữ nguyên bước hiện tại, không ghi nhận kết quả phê duyệt và bản trình ký giữ nguyên các chữ ký hợp lệ đã có trước đó. Kết quả ký không thành công được ghi vào Lịch sử cập nhật (BR-004-09).
+3.5.5. Quy tắc nghiệp vụ
+STT
+Mô tả quy tắc nghiệp vụ
+Nội dung chi tiết
+BR-004-01
+Toàn bộ thông tin là chỉ xem
+Người dùng tại bất kỳ bước nào trong luồng này không được sửa bất kỳ trường nào, kể cả các trường mà bước trước cho phép nhập. Áp dụng cho tất cả tab.
+BR-004-02
+Bắt buộc nhập lý do khi Yêu cầu chỉnh sửa
+Hệ thống hiển thị hộp nhập Lý do chỉnh sửa khi người dùng nhấn nút Yêu cầu chỉnh sửa. Trường lý do là bắt buộc - không thể xác nhận nếu để trống.
+BR-004-03
+Ghi nhật ký mọi hành động
+Mọi hành động tại tất cả bước được ghi vào Lịch sử cập nhật: thời gian (DD/MM/YYYY HH:mm:ss), người thực hiện, loại hành động (Xác nhận / Phê duyệt / Yêu cầu chỉnh sửa), và lý do (nếu có).
+BR-004-04
+Ký số là điều kiện hoàn tất phê duyệt
+Áp dụng tại Bước 2, 3 và 5. Hệ thống chỉ ghi nhận kết quả phê duyệt của bước khi hệ thống ký số trả về kết quả ký thành công. Trường hợp ký không thành công hoặc người ký đóng màn hình Ký số giữa chừng, phiếu giữ nguyên bước hiện tại và không phát sinh bản ghi phê duyệt.
+BR-004-05
+Điều kiện bật nút Gửi ký số
+Nút Gửi ký số chỉ được bật khi người ký đã chọn một mẫu chữ ký và đặt tối thiểu một vị trí ký trên bản trình ký. Trước đó, nút ở trạng thái vô hiệu hóa.
+BR-004-06
+Kế thừa chữ ký của các bước trước
+Bản trình ký hiển thị tại mỗi bước bao gồm đầy đủ chữ ký đã ghi nhận ở các bước trước đó. Người ký không được xóa hoặc thay đổi vị trí chữ ký của người khác; nút Xóa vị trí này chỉ tác động đến vị trí chữ ký do chính người ký đặt trong phiên làm việc hiện tại và chưa gửi ký.
+BR-004-07
+Hủy toàn bộ chữ ký khi Yêu cầu chỉnh sửa
+Khi bất kỳ bước nào trong luồng nhấn Yêu cầu chỉnh sửa, toàn bộ chữ ký đã ghi nhận trên phiếu và bản trình ký hiện hành bị hủy hiệu lực, không phụ thuộc số bước đã ký thành công. Sau khi phiếu được chỉnh sửa và trình lại, luồng ký số thực hiện lại từ đầu trên bản trình ký mới.
+BR-004-08
+Nguồn danh sách mẫu chữ ký
+Danh sách mẫu chữ ký hiển thị tại pop-up Chọn chữ ký do hệ thống ký số trả về theo tài khoản của người ký đang đăng nhập. QLTS không lưu trữ mẫu chữ ký và không cung cấp chức năng tải lên mẫu chữ ký.
+BR-004-09
+Ghi nhật ký ký số
+Mọi lượt ký số được ghi vào Lịch sử cập nhật, bao gồm: thời gian, người ký, bước phê duyệt, phương thức xác thực (HSM / VNPT SmartCA) và kết quả (Thành công / Không thành công).
+3.5.6. Mô tả màn hình
+Nút hành động chính của từng bước
+Bước
+Tên bước
+Người thực hiện
+Nút hành động chính
+Yêu cầu ký số
+1
+Rà soát RS1
+Cán bộ RS1
+Xác nhận
+Không
+2
+Phê duyệt Lãnh đạo ĐMMS
+Lãnh đạo đơn vị ĐMMS
+Phê duyệt
+Có
+3
+Phê duyệt Lãnh đạo KTTC
+Lãnh đạo phòng KTTC
+Phê duyệt
+Có
+4
+Rà soát RS2
+Cán bộ RS2
+Xác nhận
+Không
+5
+Phê duyệt Cấp thẩm quyền
+Cấp có thẩm quyền (được cấu hình)
+Phê duyệt
+Có
+Ở mọi bước, header còn có các nút bổ sung: Yêu cầu chỉnh sửa, Quay lại và Phiếu in.
+Header - Phần chung cho các bước
+STT
+Tên trường
+Kiểu hiển thị
+Kiểu dữ liệu
+Bắt buộc
+Nguồn
+Mô tả
+Ví dụ / Ghi chú
+1
+Quay lại
+Nút bấm
+BUTTON
+N/A
+Trở về danh sách phiếu chờ xử lý. Không cần xác nhận (màn hình chỉ xem).
+2
+Phiếu in
+Nút bấm
+BUTTON
+N/A
+Mở pop-up hiển thị bản trình ký của phiếu ở định dạng PDF, bao gồm các chữ ký đã ghi nhận. Áp dụng theo CR-09.
+3
+Yêu cầu chỉnh sửa
+Nút bấm
+BUTTON
+N/A
+Mở pop-up theo CR-08 (bắt buộc nhập lý do, không có phân loại điều chỉnh); sau khi xác nhận, phiếu trả về Chờ chỉnh sửa đề nghị. Áp dụng ở cả 5 bước.
+4
+Xác nhận / Phê duyệt
+Nút bấm
+BUTTON
+N/A
+Nhãn nút là Xác nhận ở Bước 1 (RS1) và Bước 4 (RS2), Phê duyệt ở Bước 2, 3 và 5. Với Bước 1 và 4: hiển thị pop-up xác nhận CR-04, sau đó chuyển phiếu sang bước tiếp theo. Với Bước 2, 3 và 5: mở pop-up Ký số; phiếu chỉ chuyển bước khi ký số thành công (BR-004-04).
+Pop-up Ký số phiếu in
+STT
+Tên trường
+Kiểu hiển thị
+Kiểu dữ liệu
+Bắt buộc
+Nguồn
+Mô tả
+Ví dụ
+Vùng hiển thị bản phiếu trình ký
+1
+Bản trình ký
+PDFViewer
+FILE
+Tự động điền
+Hệ thống
+Hiển thị bản trình ký PDF của phiếu, bao gồm đầy đủ chữ ký đã ghi nhận ở các bước trước (BR-004-06).
+Mẫu số 01/TƯTM – Giấy đề nghị tạm ứng kiêm chứng từ hạch toán
+2
+Điều hướng trang
+Button
+BUTTON
+N/A
+Nút Trước / Sau và chỉ số trang, dùng để di chuyển giữa các trang của bản trình ký.
+Trước | 1 | 2 | Sau
+3
+Tỷ lệ hiển thị
+Button
+BUTTON
+N/A
+Phóng to hoặc thu nhỏ tỷ lệ hiển thị bản trình ký.
+62%
+4
+Zoom chữ ký
+Slider
+NUMBER
+Không bắt buộc
+NSD nhập
+Điều chỉnh kích thước hình chữ ký đang đặt trên bản trình ký. Chỉ tác động đến chữ ký của người ký hiện tại.
+62
+Hành động
+5
+Xóa vị trí này
+Button
+BUTTON
+N/A
+Gỡ chữ ký đang đặt khỏi bản trình ký để chọn lại vị trí. Chỉ tác động đến chữ ký của người ký hiện tại và chưa gửi ký (BR-004-06).
+6
+Chọn chữ ký
+Button
+BUTTON
+N/A
+Mở pop-up Chọn chữ ký. Sau khi chọn, mẫu chữ ký hiển thị trên bản trình ký và người ký kéo thả đến vị trí mong muốn.
+7
+Gửi ký số
+Button
+BUTTON
+N/A
+Thực hiện ký số. Chỉ bật khi đã chọn chữ ký và đặt vị trí ký (BR-004-05). Sau khi nhấn, hệ thống hiển thị bước xác thực theo phương thức đã cấu hình cho tài khoản người ký.
+8
+Hủy ký số
+Button
+BUTTON
+N/A
+Đóng màn hình Ký số và quay về màn hình chi tiết phiếu, không ghi nhận kết quả phê duyệt (BR-004-04). Nút đóng (X) ở góc trên của pop-up cũng có hành động tương đương.
+Pop-up Chọn chữ ký
+STT
+Tên trường
+Kiểu hiển thị
+Kiểu dữ liệu
+Bắt buộc
+Nguồn
+Mô tả
+Ví dụ
+1
+Danh sách mẫu chữ ký
+ImageList
+IMAGE
+Tự động điền
+Hệ thống ký số
+Hiển thị các mẫu chữ ký của người ký đang đăng nhập do hệ thống ký số trả về (BR-004-08). Nhấn chọn một mẫu để đưa mẫu đó lên bản trình ký; pop-up tự đóng ngay sau khi chọn.
+2
+Đóng (X)
+Icon Button
+BUTTON
+N/A
+Đóng pop-up, không chọn mẫu chữ ký nào.
+Pop-up Đăng nhập HSM
+STT
+Tên trường
+Kiểu hiển thị
+Kiểu dữ liệu
+Bắt buộc
+Nguồn
+Mô tả
+Ví dụ
+1
+Tài khoản HSM
+TextInput
+TEXT(255)
+Bắt buộc
+NSD nhập
+Tài khoản ký số HSM của người ký.
+2
+Mật khẩu HSM
+PasswordInput
+TEXT(255)
+Bắt buộc
+NSD nhập
+Mật khẩu tương ứng. Giá trị nhập được che hiển thị và không lưu tại QLTS.
+3
+Đăng nhập
+Button
+BUTTON
+N/A
+Gửi thông tin xác thực sang hệ thống ký số và thực hiện ký. Chỉ bật khi đã nhập đủ hai trường.
+4
+Hủy
+Button
+BUTTON
+N/A
+Đóng pop-up, quay lại màn hình Ký số, không thực hiện ký.
+3.6. FS-TU-005 - Gửi thông tin giao dịch và cập nhật kết quả hạch toán
+3.6.1. Mô tả chức năng chi tiết
+FS-TU-005: Gửi thông tin giao dịch
+Tóm tắt nghiệp vụ
+Ngay sau khi Cấp có thẩm quyền phê duyệt, hệ thống tự động tạo yêu cầu hạch toán sang OGL cho các bút toán AP và GL bổ sung. Trường hợp phát sinh sau thời điểm cut-off, hệ thống không gửi ngay mà đưa yêu cầu vào hàng đợi để job tự động gửi lại khi OGL mở cửa. Đây là use case hoàn toàn tự động, không có thao tác của người dùng; việc theo dõi kết quả và thử lại thuộc FS-TU-006.
+Người thực hiện
+Hệ thống (tự động). Không có vai trò người dùng nào thao tác trong use case này.
+Điều kiện thực hiện
+Phiếu vừa chuyển sang trạng thái Đã phê duyệt; dữ liệu hạch toán đã được chốt theo bản trình ký được phê duyệt; các thông tin bắt buộc để gửi OGL đã đầy đủ.
+Kết quả sau khi thực hiện
+Yêu cầu hạch toán được tạo cho toàn bộ bút toán AP và GL bổ sung. Nếu trong khung giờ cho phép gửi, hệ thống gửi yêu cầu sang OGL và khởi tạo trạng thái Đang xử lý tại tab Kết quả hạch toán. Nếu ngoài khung giờ gửi, yêu cầu được ghi nhận ở trạng thái chờ gửi và được job tự động xử lý lại theo BR-005-04.
+Điều kiện kích hoạt
+Tự động ngay khi phiếu đạt trạng thái Đã phê duyệt.
+FS-TU-005: Gửi thông tin giao dịch và cập nhật kết quả
+Tóm tắt nghiệp vụ
+Ngay sau khi Cấp có thẩm quyền phê duyệt, hệ thống tự động tạo và gửi thông tin giao dịch sang OGL (bút toán hạch toán) và Core Banking (lệnh chuyển tiền cho các NCC thanh toán bằng chuyển khoản). Đây là use case hoàn toàn tự động, không có thao tác của người dùng; việc theo dõi kết quả và thử lại thuộc FS-TU-006.
+Người thực hiện
+Hệ thống (tự động). Không có vai trò người dùng nào thao tác trong use case này.
+Điều kiện thực hiện
+Phiếu vừa chuyển sang trạng thái Đã phê duyệt.
+Kết quả sau khi thực hiện
+Yêu cầu giao dịch được tạo và gửi đi cho tất cả bút toán (AP, GL bổ sung) và lệnh chuyển tiền (với NCC thanh toán Chuyển khoản); mỗi giao dịch được khởi tạo ở trạng thái Đang xử lý tại tab Kết quả xử lý giao dịch. Use case kết thúc ngay khi yêu cầu đã được gửi đi, không đợi phản hồi.
+Điều kiện kích hoạt
+Tự động ngay khi phiếu đạt trạng thái Đã phê duyệt.
+3.6.2. Luồng thực hiện
+Khi phiếu chuyển sang Đã phê duyệt, hệ thống khóa dữ liệu nghiệp vụ đã được phê duyệt và tổng hợp toàn bộ bút toán AP, GL bổ sung tại tab Thông tin hạch toán.
+Hệ thống kiểm tra thời điểm phát sinh yêu cầu so với cut-off time theo BR-005-04.
+Nếu trong khung giờ gửi, hệ thống tạo batch/yêu cầu và gửi sang OGL. Mỗi bút toán được khởi tạo trạng thái Đang xử lý tại tab Kết quả hạch toán.
+Nếu sau cut-off, hệ thống ghi nhận yêu cầu vào hàng đợi, chưa gửi sang OGL và để job tự động gửi vào ngày làm việc kế tiếp khi OGL mở cửa.
+Use case kết thúc sau khi yêu cầu được gửi hoặc được đưa vào hàng đợi hợp lệ. Việc nhận phản hồi, cập nhật trạng thái thành công/thất bại và xử lý thử lại được mô tả tại FS-TU-006.
+Hệ thống tổng hợp toàn bộ Thông tin giao dịch và GL bổ sung tại tab Thông tin hạch toán, tạo yêu cầu gửi sang OGL.
+Với các NCC có Phương thức thanh toán là Chuyển khoản, hệ thống tạo lệnh chuyển tiền gửi sang Core Banking.
+Mỗi giao dịch (bút toán hoặc lệnh chuyển tiền) được khởi tạo ở trạng thái Đang xử lý ngay sau khi gửi.
+3.6.3. Quy tắc nghiệp vụ
+STT
+Mô tả Rule
+Áp dụng tại bước
+Nội dung chi tiết
+BR-005-01
+Gửi ngay khi phê duyệt, không cần thao tác
+Toàn use case
+Việc tạo yêu cầu giao dịch được kích hoạt hoàn toàn tự động khi phiếu chuyển sang Đã phê duyệt, không có bước xác nhận hay thao tác người dùng.
+BR-005-02
+Trạng thái khởi tạo là Đang xử lý
+Tab Kết quả hạch toán
+Khi yêu cầu được gửi sang OGL, mỗi giao dịch hiển thị trạng thái Đang xử lý cho đến khi có phản hồi từ OGL. Kết quả phản hồi được cập nhật theo FS-TU-006.
+BR-005-03
+Tham chiếu các trường hợp hạch toán
+Tạo yêu cầu OGL
+Các trường hợp sinh bút toán AP, GL và cấu trúc dữ liệu gửi đi thực hiện theo mapping nghiệp vụ hạch toán đã được phê duyệt. Hệ thống không cho phép thay đổi dữ liệu hạch toán tại thời điểm gửi tự động.
+BR-005-04
+Logic cut-off time và job gửi lại
+Thời điểm gửi OGL
+Cut-off time là 18:00. Sau 18:00, hệ thống vẫn cho phép hoàn tất phê duyệt nhưng không gửi hạch toán ngay; yêu cầu được đưa vào hàng đợi. Sáng ngày làm việc kế tiếp, khi OGL mở cửa lúc 08:45, job tự động gửi các yêu cầu hạch toán phát sinh sau cut-off của ngày trước đó. Sau khi gọi hạch toán, hệ thống quét kết quả sau 5 phút và tiếp tục quét các request chưa thành công mỗi 20 phút.
+BR-005-05
+Không gửi Core Banking tại use case này
+FS-TU-005
+FS-TU-005 chỉ đặc tả việc tạo/gửi yêu cầu hạch toán sang OGL. Kết quả chuyển tiền/đi tiền và các thông tin thanh toán liên quan được theo dõi tại FS-TU-006 theo kết quả trả về của hệ thống tích hợp.
+STT
+Mô tả Rule
+Áp dụng tại bước
+Nội dung chi tiết
+BR-005-01
+Gửi ngay khi phê duyệt, không cần thao tác
+Toàn use case
+Việc gửi giao dịch được kích hoạt hoàn toàn tự động, không có bước xác nhận hay thao tác nào của người dùng.
+BR-005-02
+Trạng thái khởi tạo là Đang xử lý
+Tab Kết quả xử lý giao dịch
+Ngay khi yêu cầu được gửi đi, mỗi giao dịch hiển thị trạng thái Đang xử lý cho đến khi có phản hồi từ OGL/Core Banking (xem FS-TU-006).
+BR-005-03
+Các trường hợp hạch toán
+Tham chiếu tài liệu https://vietinbank.atlassian.net/wiki/pages/resumedraft.action?draftId=368347108&draftShareId=9d7a6f37-6c61-4272-9494-0bbe77e3cca6
+BR-005-04
+Bổ sung logic cut off time
+Thời điểm cut off = 18:00: Vẫn cho phép phê duyệt nhưng không gửi đi hạch toán; yêu cầu sẽ xếp hàng.
+Sáng hôm sau, khi OGL mở cửa lúc 08:45, chạy job để gửi những yêu cầu hạch toán (sau khi COT hôm trước, T‑1)
+Tần suất chạy job : 5 phút sau khi gọi hạch toán và mỗi 20 phút quét các request hạch toán chưa thành công
+3.7. FS-TU-006 – Theo dõi và cập nhật kết quả xử lý giao dịch
+3.7.1. Mô tả chức năng chi tiết
+FS-TU-006: Nhận kết quả hạch toán
+Tóm tắt nghiệp vụ
+Hệ thống tự động nhận, quét và cập nhật kết quả hạch toán từ OGL cho các yêu cầu đã được tạo tại FS-TU-005. Người dùng theo dõi trạng thái từng bút toán tại tab Kết quả hạch toán; không thực hiện thao tác gửi lại thủ công trên giao diện. Khi toàn bộ yêu cầu hạch toán của phiếu thành công, hệ thống cập nhật các thông tin phản hồi từ OGL và chuyển phiếu sang trạng thái Đã hạch toán.
+Người thực hiện
+Hệ thống tự động. Người dùng có quyền xem phiếu chỉ theo dõi kết quả tại tab Kết quả hạch toán.
+Điều kiện thực hiện
+Phiếu đã ở trạng thái Đã phê duyệt; yêu cầu hạch toán OGL đã được gửi hoặc đang ở hàng đợi gửi theo FS-TU-005; tồn tại ít nhất một request hạch toán cần nhận kết quả.
+Kết quả sau khi thực hiện
+Trạng thái từng request hạch toán được cập nhật theo phản hồi từ OGL. Các thông tin phản hồi như Batch name, Số Invoice, Số Payment, trạng thái và thời gian cập nhật được lưu và hiển thị tại tab Kết quả hạch toán. Khi tất cả request thành công, phiếu chuyển sang Đã hạch toán.
+Điều kiện kích hoạt
+Job hệ thống tự động quét kết quả sau khi gửi hạch toán theo tần suất tại BR-005-04; hoặc người dùng mở tab Kết quả hạch toán để xem dữ liệu hiện hành đã được hệ thống cập nhật.
+3.7.2. Luồng thực hiện
+Sau khi hệ thống gửi yêu cầu hạch toán sang OGL hoặc job gửi thành công các yêu cầu trong hàng đợi, hệ thống khởi tạo trạng thái Đang xử lý cho từng request tại tab Kết quả hạch toán.
+Job hệ thống tự động quét kết quả theo tần suất quy định tại BR-005-04.
+Khi nhận được phản hồi từ OGL, hệ thống cập nhật trạng thái từng request: Đang xử lý, Thành công hoặc Gửi thất bại; đồng thời cập nhật các thông tin phản hồi tương ứng như Batch name, Số Invoice, Số Payment, mã lỗi/thông báo lỗi và thời gian cập nhật.
+Nếu còn request Đang xử lý hoặc Gửi thất bại, phiếu giữ trạng thái Đã phê duyệt để tiếp tục theo dõi hoặc chờ job xử lý tiếp theo theo cơ chế hệ thống.
+Khi toàn bộ request hạch toán của phiếu thành công, hệ thống chuyển trạng thái phiếu sang Đã hạch toán và ghi nhận lịch sử cập nhật.
+3.7.3. Quy tắc nghiệp vụ
+Mã
+Tên quy tắc
+Áp dụng tại
+Nội dung chi tiết
+BR-006-01
+Bộ trạng thái hạch toán
+Cột Trạng thái
+Mỗi request hạch toán có 3 trạng thái: Đang xử lý (vàng), Thành công (xanh lá), Gửi thất bại (đỏ). Trạng thái được cập nhật tự động theo phản hồi từ OGL hoặc kết quả xử lý của job hệ thống.
+BR-006-02
+Không thao tác thử lại thủ công trên giao diện
+Tab Kết quả hạch toán
+Người dùng chỉ theo dõi kết quả, không có nút Thử lại tại tab Kết quả hạch toán. Việc gửi lại hoặc quét lại các request chưa thành công được thực hiện bởi job hệ thống theo BR-005-04 và cơ chế vận hành tích hợp.
+BR-006-03
+Quét kết quả sau khi gọi hạch toán
+Job nhận kết quả
+Sau khi gọi hạch toán sang OGL, hệ thống quét kết quả sau 5 phút. Với các request chưa thành công, hệ thống tiếp tục quét lại theo chu kỳ 20 phút cho đến khi nhận được kết quả cuối hoặc theo ngưỡng vận hành được cấu hình.
+BR-006-04
+Điều kiện chuyển Đã hạch toán
+Toàn phiếu
+Phiếu chỉ chuyển sang Đã hạch toán khi toàn bộ request hạch toán OGL của phiếu ở trạng thái Thành công. Nếu còn request Đang xử lý hoặc Gửi thất bại, phiếu giữ trạng thái Đã phê duyệt để tiếp tục theo dõi.
+BR-006-05
+Lưu thông tin phản hồi OGL
+Khi nhận phản hồi
+Hệ thống lưu các thông tin OGL trả về gồm Batch name, Số Invoice, Số Payment, trạng thái xử lý, thời gian cập nhật, mã lỗi và nội dung lỗi nếu có. Giá trị chưa có dữ liệu hiển thị bằng dấu “-”.
+BR-006-06
+Ghi lịch sử cập nhật
+Khi trạng thái thay đổi
+Khi toàn bộ request thành công và phiếu chuyển sang Đã hạch toán, hệ thống ghi một bản ghi lịch sử cập nhật với hành động Đã hạch toán, thời gian hệ thống và mô tả kết quả xử lý.
+3.7.4. Mô tả màn hình
+Hình 3.6.1. Tab Kết quả hạch toán
+Tab Kết quả hạch toán
+STT
+Tên trường
+Kiểu hiển thị
+Kiểu dữ liệu
+Bắt buộc
+Nguồn
+Mô tả
+Ví dụ
+Bảng Kết quả hạch toán (OGL)
+1
+Badge tổng kết
+Badge
+COMPUTED
+Computed
+Hệ thống
+Hiển thị "Số bút toán đồng bộ OGL thành công: X/Y".
+1/3
+2
+STT
+OutputText
+NUMBER
+Tự động điền
+Hệ thống
+Số thứ tự dòng.
+1
+3
+Loại bút toán
+OutputText
+ENUM
+Tự động điền
+QLTS
+AP hoặc GL, ứng với khối bút toán tại tab Thông tin hạch toán.
+AP
+4
+Nội dung hạch toán
+OutputText
+TEXT(255)
+Tự động điền
+Diễn giải đã gửi
+Nội dung đã gửi sang OGL tại thời điểm phát sinh giao dịch.
+Tạm ứng HĐ mua máy tính
+5
+Số tiền
+OutputText
+MONEY
+Tự động điền
+Hệ thống
+Tổng ghi nợ của bút toán; định dạng phân cách nghìn.
+33,000,000
+bổ sung
+Loại tiền
+OutputText
+TEXT(255)
+Tự động điền
+Hệ thống
+Lấy theo loại tiền gửi đi hạch toán.
+VND
+6
+Batch name (OGL)
+OutputText
+TEXT(255)
+Tự động điền
+OGL
+Tên batch OGL; hiển thị "-" nếu chưa có.
+QLTS_26062026_01
+7
+Số Invoice (OGL)
+OutputText
+TEXT(255)
+Tự động điền
+OGL
+Chỉ có ở dòng Loại bút toán = AP.
+QLTS_26062026_01_01
+bổ sung
+Số Payment (OGL)
+OutputText
+TEXT(255)
+Tự động điền
+OGL
+Số Payment OGL; hiển thị "-" nếu chưa có.
+112345
+8
+Trạng thái
+Badge
+ENUM
+Tự động điền
+OGL
+Ba trạng thái theo BR-006-01.
+Thành công
+9
+Thời gian cập nhật
+OutputText
+DATETIME
+Tự động điền
+Hệ thống
+Thời điểm nhận phản hồi gần nhất từ OGL cho dòng này.
+14:32 25/06/2026
+10
+Hành động
+Button
+BUTTON
+N/A
+Thử lại khi Gửi thất bại; khóa (không hiển thị nút) khi Đang xử lý; không có hành động khi Thành công.
+Thử lại
+Bảng Kết quả chuyển tiền (Core Banking)
+11
+Badge tổng kết
+Badge
+COMPUTED
+Computed
+Hệ thống
+Hiển thị "Số giao dịch chuyển tiền thành công: X/Y", chỉ tính NCC có phương thức Chuyển khoản.
+1/2
+12
+STT
+OutputText
+NUMBER
+Tự động điền
+Hệ thống
+Số thứ tự dòng.
+1
+13
+Nội dung/diễn giải
+OutputText
+TEXT(255)
+Tự động điền
+Thông tin đề nghị
+Nội dung giao dịch của NCC tương ứng.
+Tạm ứng HĐ mua máy tính
+14
+Số tiền
+OutputText
+MONEY
+Tự động điền
+Thông tin đề nghị
+Số tiền chuyển cho NCC.
+45,000,000
+bổ sung
+Loại tiền
+OutputText
+TEXT(255)
+Tự động điền
+Hệ thống
+Lấy theo loại tiền gửi đi hạch toán.
+VND
+15
+Tài khoản thụ hưởng
+OutputText
+TEXT(255)
+Tự động điền
+Thông tin đề nghị
+Số tài khoản nhận tiền; giúp phân biệt khi nhiều giao dịch cùng nội dung.
+6868686868
+16
+Trạng thái xử lý
+Badge
+ENUM
+Tự động điền
+Core Banking
+Áp dụng cùng bộ ba trạng thái với Bảng 1 (BR-006-01).
+Thành công
+17
+Thời gian cập nhật
+OutputText
+DATETIME
+Tự động điền
+Hệ thống
+Thời điểm nhận phản hồi gần nhất từ Core Banking.
+14:35 25/06/2026
+18
+Hành động
+Button
+BUTTON
+N/A
+Thử lại khi Gửi thất bại, áp dụng cùng quy tắc với Bảng 1.
+Thử lại
+3.8. FS-TU-007 - Yêu cầu chỉnh sửa / Trả lại đề nghị
+3.8.1. Mô tả Chức năng chi tiết
+FS-TU-007: Yêu cầu chỉnh sửa / Trả lại đề nghị
+Tóm tắt nghiệp vụ
+Cho phép người đang xử lý tại bước KTTC, rà soát hoặc phê duyệt trả phiếu về trạng thái Chờ chỉnh sửa đề nghị khi hồ sơ chưa hợp lệ hoặc cần bổ sung thông tin. Người thực hiện nhập lý do yêu cầu chỉnh sửa; hệ thống ghi nhận lịch sử, thông báo cho người chịu trách nhiệm chỉnh sửa và hủy hiệu lực bản trình ký/chữ ký hiện hành nếu phiếu đã đi vào luồng phê duyệt.
+Người thực hiện
+CB KTTC tại bước Chờ KTTC xử lý; cán bộ RS1; Lãnh đạo ĐMMS; Lãnh đạo KTTC; cán bộ RS2; Cấp có thẩm quyền tại các bước thuộc luồng rà soát/phê duyệt.
+Điều kiện thực hiện
+Phiếu đang ở trạng thái Chờ KTTC xử lý hoặc Chờ phê duyệt đề nghị; người dùng là người thực hiện hiện hành của bước đang chờ xử lý; bước chưa hoàn thành và phiếu chưa ở trạng thái cuối.
+Kết quả sau khi thực hiện
+Phiếu chuyển về trạng thái Chờ chỉnh sửa đề nghị. Bước xử lý hiện hành được trả về Bước 1 để cán bộ chịu trách nhiệm chỉnh sửa hoàn thiện và trình lại. Hệ thống ghi lịch sử cập nhật, lưu lý do yêu cầu chỉnh sửa và gửi thông báo cho người cần xử lý tiếp theo. Nếu phiếu đã có bản trình ký/chữ ký, toàn bộ bản trình ký và chữ ký hiện hành bị hủy hiệu lực theo BR-007-05.
+Điều kiện kích hoạt
+Người dùng nhấn nút Yêu cầu chỉnh sửa trên màn hình chi tiết phiếu tại bước mình đang được phân công xử lý.
+Bước tại luồng quy trình
+Áp dụng cho các nhánh trả về từ Bước 2 đến Bước 7 trong luồng xử lý. Sau khi người chỉnh sửa trình lại, phiếu đi lại từ đầu luồng phù hợp với cấu hình hiện hành.
+3.8.2. Luồng thực hiện
+Người dùng mở phiếu tại bước mình được phân công xử lý.
+Hệ thống hiển thị màn hình chi tiết phiếu ở chế độ phù hợp với bước hiện hành, đồng thời hiển thị nút Yêu cầu chỉnh sửa tại Header.
+Người dùng nhấn Yêu cầu chỉnh sửa.
+Hệ thống hiển thị pop-up Yêu cầu chỉnh sửa theo CR-07, gồm thông báo xác nhận và ô nhập lý do bắt buộc.
+Người dùng nhập lý do và nhấn Xác nhận.
+Hệ thống kiểm tra lại trạng thái phiếu và quyền xử lý tại thời điểm xác nhận.
+Nếu hợp lệ, hệ thống cập nhật phiếu về trạng thái Chờ chỉnh sửa đề nghị, ghi lịch sử cập nhật, gửi thông báo cho cán bộ chịu trách nhiệm chỉnh sửa và đóng pop-up.
+Người chỉnh sửa mở phiếu, thực hiện điều chỉnh theo nội dung yêu cầu, sau đó trình lại. Phiếu đi lại từ đầu luồng theo cấu hình hiện hành.
+3.8.3. Luồng thay thế
+Tên nhánh
+Nội dung
+CB KTTC yêu cầu chỉnh sửa tại bước tiếp nhận
+Phiếu đang ở trạng thái Chờ KTTC xử lý. Sau khi xác nhận yêu cầu chỉnh sửa, phiếu chuyển về Chờ chỉnh sửa đề nghị để CB ĐMMS hoặc cán bộ khởi tạo bổ sung thông tin, sau đó trình lại sang KTTC.
+Bước rà soát yêu cầu chỉnh sửa
+Cán bộ RS1 hoặc RS2 nhấn Yêu cầu chỉnh sửa. Phiếu quay về Chờ chỉnh sửa đề nghị; khi trình lại, các bước rà soát/phê duyệt trước đó được thực hiện lại theo luồng hiện hành.
+Bước phê duyệt yêu cầu chỉnh sửa
+Lãnh đạo ĐMMS, Lãnh đạo KTTC hoặc Cấp có thẩm quyền yêu cầu chỉnh sửa. Hệ thống hủy hiệu lực bản trình ký/chữ ký hiện hành nếu đã có, trả phiếu về Chờ chỉnh sửa đề nghị và yêu cầu trình lại từ đầu luồng phê duyệt.
+Người dùng hủy pop-up
+Người dùng nhấn Hủy hoặc đóng pop-up. Hệ thống không cập nhật trạng thái, không ghi lịch sử yêu cầu chỉnh sửa và phiếu giữ nguyên bước hiện hành.
+3.8.4. Luồng ngoại lệ
+Tình huống
+Xử lý của hệ thống
+Không nhập lý do
+Nút Xác nhận không được kích hoạt hoặc hệ thống hiển thị cảnh báo trường bắt buộc; thao tác không được ghi nhận.
+Phiếu đã được xử lý bởi người khác trước khi xác nhận
+Hệ thống từ chối thao tác, thông báo phiếu đã thay đổi trạng thái/bước xử lý và yêu cầu người dùng tải lại dữ liệu.
+Người dùng không còn quyền xử lý
+Hệ thống không cho xác nhận yêu cầu chỉnh sửa, không ghi nhận thay đổi và hiển thị thông báo không có quyền thao tác.
+Lỗi ghi nhận trạng thái hoặc gửi thông báo
+Nếu chưa cập nhật trạng thái thành công, hệ thống rollback toàn bộ giao dịch và thông báo lỗi. Nếu trạng thái đã cập nhật nhưng gửi thông báo lỗi, hệ thống vẫn ghi nhận trạng thái/lịch sử và đưa thông báo vào hàng đợi gửi lại theo cơ chế vận hành.
+3.8.5. Quy tắc nghiệp vụ
+Mã
+Mô tả quy tắc
+Nội dung chi tiết
+BR-007-01
+Điều kiện hiển thị nút Yêu cầu chỉnh sửa
+Nút Yêu cầu chỉnh sửa chỉ hiển thị khi phiếu đang ở bước có thể xử lý và người dùng hiện tại là người thực hiện của bước đó. Không hiển thị khi phiếu ở trạng thái Tạo mới, Chờ chỉnh sửa đề nghị, Đã phê duyệt, Đã hạch toán hoặc Đã xóa.
+BR-007-02
+Bắt buộc nhập lý do
+Lý do yêu cầu chỉnh sửa là bắt buộc, nhập dạng TextArea. Hệ thống lưu nguyên văn nội dung người dùng nhập và hiển thị tại Lịch sử cập nhật.
+BR-007-03
+Trạng thái sau khi yêu cầu chỉnh sửa
+Sau khi xác nhận thành công, phiếu chuyển về trạng thái Chờ chỉnh sửa đề nghị. Bước hiện hành của phiếu quay về bước nhập liệu/chỉnh sửa để cán bộ chịu trách nhiệm chỉnh sửa xử lý và trình lại.
+BR-007-04
+Trình lại từ đầu luồng
+Khi phiếu ở Chờ chỉnh sửa đề nghị được hoàn thiện và trình lại, hệ thống thực hiện lại các kiểm tra bắt buộc của bước nhập liệu và đưa phiếu đi lại từ đầu luồng xử lý/phê duyệt tương ứng với cấu hình tại thời điểm trình lại.
+BR-007-05
+Hủy hiệu lực bản trình ký và chữ ký
+Nếu phiếu đã phát sinh bản trình ký hoặc chữ ký số, thao tác Yêu cầu chỉnh sửa làm hủy hiệu lực bản trình ký hiện hành và toàn bộ chữ ký đã ghi nhận. Khi phiếu được trình lại, hệ thống kết xuất bản trình ký mới theo dữ liệu sau chỉnh sửa.
+BR-007-06
+Ghi lịch sử cập nhật
+Mỗi lần yêu cầu chỉnh sửa sinh một bản ghi lịch sử gồm thời gian, người yêu cầu, bước phát sinh yêu cầu, lý do và trạng thái sau xử lý. Lịch sử không bị ghi đè khi phiếu tiếp tục được trình lại hoặc bị yêu cầu chỉnh sửa nhiều lần.
+BR-007-07
+Thông báo
+Hệ thống gửi thông báo cho cán bộ chịu trách nhiệm chỉnh sửa phiếu. Nội dung thông báo gồm mã phiếu, bước yêu cầu chỉnh sửa, người yêu cầu và lý do yêu cầu chỉnh sửa.
+3.8.6. Mô tả màn hình
+Nút Yêu cầu chỉnh sửa tại Header
+STT
+Tên trường
+Kiểu hiển thị
+Kiểu dữ liệu
+Bắt buộc
+Nguồn
+Mô tả
+1
+Yêu cầu chỉnh sửa
+Button
+BUTTON
+N/A
+Hệ thống
+Hiển thị tại Header khi người dùng có quyền xử lý bước hiện hành. Nhấn nút để mở pop-up Yêu cầu chỉnh sửa theo CR-07.
+Pop-up Yêu cầu chỉnh sửa
+Sử dụng pop-up dùng chung tại CR-07 và Phụ lục 4.2.
+3.9. FS-TU-008 - Tái phân công người thực hiện
+3.9.1. Mô tả chức năng chi tiết
+FS-TU-008: Tái phân công người thực hiện
+Tóm tắt nghiệp vụ
+Trong quá trình phiếu lưu chuyển, cán bộ được chỉ định tại một bước có thể không tiếp tục xử lý được do nghỉ phép, điều chuyển công tác hoặc quá tải. Lãnh đạo khối quản lý bước đó thực hiện tái phân công sang cán bộ khác trong khối để phiếu tiếp tục được xử lý. Quyền tái phân công gắn với vai trò lãnh đạo khối và phạm vi đơn vị hoặc phòng ban, không phụ thuộc việc lãnh đạo đó có được chỉ định trên phiếu hay không.
+Người thực hiện
+Lãnh đạo ĐMMS đối với các bước thuộc khối ĐMMS. Lãnh đạo KTTC đối với các bước thuộc khối KTTC. Chi tiết tại BR-008-02.
+Điều kiện thực hiện
+Phiếu ở trạng thái Chờ KTTC xử lý, Chờ phê duyệt đề nghị hoặc Chờ chỉnh sửa đề nghị. Bước đích tồn tại trên luồng và chưa ở trạng thái Đã hoàn thành. Phiếu thuộc phạm vi đơn vị hoặc phòng ban của người thực hiện.
+Kết quả sau khi thực hiện
+Người thực hiện của bước đích được cập nhật. Người cũ mất quyền thao tác trên bước đó, người mới nhận quyền. Hệ thống ghi bản ghi vào Lịch sử cập nhật và gửi thông báo cho cả hai bên. Trạng thái phiếu, cấu hình luồng và chữ ký đã ghi nhận giữ nguyên.
+Điều kiện kích hoạt
+Người có quyền tái phân công chọn cán bộ khác tại trường người thực hiện đang mở khóa, sau đó xác nhận tại pop-up.
+Bước tại luồng quy trình
+Thao tác ngoài luồng, không gắn với một bước cụ thể trong sơ đồ quy trình.
+3.9.2. Luồng thực hiện
+Bước chung
+Người dùng mở phiếu từ màn hình danh sách.
+Hệ thống mở khóa các trường người thực hiện tại tab Thông tin phê duyệt mà người dùng có quyền tái phân công và bước tương ứng chưa hoàn thành. Các trường còn lại của phiếu giữ nguyên chế độ chỉ xem.
+Người dùng chọn cán bộ mới tại trường cần đổi. Danh sách chọn được lọc theo BR-008-04.
+Ngay khi giá trị mới được chọn, hệ thống mở pop-up Xác nhận tái phân công, hiển thị tên bước, người thực hiện cũ, người thực hiện mới và ô nhập Lý do tái phân công.
+Người dùng nhập lý do và nhấn Xác nhận.
+Hệ thống kiểm tra điều kiện theo BR-008-03 và BR-008-04, cập nhật người thực hiện của bước, ghi Lịch sử cập nhật, gửi thông báo, đóng pop-up và hiển thị thông báo thành công.
+3.9.3. Luồng thay thế
+Tên nhánh
+Nội dung
+Tái phân công bước đang chờ xử lý
+Người thực hiện cũ mất quyền thao tác ngay khi giao dịch cập nhật thành công. Phiếu rời khỏi danh sách cần xử lý của người cũ và xuất hiện tại danh sách cần xử lý của người mới. Bước giữ nguyên trạng thái Đang chờ xử lý.
+Tự nhận bước về mình
+Người thực hiện chọn chính mình trong danh sách Người thực hiện mới. Hệ thống xử lý như một lượt tái phân công thông thường và ghi nhật ký đầy đủ.
+Tái phân công trở lại người cũ
+Trong thời gian bước chưa hoàn thành, lãnh đạo khối chọn lại người thực hiện trước đó. Hệ thống xử lý như một lượt tái phân công mới, không xóa hay sửa các bản ghi lịch sử đã có.
+Hủy thao tác tại pop-up
+Người dùng nhấn Đóng hoặc thoát khỏi pop-up. Hệ thống không ghi nhận thay đổi, trường trả về giá trị trước khi chọn.
+3.9.4. Luồng ngoại lệ
+Tình huống
+Xử lý của hệ thống
+Bước đã hoàn thành trước khi xác nhận
+Trong thời gian pop-up đang mở, nếu người thực hiện hiện tại đã hoàn thành bước, hệ thống từ chối thao tác và thông báo bước đã được xử lý, đề nghị tải lại phiếu.
+Bỏ trống lý do
+Nút Xác nhận không được kích hoạt. Hệ thống hiển thị cảnh báo trường bắt buộc.
+Danh sách người thực hiện mới rỗng
+Hệ thống thông báo không có cán bộ phù hợp và không cho thực hiện thao tác.
+Lựa chọn vi phạm quy tắc không tự phê duyệt
+Hệ thống không đưa các cán bộ vi phạm CR-03 vào danh sách chọn. Trường hợp vi phạm phát sinh do dữ liệu thay đổi giữa lúc mở pop-up và lúc xác nhận, hệ thống từ chối thao tác và thông báo lý do.
+3.9.5. Quy tắc nghiệp vụ
+Mã
+Mô tả quy tắc
+Nội dung chi tiết
+BR-008-01
+Cơ sở quyền tái phân công
+Quyền gắn với vai trò lãnh đạo khối và phạm vi đơn vị hoặc phòng ban của phiếu, không phụ thuộc việc người thực hiện có được chỉ định tại bất kỳ bước nào trên phiếu hay không. Mọi người dùng mang vai trò lãnh đạo khối trong cùng phạm vi đều có quyền tương đương trên cùng một phiếu.
+BR-008-02
+Ma trận bước theo khối
+Khối ĐMMS do Lãnh đạo ĐMMS quản lý, gồm Bước 3 (Rà soát RS1) và Bước 4 (Phê duyệt ĐMMS).
+Khối KTTC do Lãnh đạo KTTC quản lý, gồm Bước 2 (KTTC tiếp nhận), Bước 5 (Phê duyệt KTTC), Bước 6 (Rà soát RS2) và Bước 7 (Cấp có thẩm quyền).
+BR-008-03
+Điều kiện trạng thái bước đích
+Bước đích phải ở trạng thái Chưa bắt đầu hoặc Đang chờ xử lý. Bước ở trạng thái Đã hoàn thành không tái phân công được, kể cả khi phiếu chưa kết thúc luồng. Bước không tồn tại trên luồng do toggle Yêu cầu Rà soát đang tắt thì trường tương ứng không hiển thị nên không tái phân công được.
+BR-008-04
+Quy tắc lọc danh sách người thực hiện mới
+Danh sách hiển thị các cán bộ thỏa mãn đồng thời: có vai trò tương ứng với bước đích, thuộc phạm vi đơn vị hoặc phòng ban của phiếu, còn hiệu lực làm việc, và không tạo ra vi phạm quy tắc không tự phê duyệt tại CR-03. Danh sách không loại trừ người thực hiện hiện tại và không loại trừ chính người đang thao tác. Cấu trúc hiển thị: [Tên cán bộ] - [Vị trí công việc].
+BR-008-05
+Bắt buộc nhập lý do
+Pop-up Xác nhận tái phân công hiển thị ô nhập Lý do tái phân công. Trường bắt buộc, không thể xác nhận nếu để trống.
+BR-008-06
+Không ảnh hưởng chữ ký, trạng thái và cấu hình luồng
+Tái phân công không hủy hiệu lực chữ ký số đã ghi nhận và không làm mất hiệu lực bản trình ký hiện hành. Bản trình ký không kết xuất sẵn tên cán bộ phê duyệt; tên và chữ ký được hệ thống ký số bổ sung tại thời điểm ký, nên việc thay đổi người thực hiện của bước chưa ký không ảnh hưởng tới nội dung bản trình ký. Thao tác cũng không làm thay đổi trạng thái phiếu và không cho phép bật hoặc tắt các toggle Yêu cầu Rà soát.
+BR-008-07
+Ghi nhật ký bắt buộc
+Mỗi lượt tái phân công sinh một bản ghi tại Lịch sử cập nhật gồm thời gian theo định dạng DD/MM/YYYY HH:mm:ss, người thực hiện thao tác, tên bước, người thực hiện cũ, người thực hiện mới và lý do.
+BR-008-08
+Thông báo
+Hệ thống gửi thông báo tới người thực hiện mới và người thực hiện cũ. Trường hợp người mới trùng người cũ, hệ thống gửi một thông báo duy nhất.
+BR-008-09
+Không khóa phiên, ghi đè theo thứ tự thời gian
+Hệ thống không khóa phiếu khi có người đang mở. Khi phát sinh nhiều lượt tái phân công trên cùng một bước, lượt được xác nhận sau cùng là kết quả có hiệu lực. Mọi lượt đều được ghi vào Lịch sử cập nhật.
+BR-008-10
+Cơ chế thao tác trên trường
+Tái phân công dùng lại các trường người thực hiện sẵn có tại tab Thông tin phê duyệt, không thêm trường mới. Pop-up xác nhận mở ngay khi chọn giá trị mới. Mỗi lần đổi một trường là một lượt độc lập, chỉ ghi nhận sau khi xác nhận tại pop-up.
+3.9.6. Mô tả màn hình
+Không bổ sung trường mới. Các trường người thực hiện tại tab Thông tin phê duyệt được mở khóa cho lãnh đạo khối theo BR-008-02 và BR-008-03, danh sách chọn lọc theo BR-008-04. Pop-up xác nhận mở ngay khi người dùng chọn giá trị mới.
+Pop-up Xác nhận tái phân công
+STT
+Tên trường
+Kiểu hiển thị
+Kiểu dữ liệu
+Bắt buộc
+Nguồn
+Mô tả
+Ví dụ
+1
+Nội dung xác nhận
+OutputText
+TEXT(500)
+Tự động điền
+Hệ thống
+Bạn có chắc chắn muốn tái phân công [Tên bước] từ [Tên cán bộ cũ] sang [Tên cán bộ mới]?
+Bạn có chắc chắn muốn tái phân công Rà soát ĐMMS (Rà soát 1) từ Nguyễn Văn A sang Trần Thị B?
+2
+Lý do tái phân công
+TextArea
+TEXT(500)
+Bắt buộc
+NSD nhập
+Tham chiếu BR-008-05
+Cán bộ nghỉ phép dài ngày
+3
+Xác nhận
+Button
+BUTTON
+N/A
+Ghi nhận tái phân công. Chỉ kích hoạt khi đã nhập lý do.
+4
+Đóng
+Button
+BUTTON
+N/A
+Đóng pop-up, không ghi nhận thay đổi. Trường trả về giá trị trước khi chọn.
+3.10. FS-TU-009 - Xóa đề nghị
+3.10.1. Mô tả Chức năng chi tiết
+FS-TU-009: Xóa đề nghị
+Tóm tắt nghiệp vụ
+Cho phép cán bộ đang chịu trách nhiệm chỉnh sửa phiếu hủy bỏ hoàn toàn một đề nghị tạm ứng khi phiếu chưa đi vào luồng phê duyệt chính thức hoặc đang trong thời gian chờ bổ sung. Thao tác kết thúc luồng quy trình ngay lập tức, không phục hồi.
+Người thực hiện
+Cán bộ ĐMMS (Luồng 1) hoặc Cán bộ KTTC (Luồng 2), là người đang chịu trách nhiệm nhập liệu hoặc chỉnh sửa phiếu tại Bước 1.
+Điều kiện thực hiện
+Phiếu ở trạng thái Tạo mới hoặc Chờ chỉnh sửa đề nghị; người dùng là cán bộ chịu trách nhiệm chỉnh sửa phiếu tại thời điểm thao tác.
+Kết quả sau khi thực hiện
+Phiếu chuyển sang trạng thái Đã xóa, kết thúc luồng quy trình. Hệ thống ghi lịch sử cập nhật, không phát sinh giao dịch gửi OGL/Core Banking.
+Điều kiện kích hoạt
+Người dùng nhấn nút Xóa tại Header và xác nhận tại pop-up theo CR-08.
+Bước tại luồng quy trình
+Áp dụng tại Bước 1, trước khi phiếu được trình hoặc trong thời gian chờ chỉnh sửa.
+3.10.2. Luồng thực hiện
+Người dùng mở phiếu ở trạng thái Tạo mới hoặc Chờ chỉnh sửa đề nghị.
+Hệ thống hiển thị nút Xóa tại Header nếu người dùng là cán bộ chịu trách nhiệm chỉnh sửa phiếu.
+Người dùng nhấn Xóa.
+Hệ thống hiển thị pop-up xác nhận theo CR-08.
+Người dùng nhấn Xác nhận.
+Hệ thống kiểm tra lại trạng thái phiếu tại thời điểm xác nhận.
+Nếu hợp lệ, hệ thống chuyển trạng thái phiếu sang Đã xóa, ghi lịch sử cập nhật và đóng pop-up.
+3.10.3. Luồng thay thế
+Tên nhánh
+Nội dung
+Xóa tại trạng thái Tạo mới
+Phiếu chưa từng được trình, xóa không ảnh hưởng tới bất kỳ bước xử lý nào khác.
+Xóa tại trạng thái Chờ chỉnh sửa đề nghị
+Phiếu đã từng đi qua luồng rà soát/phê duyệt trước khi bị yêu cầu chỉnh sửa. Xóa tại đây kết thúc hẳn luồng; các bản ghi lịch sử trước đó (rà soát, phê duyệt, yêu cầu chỉnh sửa) vẫn giữ nguyên.
+3.10.4. Luồng ngoại lệ
+Tình huống
+Xử lý của hệ thống
+Người dùng không còn là cán bộ chịu trách nhiệm chỉnh sửa
+Nút Xóa không hiển thị, hoặc hệ thống từ chối thao tác và thông báo không có quyền.
+Phiếu đã đổi trạng thái trước khi xác nhận
+Hệ thống từ chối thao tác, thông báo phiếu đã thay đổi trạng thái và yêu cầu tải lại.
+Người dùng hủy pop-up xác nhận
+Hệ thống không xóa phiếu, giữ nguyên trạng thái hiện hành.
+3.10.5. Quy tắc nghiệp vụ
+Mã
+Mô tả quy tắc
+Nội dung chi tiết
+BR-009-01
+Điều kiện hiển thị nút Xóa
+Nút Xóa chỉ hiển thị khi phiếu ở trạng thái Tạo mới hoặc Chờ chỉnh sửa đề nghị và người dùng là cán bộ chịu trách nhiệm chỉnh sửa phiếu.
+BR-009-02
+Xác nhận trước khi xóa
+Nhấn Xóa mở pop-up xác nhận theo CR-08. Không hoàn tác sau khi xác nhận.
+BR-009-03
+Trạng thái sau khi xóa
+Phiếu chuyển sang Đã xóa, không mở lại để chỉnh sửa hoặc trình phiếu. Vẫn xem được ở chế độ chỉ đọc từ màn hình danh sách.
+BR-009-04
+Không phát sinh giao dịch
+Phiếu bị xóa không gửi dữ liệu sang OGL/Core Banking, không ảnh hưởng số liệu Tổng giá trị đã tạm ứng của HĐ/KMS liên quan.
+BR-009-05
+Ghi lịch sử cập nhật
+Mỗi lần xóa phiếu sinh một bản ghi tại Lịch sử cập nhật: thời gian, người xóa, trạng thái phiếu trước khi xóa.
+3.10.6. Mô tả màn hình
+Nút Xóa tại Header
+STT
+Tên trường
+Kiểu hiển thị
+Kiểu dữ liệu
+Bắt buộc
+Nguồn
+Mô tả
+1
+Xóa
+Button
+BUTTON
+N/A
+Hệ thống
+Hiển thị tại Header khi phiếu ở trạng thái Tạo mới hoặc Chờ chỉnh sửa đề nghị và người dùng có quyền chỉnh sửa. Nhấn nút mở pop-up xác nhận theo CR-08.
+Pop-up xác nhận Xóa
+Sử dụng pop-up dùng chung tại CR-08 và Phụ lục 4.2.
+IV. PHỤ LỤC
+4.1. Common Rule - Quy tắc chung áp dụng xuyên suốt
+Các quy tắc dưới đây áp dụng cho toàn bộ module Tạm ứng. Trong đặc tả Chức năng chi tiết, các mục này được tham chiếu theo mã CR-xx thay vì lặp lại nội dung.
+Mã
+Tên quy tắc
+Nội dung
+CR-01
+Hiển thị theo quyền
+Hệ thống chỉ hiển thị và cho phép thao tác các chức năng phù hợp với quyền của người dùng hiện tại. Nút/trường không có quyền sẽ ẩn đi, không chờ người dùng nhấn rồi mới báo lỗi.
+CR-02
+Ghi log mọi thao tác
+Mọi hành động tạo/sửa/gửi/yêu cầu chỉnh sửa/phê duyệt đều được ghi lại vào Tab Lịch sử cập nhật: người thực hiện, thời gian, loại hành động, nội dung thay đổi.
+CR-03
+Không tự phê duyệt
+Người lập phiếu (CB ĐMMS) không được đồng thời là người phê duyệt phiếu đó ở bất kỳ bước nào.
+CR-04
+Confirm dialog khi rời màn hình có thay đổi chưa lưu
+Khi người dùng Quay lại hoặc điều hướng đi trong lúc có dữ liệu chưa Lưu, hệ thống hiển thị pop-up: "Bạn có thông tin chưa được lưu. Nếu quay lại, các thay đổi sẽ bị mất. Bạn có muốn tiếp tục?" -> nút Đồng ý (tiếp tục rời trang, mất thay đổi) / Hủy (ở lại màn hình).
+CR-05
+Định dạng số tiền
+Tất cả số tiền hiển thị có dấu phẩy phân cách nghìn. Không hiển thị số âm trong giao diện.
+CR-06
+Định dạng ngày
+Tất cả ngày hiển thị theo định dạng DD/MM/YYYY. Ngày giờ đầy đủ: DD/MM/YYYY HH:mm:ss.
+CR-07
+Pop-up Yêu cầu chỉnh sửa
+Khi nhấn Yêu cầu chỉnh sửa, hệ thống hiển thị pop-up: "Bạn có chắc chắn muốn yêu cầu chỉnh sửa?" kèm ô "Vui lòng nhập lý do:" bắt buộc (không giới hạn phân loại điều chỉnh); nút Xác nhận chỉ bật khi đã nhập lý do, nút phụ là Hủy.
+CR-08
+Pop-up xác nhận Xóa
+Khi nhấn Xóa (phiếu hoặc NCC), hệ thống hiển thị pop-up xác nhận trước khi xóa; xác nhận rồi mới thực thi, không có bước hoàn tác sau đó.
+CR-09
+Phiếu in
+Nút Phiếu in hiển thị với mọi nhóm quyền có quyền xem phiếu và ở mọi trạng thái phiếu. Nội dung hiển thị phụ thuộc trạng thái: với Tạo mới, Chờ chỉnh sửa đề nghị và Chờ KTTC xử lý, hệ thống kết xuất biểu mẫu theo dữ liệu hiện hành tại thời điểm nhấn; với Chờ phê duyệt đề nghị, Đã phê duyệt và Đã hạch toán, hệ thống hiển thị đúng bản trình ký đã chốt kèm các chữ ký đã ghi nhận. Hệ thống không sử dụng watermark hay nhãn phân biệt giữa bản kết xuất tạm thời và bản trình ký. Pop-up sử dụng thanh công cụ mặc định của trình đọc PDF, cho phép xem, tìm kiếm, tải về và in.
+4.2. Giao diện các pop-up dùng chung
+Bốn pop-up dưới đây dùng chung cho toàn bộ module Tạm ứng tương ứng các quy tắc CR-04, CR-07, CR-08, CR-09.
+Mapping Phiếu in - nghiệp vụ:
+Mapping Phiếu In:
+TUCK:
+TUTM:

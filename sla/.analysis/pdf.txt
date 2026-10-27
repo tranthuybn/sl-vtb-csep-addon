@@ -1,0 +1,182 @@
+PAGE 1
+1.1.1 CÔNG CỤ SLM (CHO PHÉP CẤU HÌNH CÁC SLA,OLA THEO NHU CẦU). 
+Chi tiết cấu hình 
+Trên giao diện menu System Navigator chọn đên menu Service Level Managenment 
+ 
+ 
+Tại đây hệ thống cung cấp các menu dành để cấu hình mức độ cam kết dịch vụ công nghệ thông tin 
+
+PAGE 2
+ 
+ 
+Tạo mới một SLM 
+B1. Tạo mới một argreements 
+ + Trên menu Agreements chọn New Agreement để tạo mới 
+ 
+ + Lựa chọn loại Agreement cần tạo mới : 
+ Có các loại Agreement sau để người quản trị có thể khởi tạo 
+ Operational Level Agreement (OLA) : 
+ Service Level Agreement (SLA) 
+ + Màn hình chi tiết tạo mới sau khi đã lựa chọn lọa Agreement 
+
+PAGE 3
+ 
+ 
+ + Một số tham số người quản trị cần lưu lý 
+- Agreement ID : Mã ID của Agreement hệ thống sẽ tự sinh 
+- Category : Loại Agreement đã chịn 
+- Type : Dạng cam kết 
+- Customer : Tên đối tượng cam kết 
+- Service Hour : Khoảng thời gian cam kết , đối với KBNN khoảng thời gian 
+cam kết này sẽ là giờ làm việc hành chính tức là tương ứng với : Mon to Fri 
+from 8am to 5pm with Break 
+- Title : tiêu đề 
+- Description : mô tả 
++ Sauk hi điền đầy đủ các thông tin trên ấn save để lưu lại Agreement vừa tạo 
+ 
+ 
+B2. Tạo mới Process Taget 
+ + Trên menu Agreements chọn đến Process Taget 
+
+PAGE 4
+ 
+Màn hình chi tiết Process Taget 
+ + Điền các thông tin cần thiết bao gồm 
+- Service Level Taget ID : Mã ID của Process Taget 
+- Agreeement ID : Mã ID của Agreement mà Process Taget gọi đến 
+- Name : Tên của Process Taget 
+- Condition : Điều kiện để chạy Process Taget 
+- Service Level Category : Loại service level cam kết (OLA hoặc SLA) 
+- Service Area : Module mà Process Taget được gọi đến 
+- Initial State : Phase bắt đầu 
+- Final State : Phasce kết thúc 
+- Duration type : Dạng tính toán ( có thể chọn là Interval: điền cụ thể 
+thời gian cam kết dịch vụ , Duration in record : tính toán dựa trên một 
+biến được cấu hình trên bản ghi) 
+- Schedule Value : giá trị của schedule mà người quản trị muốn 
+process taget chạy trên hệ thống 
+- Time zone : điền thông tin chọn là thời gian trên service ITSM được 
+cài đặt 
+- Alert : Thông báo của Process taget , sẽ được hướng dẫn trong phần 
+công cụ alert  
+- Suspend processing : trường hợp mà process tạm dừng 
+
+PAGE 5
+ 
+ 
+ + Sau khi điền đầy đủ thông tin cho process taget thực hiện bấm nút Add để xác nhận việc 
+tạo mới 
+ 
+B3. Tạo mới Schedule 
+ + vào DB và search table Name “caldutyhours” 
+ 
+ 
++ Nhập tên và các tham số như hình sau đấy bấm Add để tạo mới Schedule làm việc cho đơn 
+vị mình 
+ 
+
+PAGE 6
+ 
+ 
+B4. Tạo mới Alert 
+ + vào DB và search table Name “AlertDef” 
+ 
+ 
+ 
++ Thêm mới Name, và bấm Add để tạo mới AlertDef 
+ 
+ 
+
+PAGE 7
++ Các mục cấu hình cho Alert như sau 
+ 
+ 
+ 
+ 
+ 
+1.1.2 CÔNG CỤ ALERT (CHO PHÉP CẤU HÌNH CẢNH BÁO PHỤC VỤ CHO PHẦN SLA). 
+Chi tiết cấu hình 
+Trên menu Agreements chọn đến menu Configuration và chọn mục Alert Defenitions 
+ 
+Màn hình tạo mới , tìm kiếm Alert Definitions 
+
+PAGE 8
+ 
+Để tránh sai sót trong quá trình tạo mới một Alert Definitions người quản trị nên thực hiện tạo mới 
+bằng cách clone từ những Alert đã được cấu hình sẵn trên hệ thống 
+Ví dụ tạo mới một Alert bằng cách clone từ Alert cảnh báo 75% đã được cấu hình trên hệ thống như 
+sau 
+Chi tiết Alert 75% đã được cấu hình 
+ 
+
+PAGE 9
+ 
+Người quản trị thực hiện đổi thông tin Alert Name, Description sau đó ấn Add để xác nhận việc tạo 
+mới 
+ 
+ 
+Sau khi tạo mới người quản trị thực hiện sửa các thông tin trên Alert vừa tạo, các thông tin cần lưu ý 
+đó là 
+ +  Spacial Alert Type : Chọn lại loại cam kết dịch vụ cần gọi đến Alert (SLA, OLA) 
+ + Alert Status : Tên trạng thái của Alert 
+ + Schedule Condition : điều kiện để khởi chạy Schedule của Alert 
+ + Alert Condition : Điều kiện khởi chạy của Alert 
+ + Cac Epression : Câu lệnh tính toán để chạy Alert 
+Trong tab Update Info : Cấu hình các điều kiện cho format control và Notification các thông tin cần quản 
+lý là : 
+ + Satements : Câu lệnh để khởi chạy thông báo cho Alert 
+ + Notification : Tên thông báo được gọi đến trong Alert ( sẽ được hướng dẫn trong phần 
+Notification) 
+Sau khi đã khởi tạo xong Alert Defiition người quản trị thực hiên ấn Save để lưu lại các thông tin đã tạo 
+ 
+ 
+
+PAGE 10
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+1.1.3 CÔNG CỤ NOTIFICATION (CHO PHÉP CẤU HÌNH PHẦN GỬI MAIL CẢNH BÁO TƯƠNG 
+ỨNG CHO PHẦN ALERT SLA). 
+Chi tiết cấu hình 
+Trên thanh command line thực hiện gõ note để truy cập vào màn hình cấu hinh chi tiết của công cụ 
+ 
+Màn chình chi tiết cấu hình của công cụ Notification 
+ 
+ 
+Tạo mới một Notification 
+B1. Điền tên notification cần tạo 
+B2 , Điền ID cho notification 
+B3, Điền condition cho notification 
+B4, Cấu hình cho messege được gọi đến trong notification 
+Tại tab Message 
+- Msg class : điền HTMLTemplate 
+- Msg No : điền 1 
+- Agruments : điền theo cấu trúc : jscall( "htmlemailtemplates.getMailBody", "tên HTML 
+Template", $L.file, $L.file.save) 
+- Condition : điền true 
+
+PAGE 11
+- Notify Method : điền email 
+- Recipients : cấu hình đối tượng nhận thông báo 
+- Group File : cấu hình nhóm nhận thông báo 
+- Subgroup : cấu hình đối tượng nhận thông báo trong nhóm 
+Tại tab Email/Mail Subject Line cấu hình tiêu đề mail cần quản lý các thông tin sau 
+- Msg Class : điền HTML Template 
+- Msg No : điền 1 
+- Agruments : điền theo cấu trúc : jscall( "htmlemailtemplates.getMailHeader", "Tên 
+template được gọi tron notification", $L.file, $L.file.save) 
+Sau khi cấu hình xong tại 2 tab trên người quản trị thực hiện ấn Save để lưu lại cấu hình notification 
+vừa được cấu hình 
+ấn OK để thoát khỏi màn hình cấu hình notification 
+ 
+ 
+ 
+ 
+ 
+ 
+ 

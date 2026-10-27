@@ -1,0 +1,254 @@
+
+SHEET Danh mục SLA
+1 A:SLA cho các giao dịch tạm ứng , thanh toán trên hệ thống Mua sắm và QLTS
+2 J:Đơn vị : Giờ
+3 A:Loại giao dịch | B:Nghiệp vụ/ Sản phẩm | C:CB Đề nghị | D:Rà soát 1 | E:Phê duyệt ĐM | F:CB KTTC | G:Phê duyệt KTTC | H:RS2 | I:PD người có TQ | J:Ghi chú
+4 A:Tạm ứng | B:Mua sắm HHDV | C:1.0 | D:1.5 | E:3.0 | F:3.0 | G:6.0 | H:4.5 | I:9.0
+5 A:Tạm ứng | B:Xây dựng cơ bản | C:1.5 | D:2.25 | E:4.5 | F:4.0 | G:8.0 | H:6.0 | I:12.0
+6 A:Tạm ứng | B:BDSC công trình XDCB | C:1.0 | D:1.5 | E:3.0 | F:3.0 | G:6.0 | H:4.5 | I:9.0
+7 A:Tạm ứng | B:Mua sắm nhà đất | C:2.0 | D:3.0 | E:6.0 | F:5.0 | G:10.0 | H:7.5 | I:15.0
+8 A:Tạm ứng | B:Khác | C:1.5 | D:2.25 | E:4.5 | F:4.0 | G:8.0 | H:6.0 | I:12.0
+9 A:Thanh toán | B:Dự án đầu tư phát triển | C:2.0 | D:3.0 | E:6.0 | F:6.0 | G:12.0 | H:9.0 | I:18.0
+10 A:Thanh toán | B:MS HHDV thường xuyên từ vốn ĐT mua sắm TSCĐ | C:2.0 | D:3.0 | E:6.0 | F:6.0 | G:12.0 | H:9.0 | I:18.0
+11 A:Thanh toán | B:MS HHDV thường xuyên từ vốn chi phí nhóm 1 | C:1.0 | D:1.5 | E:3.0 | F:3.0 | G:6.0 | H:4.5 | I:9.0
+12 A:Thanh toán | B:MS HHDV thường xuyên từ vốn chi phí nhóm 2 | C:1.0 | D:1.5 | E:3.0 | F:3.0 | G:6.0 | H:4.5 | I:9.0
+13 A:Thanh toán | B:MS HHDV thường xuyên từ vốn chi phí nhóm 3 | C:1.5 | D:2.25 | E:4.5 | F:4.0 | G:8.0 | H:6.0 | I:12.0
+14 A:Thanh toán | B:MS HHDV thường xuyên từ vốn chi phí nhóm 4 | C:2.0 | D:3.0 | E:6.0 | F:5.0 | G:10.0 | H:7.5 | I:15.0
+15 A:Thanh toán | B:BDSC công trình XDCB | C:2.0 | D:3.0 | E:6.0 | F:3.0 | G:6.0 | H:4.5 | I:9.0
+16 A:Thanh toán | B:Công trình XDCB | C:3.0 | D:4.5 | E:9.0 | F:4.0 | G:8.0 | H:6.0 | I:12.0
+17 A:Thanh toán | B:Mua sắm nhà đất | C:3.0 | D:4.5 | E:9.0 | F:5.0 | G:10.0 | H:7.5 | I:15.0
+18 A:Thanh toán | B:Khác | C:2.0 | D:3.0 | E:6.0 | F:3.0 | G:6.0 | H:4.5 | I:9.0
+19 A:Dự chi | B:Tất cả | C:2.0 | D:3.0 | E:6.0 | F:3.0 | G:6.0 | H:4.5 | I:9.0
+
+SHEET Quy tắc đo SLA
+1 A:STT | B:Nguyên tắc cài SLA  | C:Note
+2 A:1.0 | B:Giờ làm việc: Được tính từ 8h đến 12h trưa và 13h đến 17h chiều. Ngày làm việc theo quy định của VTB từ thứ 2 đến thứ 6 trừ ngày nghỉ lễ tết theo quy định từng năm. | C:Tạo thêm trường lưu 3 thông tin sau:
+- sla đang được đo ở step nào
+- thời gian bắt đầu - kết thúc của từng role
+3 A:2.0 | B:Trường hợp đề nghị bị yêu cầu chỉnh sửa thông tin: SLA đo lại từ đầu kể cả maker
+4 A:3.0 | B:Trường hợp tái phân công SLA vẫn chạy tiếp thời gian ở step đó không dừng hay tính lại
+5 A:4.0 | B:SLA của CB Đề nghị Đo từ khi ấn nút tạo mới đề nghị đến khi phiếu đề nghị ở trạng thái Chờ KTTC xử lý
+6 A:5.0 | B:SLA của KTTC: 
+  - Trường hợp DMMS tạo: Đo từ trạng thái Chờ KTTC xử lý đến khi ticket được chuyển sang Chờ phê duyệt
+  - Trường hợp CB KTTC tạo: Đo từ khi ấn nút tạo mới đề nghị đến khi ticket được chuyển sang phiếu đề nghị chuyể sang trạng thái Chờ KTTC xử lý
+7 A:6.0 | B:SLA của Rà soát 1 Đo từ khi cb KTTC ấn nút phê duyệt đến khi cb Rà soát 1 ấn nút Xác nhận
+8 A:7.0 | B:SLA của Phê duyệt ĐMMS 
+ - Trường hợp không qua RS1: Đo từ khi cb KTTC ấn nút phê duyệt đến khi Phê duyệt ĐMMS ấn nút Phê duyệt
+ - Trường hợp có qua RS1: Đo từ khi cb Rà soát 1 ấn nút Xác nhận đến khi Phê duyệt ĐMMS ấn nút Phê duyệt
+9 A:8.0 | B:SLA của Phê duyệt KTTC 
+ - Trường hợp DMMS tạo:  Đo từ khi Phê duyệt ĐMMS ấn nút Phê duyệt đến khi Phê duyệt KTTC ấn nút Phê duyệt
+ - Trường hợp CB KTTC tạo:  Đo từ khi phiếu ở trạng thái Chờ KTTC xử lý đến khi Phê duyệt KTTC ấn nút Phê duyệt
+10 A:9.0 | B:SLA của Rà soát 2 Đo từ khi ấn nút tạo mới đề nghị đến khi phiếu đề nghị ở trạng thái Chờ KTTC xử lý
+11 A:10.0 | B:SLA của PD cấp có thẩm quyền :
+ - Trường hợp không qua RS2: Đo từ khi cb KTTC ấn nút phê duyệt đến khi phiếu đề nghị ở trạng thái Đã phê duyệt
+ - Trường hợp có qua RS2: Đo từ khi cb Rà soát 2 ấn nút Xác nhận đến khi phiếu đề nghị ở trạng thái Đã phê duyệt
+12 A:11.0 | B:Gửi mail cảnh báo SLA xử lý yêu cầu khi ticket chưa được kết thúc SLA . Gửi mail cảnh báo cho người đang xử lý trong trường hợp tái phân công sẽ gửi mail cho ông đang được giao việc
+
+SHEET Gửi mail cảnh báo + Trạng thái 
+1 A:Quy tắc gửi mail
+2 A:Các mốc hiển thị Alert của hệ thống:
+3 A:- SLA Alert 70%: Thời gian xử lý ticket đã qua 70% khoảng thời gian SLA cam kết , chuyển trạng thái Alert status thành Alert Stage 1,email cho người đang xử lý
+5 A:- SLA Alert 90%: Thời gian xử lý ticket đã qua 90% khoảng thời gian SLA cam kết , chuyển trạng thái Alert status thành Alert Stage 2, email cho người đang xử lý
+7 A:- SLA Alert BREACH: Thời gian xử lý ticket đã quá khoảng thời gian SLA cam kết , chuyển trạng thái Alert status thành Alert Stage 3, email cho người đang xử lý
+9 A:Trạng thái sla
+10 A:Không tính SLA: Khi user vào phiếu đề nghị nhưng task đấy chưa tới lượt ông ấy xử lý
+11 A:Trong thời gian: Khi phiếu đã tới phiên user xử lý và vẫn trong thời gian quy định (Khi thời gian còn lại >0)
+12 A:Vi phạm: Là những phiếu quá hạn SLA ( thời gian còn lại =< 0)
+14 A:Màn hình sla
+15 A:SLA khi ở trạng thái "Trong thời gian"
+34 A:SLA khi ở trạng thái "Chưa tính"
+52 A:SLA khi ở trạng thái "Vi phạm"
+
+SHEET Sheet1
+1 A:TỔNG QUAN: SLA&KPI
+3 A:0.0 | B:Giải thích từ viết tắt
+4 B:Viết tắt | C:Cụm từ đầy đủ | D:Mô tả
+5 B:SLA | C:Service Level Agreement | D:Tiêu chuẩn thời gian để hoàn thành mỗi tác vụ/bước/dự án/khoản mua sắm
+6 B:COT | C:Cut-off time | D:Các mốc thời gian trong ngày để giới hạn việc tính toán SLA
+7 B:KPI | C:Điểm KPI | D:Số điểm sau khi hoàn thành tác vụ/bước/dự án/khoản mua sắm mà người thiết lập đạt được
+8 B:DA | C:Dự án
+9 B:KMS | C:Khoản mua sắm
+11 A:1.0 | B:Rule thiết lập mã SLA
+12 B:Loại SLA | C:Mô tả | D:Quy tắc đặt mã
+13 B:Mã SLA quy trình | C:Áp dụng cho mỗi DA/KMS theo các quy trình cụ thể | D:• “SLA” + [2 chữ số cuối của năm hiện tại] + "_" + [tháng hiện tại] + "_" + [chuỗi số bất kì có 4 chữ số từ 0001 đến 9999]
+• Ví dụ: SLA_26_08_0001
+14 B:Mã SLA bước | C:Áp dụng cho các bước trong 1 DA/KMS theo các quy trình cụ thể | D:• [Mã SLA quy trình của DA/KMS] + "_" + "0" + PARENT_ORDER (của TASK_ID bước ứng với quy trình)
+• Ví dụ: SLA_26_08_0001_01
+15 B:Mã SLA tác vụ | C:Áp dụng cho các tác vụ trong 1 DA/KMS theo các quy trình cụ thể | D:• [Mã SLA bước của DA/KMS] + "_" + "0" + STEP_ORDER (của TASK_ID tác vụ trong bước)
+• Ví dụ: SLA_26_08_0001_01_01
+17 A:2.0 | B:Business Rules (BRs)
+18 B:Mã | C:Mô tả | E:Phân loại
+19 B:BR_SLA_01 | C:1 task chỉ tồn tại 1 bộ SLA đang hoạt động tại 1 thời điểm, khoảng thời gian hiệu lực của các phiên bản SLA cùng 1 quy trình không được chồng lấn | E:Configuration
+20 B:BR_SLA_02 | C:Mỗi lần cấu hình mới/thay đổi cấu hình SLA, hệ thống sinh ra 1 bộ mã SLA quy trình, bước, tác vụ để đại diện cho lần cấu hình đó, bộ mã SLA cũ sẽ chuyển thành "Không hoạt động" khi đến ngày bắt đầu hiệu lực của bộ mã SLA mới | E:Configuration
+21 B:BR_SLA_03 | E:Configuration
+22 B:BR_SLA_04 | C:Không thể cấu hình hay sửa đổi chi tiết các trường "Thời điểm thực hiện kế hoạch (giờ)", "Cảnh báo đến ngày hết hạn (giờ)", "Điểm KPI" của bước "Tổ chức lựa chọn nhà thầu" | E:Configuration
+23 B:BR_SLA_05 | C:Khi thêm mới 1 mã SLA cho quy trình, user bắt buộc phải điền thời điểm bắt đầu hiệu lực lớn hơn thời điểm hiện tại | E:Configuration
+24 B:BR_SLA_06 | C:Khi thêm mới 1 mã SLA cho quy trình đã tồn tại 1 mã SLA đang hoạt động, hệ thống cần hiển thị lại dữ liệu của mã SLA đang hoạt động lên giao diện của màn hình cấu hình mã SLA mới | E:Configuration
+25 B:BR_SLA_07 | C:Hệ thống không cho phép thêm mới mã SLA mới khi quy trình đang có 1 mã SLA ở trạng thái "Tạo mới" hoặc "Chờ hiệu lực" | E:Configuration
+26 B:BR_SLA_08 | C:Hệ thống chỉ cho phép chỉnh sửa thông tin SLA chi tiết của mã SLA ở trạng thái "Tạo mới" hoặc "Chờ hiệu lực" và cho phép điều chỉnh hiệu lực đối với mã SLA có trạng thái "Chờ hiệu lực" | E:Configuration
+27 B:BR_SLA_09 | C:Khi điều chỉnh hiệu lực của 1 mã SLA ở trạng thái "Chờ hiệu lực", ngày hiệu lực mới phải lớn hơn ngày hiện tại ít nhất 24 giờ. Nếu ngày bắt đầu hiệu lực được cấu hình trước đó chỉ hơn ngày hiện tại ít hơn 24 tiếng, hệ thống không cho phép điều chỉnh hiệu lực  | E:Configuration
+28 B:BR_SLA_10 | C:Trong 1 quy trình, hệ thống xác định mã SLA áp dụng cho từng tác vụ/bước:
++ Dựa vào mã quy trình của DA/KMS (STEP_CONFIG_ID) và mã định danh nhóm của tác vụ/bước (TASK_CODE) trong danh mục cấu hình SLA
++ Dựa trên thời điểm bắt đầu thực hiện của tác vụ/bước: Áp dụng mã SLA có thời gian hiệu lực gần nhất trước hoặc bằng thời điểm bắt đầu tác vụ/bước (mỗi lần thực hiện tác vụ/bước cần xét lại mã SLA tại thời điểm đó) | E:Logic (Gắn mã)
+29 B:BR_SLA_11 | C:Hệ thống sử dụng đơn vị giờ (h) để cấu hình và tính toán cho SLA, trong đó 1 ngày được quy định là 24 giờ (không áp dụng khái niệm giờ làm việc, ngày làm việc và COT) | E:Logic (Đơn vị thời gian)
+30 B:BR_SLA_12 | C:Hệ thống xác định kết quả SLA độc lập tại 3 cấp DA/KMS, Bước và Tác vụ. Ở mỗi cấp, kết quả SLA chỉ được xác định bởi thời gian thực tế và thời gian kế hoạch của chính cấp đó được cấu hình trong danh mục SLA:
++ Nếu Thời gian thực hiện thực tế <= Thời gian thực hiện theo kế hoạch: Đạt SLA (Trạng thái = "Đạt")
++ Nếu Thời gian thực hiện thực tế > Thời gian thực hiện kế hoạch: Không đạt SLA (Trạng thái = "Không đạt")
++ Khi chưa hoàn thành xong tác vụ/bước/DA/KMS: Chưa đánh giá SLA (Trạng thái = "Chưa đánh giá") | E:Logic (Trả kết quả)
+31 B:BR_SLA_13 | C:Thời điểm bắt đầu tính SLA cho DA/KMS và tác vụ đầu tiên của DA/KMS là thời điểm tiếp nhận hạng mục cuối cùng trong DA/KMS | E:Logic (Thời điểm bắt đầu)
+32 B:BR_SLA_14 | C:Hệ thống chỉ tính thời gian SLA cho tác vụ/bước/DA/KMS đang ở trạng thái "Đang thực hiện". Khi trạng thái của chúng khác "Đang thực hiện", hệ thống sẽ tạm dừng hoặc kết thúc hoặc không tính thời gian SLA tùy theo trạng thái nghiệp vụ | E:Logic (Dừng tính SLA)
+33 B:BR_SLA_15 | C:Hệ thống chấm dứt việc tính toán SLA cho tác vụ/bước/DA/KMS khi phát sinh "Dừng mua sắm", các tác vụ ở trạng thái khác "Hoàn thành" đều sẽ nhận kết quả SLA là "Không đánh giá" | E:Logic (Không đánh giá)
+34 B:BR_SLA_16 | C:Trong trường hợp 1 bước bất kỳ của DA:
++ Có cách thức thực hiện là "Ghi nhận kết quả cuối cùng": Thời điểm nhấn nút hoàn thành của user được coi là mốc hoàn thành của toàn bộ bước và tác vụ đầu tiên của bước, các tác vụ bên trong sẽ không được đánh giá SLA (các tác vụ này nhận kết quả SLA là "Không đánh giá")
++ Thay đổi cách thức thực hiện: Không đánh SLA cho các tác vụ, chỉ đánh giá SLA cho bước và toàn bộ DA/KMS (các tác vụ này nhận kết quả SLA là "Không đánh giá") | E:Logic (Không đánh giá)
+35 B:BR_SLA_17 | C:Trong trường hợp KMS phát sinh thay đổi quy trình:
++ Các chuẩn SLA được áp dụng theo mã SLA đang hoạt động của quy trình mới tại thời điểm nhấn nút thay đổi quy trình
++ Thời gian lập TTMS sẽ bị cộng tích lũy qua từng lần đổi quy trình
++ Thời gian xử lý các tác vụ sau tác vụ lập TTMS được tính toán SLA lại từ đầu | E:Logic (Đổi quy trình)
+36 B:BR_SLA_19 | C:Thời điểm hệ thống kết thúc ghi nhận dữ liệu để tính toán SLA cho một DA/KMS là thời điểm người thiết lập hợp đồng nhấn nút "Thực hiện hợp đồng" | E:Logic (Thời điểm kết thúc)
+37 B:BR_SLA_20 | C:Tần suất tính toán và trả kết quả tính toán SLA là 1 lần 1 ngày. Thời điểm hệ thống cập nhật kết quả cho tất cả tác vụ, bước, DA/KMS là 9 giờ tối mỗi ngày | E:Logic (Thời điểm kết thúc)
+38 B:BR_SLA_21 | C:Điểm KPI của từng tác vụ chỉ được cộng cho user thiết lập DA/KMS vào những thời điểm sau: 
++ Hoàn thành tác vụ lần đầu tiên, không được cộng lại nếu có phát sinh việc hoàn thành tác vụ lần thứ 2 trở đi
++ Hoàn thành ký kết hợp đồng và bắt đầu thực hiện hợp đồng (hoàn thành tác vụ "Hợp đồng mua sắm" trong bước "Theo dõi thực hiện")
++ Mỗi lần hoàn thành hạch toán cho đề nghị tạm ứng hoặc thanh toán liên quan đến hợp đồng | E:KPI
+39 B:BR_SLA_22 | C:Trong trường hợp KMS phát sinh thay đổi quy trình, các tác vụ đã hoàn thành của quy trình cũ vẫn được tính điểm cho user thiết lập | E:KPI
+40 B:BR_SLA_23 | C:Trong trường hợp 1 bước của DA có cách thức thực hiện là "Ghi nhận kết quả cuối cùng", điểm KPI của các tác vụ bị bỏ qua trong bước vẫn cần tính điểm cho user thiết lập sau khi bước đó được hoàn thành (ngoại trừ tác vụ thẩm định trong các bước) | E:KPI
+41 B:BR_SLA_24 | C:Thời điểm cảnh báo trước hạn được xác định bằng thời điểm hết hạn dự kiến trừ đi thời gian cảnh báo trước hạn được cấu hình trong SLA (Thời điểm hết hạn dự kiến được xác định bằng thời điểm bắt đầu tính SLA của lần thực hiện gần nhất cộng với thời gian SLA còn lại của tác vụ/bước tại lần thực hiện đó) | E:Warning
+42 B:BR_SLA_25 | E:Warning
+43 B:BR_SLA_26 | E:Log
+45 A:3.0 | B:Use cases: Cấu hình SLA&KPI
+47 B:Use Case | C:UC_SLA_01: Xem danh mục SLA
+48 B:Description | C:Cho phép người dùng có quyền cấu hình SLA tra cứu danh mục các mã SLA đã được cấu hình cho các quy trình, bao gồm thông tin liên quan đến SLA của quy trình như: thời gian thực hiện kế hoạch, thời gian cảnh báo trước hạn, điểm KPI (dựa trên mã SLA đang hoạt động ở thời điểm hiện tại)
+49 B:Actor | C:Primary actor: Admin
+Supporting actor: Hệ thống
+50 B:Trigger Event | C:Admin nhấn vào "Cấu hình ngày SLA" mục "Quản lý danh mục" tab "Quản lý mua sắm" trên thanh điều hướng
+51 B:Pre-condition | C:• Admin đã đăng nhập hệ thống
+• Admin có quyền truy cập chức năng quản lý SLA
+52 B:Basic Flow | C:1. Đăng nhập tài khoản admin trên web
+> Hệ thống hiển thị màn hình trang chủ của Admin
+2. Nhấn vào "Cấu hình ngày SLA" mục "Quản lý danh mục" tab "Quản lý mua sắm" trên thanh điều hướng
+> Hệ thống hiển thị màn hình danh mục SLA của các quy trình
+3. Tìm kiếm mã quy trình trên thanh tìm kiếm
+> Hệ thống hiển thị thông tin SLA của quy trình tương ứng
+4. Nhấn vào hyperlink của mã quy trình
+> Hệ thống chuyển sang màn hình chi tiết SLA của mỗi quy trình, hiển thị tất cả thông tin SLA của tác vụ, bước, quy trình thuộc về mã SLA đang hoạt động ở thời điểm hiện tại
+53 B:Exceptional Flow
+54 B:Post-condition | C:• Dữ liệu về thông tin SLA tương ứng với từng quy trình hiển thị trên màn hình danh mục
+• Nếu vào màn hình chi tiết SLA của mỗi quy trình, hệ thống hiển thị tất cả thông tin SLA của tác vụ, bước, quy trình thuộc về mã SLA đang hoạt động ở thời điểm hiện tại
+56 B:Use Case | C:UC_SLA_02: Cấu hình mới mã SLA cho quy trình
+57 B:Description | C:Cho phép người dùng cấu hình một mã SLA mới cho một quy trình, bao gồm các thông tin SLA và các chuẩn thời gian tương ứng với các bước/tác vụ của quy trình
+58 B:Actor | C:Primary actor: Admin
+Supporting actor: Hệ thống
+59 B:Trigger Event | C:Admin nhấn "Thêm mới" trong màn hình chi tiết SLA của mỗi quy trình ở màn "Cấu hình ngày SLA"
+60 B:Pre-condition | C:• Admin đã đăng nhập hệ thống
+• Admin có quyền truy cập chức năng quản lý SLA
+61 B:Basic Flow | C:1. Đăng nhập tài khoản admin trên web
+> Hệ thống hiển thị màn hình trang chủ của Admin
+2. Nhấn vào "Cấu hình ngày SLA" mục "Quản lý danh mục" tab "Quản lý mua sắm" trên thanh điều hướng
+> Hệ thống hiển thị màn hình danh mục SLA của các quy trình
+3. Nhấn vào hyperlink của mã quy trình
+> Hệ thống chuyển sang màn hình chi tiết SLA của mỗi quy trình, hiển thị tất cả thông tin SLA của tác vụ, bước, quy trình thuộc về mã SLA đang hoạt động ở thời điểm hiện tại
+4. Nhấn nút "Thêm mới"
+> Hệ thống chuyển sang màn hình cấu hình chi tiết SLA
+5. Nhấn nút "Lưu"
+> Hệ thống hiện ra tất cả các thông tin SLA cần điền cho quy trình, bước và tác vụ tương ứng với SLA của mã quy trình thêm mới
+6. Nhấn vào ký hiệu chỉnh sửa ở từng dòng bước/tác vụ để điền các trường thông tin bắt buộc theo BR_SLA_03, nhấn "Lưu" ở từng modal cấu hình thông tin cho từng bước/tác vụ
+> Hệ thống hiển thị các thông tin đã được cấu hình của bước/tác vụ lên giao diện
+7. Nhấn nút "Xác nhận" ở màn hình cấu hình chi tiết SLA
+> Hệ thống hiện modal để điền thông tin thời điểm bắt đầu hiệu lực
+8. Thiết lập các trường Giờ, Phút và Ngày bắt đầu hiệu lực và nhấn "Xác nhận" trên modal thiết lập hiệu lực
+> Hệ thống xuất hiện popup xác nhận kết thúc cấu hình
+9. Nhấn "Có" ở popup xác nhận kết thúc cấu hình
+62 B:Exceptional Flow | C:4a. Trong trường hợp quy trình đã tồn tại 1 mã SLA có trạng thái "Chờ hiệu lực", hệ thống sẽ hiển thị thông báo lỗi "Quy trình đã tồn tại mã SLA đang chờ hiệu lực" > Kết thúc (theo BR_SLA_05)
+6b. Trong trường hợp điền sai định dạng dữ liệu ở các trường thông tin cấu hình, hệ thống sẽ hiển thị thông báo inline dưới các trường thông tin lỗi "Thông tin không đúng định dạng" > Kết thúc
+7c. Trong trường hợp chưa điền đủ thông tin cấu hình bắt buộc của các tác vụ, hệ thống sẽ hiển thị thông báo lỗi "Vui lòng nhập đầy đủ thông tin cấu hình bắt buộc" > Kết thúc
+63 B:Post-condition | C:• 1 mã SLA mới được lưu và hiển thị lên bảng "Danh sách mã SLA chờ hiệu lực" trong tab "Quản lý hiệu lực" của màn hình chi tiết SLA của quy trình được thêm mới
+• Mã SLA sẽ bắt đầu được áp dụng cho tác vụ/bước/quy trình kể từ thời điểm bắt đầu hiệu lực thiết lập trong giai đoạn cấu hình (cách thức áp dụng theo BR_SLA_07)
+• Lịch sử cập nhật ghi nhận hành động thêm mới
+65 B:Use Case | C:UC_SLA_03: Xem danh sách quản lý hiệu lực SLA
+66 B:Description | C:Cho phép người dùng xem lịch sử các mã SLA 
+67 B:Actor | C:Primary actor: Admin
+Supporting actor: Hệ thống
+68 B:Trigger Event | C:Admin nhấn tab "Quản lý hiệu lực" ở màn hình chi tiết SLA của quy trình
+69 B:Pre-condition | C:• Admin đã đăng nhập hệ thống
+• Admin có quyền truy cập chức năng quản lý SLA
+70 B:Basic Flow | C:1. Đăng nhập tài khoản admin trên web
+> Hệ thống hiển thị màn hình trang chủ của Admin
+2. Nhấn vào "Cấu hình ngày SLA" mục "Quản lý danh mục" tab "Quản lý mua sắm" trên thanh điều hướng
+> Hệ thống hiển thị màn hình danh mục SLA của các quy trình
+3. Nhấn vào hyperlink của mã quy trình
+> Hệ thống chuyển sang màn hình chi tiết SLA của mỗi quy trình, hiển thị tất cả thông tin SLA của tác vụ, bước, quy trình thuộc về mã SLA đang hoạt động ở thời điểm hiện tại
+4. Nhấn tab "Quản lý hiệu lực"
+71 B:Exceptional Flow
+72 B:Post-condition | C:• Hệ thống hiển thị tất cả các mã SLA đã từng và hiện tại đang áp dụng cho quy trình
+• Hệ thống hiển thị mã SLA có trạng thái "Chờ hiệu lực" của quy trình (nếu có)
+74 B:Use Case | C:UC_SLA_04: Chỉnh sửa chi tiết cho mã SLA của quy trình
+75 B:Description | C:Cho phép người dùng chỉnh sửa thông tin chi tiết của 1 mã SLA đang có trạng thái "Chờ hiệu lực" của 1 quy trình
+76 B:Actor | C:Primary actor: Admin
+Supporting actor: Hệ thống
+77 B:Trigger Event | C:Admin nhấn "Chỉnh sửa" ở màn hình chi tiết của mã SLA có trạng thái "Chờ hiệu lực"
+78 B:Pre-condition | C:• Admin đã đăng nhập hệ thống
+• Admin có quyền truy cập chức năng quản lý SLA
+• Quy trình mà Admin truy cập vào màn hình chi tiết đang có 1 mã SLA ở trạng thái "Chờ hiệu lực"
+79 B:Basic Flow | C:1. Đăng nhập tài khoản admin trên web
+> Hệ thống hiển thị màn hình trang chủ của Admin
+2. Nhấn vào "Cấu hình ngày SLA" mục "Quản lý danh mục" tab "Quản lý mua sắm" trên thanh điều hướng
+> Hệ thống hiển thị màn hình danh mục SLA của các quy trình
+3. Nhấn vào hyperlink của mã quy trình
+> Hệ thống chuyển sang màn hình chi tiết SLA của mỗi quy trình, hiển thị tất cả thông tin SLA của tác vụ, bước, quy trình thuộc về mã SLA đang hoạt động ở thời điểm hiện tại
+4. Nhấn vào tab "Quản lý hiệu lực" ở màn hình chi tiết SLA của quy trình
+> Hệ thống hiển thị các phiên bản mã SLA đã được cấu hình cho quy trình
+5. Nhấn vào hyperlink của mã SLA có trạng thái "Chờ hiệu lực"
+> Hệ thống hiển thị màn hình chi tiết SLA của mã SLA được chọn
+6. Nhấn nút "Chỉnh sửa"
+> Hệ thống chuyển sang màn hình cấu hình chi tiết SLA của mã SLA đó
+7. Nhấn vào ký hiệu chỉnh sửa ở từng dòng bước/tác vụ để điền các trường thông tin bắt buộc theo BR_SLA_03, nhấn "Lưu" ở từng modal cấu hình thông tin cho từng bước/tác vụ
+> Hệ thống hiển thị các thông tin đã được cấu hình của bước/tác vụ lên giao diện
+8. Nhấn nút "Xác nhận" ở màn hình cấu hình chi tiết SLA của mã SLA đó
+9. Nhấn "Có" ở popup xác nhận kết thúc chỉnh sửa
+80 B:Exceptional Flow | C:7a. Trong trường hợp điền sai định dạng dữ liệu ở các trường thông tin cấu hình, hệ thống sẽ hiển thị thông báo inline dưới các trường thông tin lỗi "Thông tin không đúng định dạng" > Kết thúc
+8b. Trong trường hợp chưa điền đủ thông tin cấu hình bắt buộc của các tác vụ, hệ thống sẽ hiển thị thông báo lỗi "Vui lòng nhập đầy đủ thông tin cấu hình bắt buộc" > Kết thúc
+81 B:Post-condition | C:• Thông tin SLA chi tiết của mã SLA ở trạng thái "Chờ hiệu lực" được cập nhật
+• Lịch sử cập nhật ghi nhận thời gian thay đổi
+83 B:Use Case | C:UC_SLA_05: Điều chỉnh hiệu lực cho mã SLA của quy trình
+84 B:Description | C:Cho phép người dùng điều chỉnh thời điểm bắt đầu hiệu lực của 1 mã SLA đang có trạng thái "Chờ hiệu lực" của 1 quy trình
+85 B:Actor | C:Primary actor: Admin
+Supporting actor: Hệ thống
+86 B:Trigger Event | C:Admin nhấn "Điều chỉnh hiệu lực" ở màn hình chi tiết của mã SLA có trạng thái "Chờ hiệu lực"
+87 B:Pre-condition | C:• Admin đã đăng nhập hệ thống
+• Admin có quyền truy cập chức năng quản lý SLA
+• Quy trình mà Admin truy cập vào màn hình chi tiết đang có 1 mã SLA ở trạng thái "Chờ hiệu lực"
+88 B:Basic Flow | C:1. Đăng nhập tài khoản admin trên web
+> Hệ thống hiển thị màn hình trang chủ của Admin
+2. Nhấn vào "Cấu hình ngày SLA" mục "Quản lý danh mục" tab "Quản lý mua sắm" trên thanh điều hướng
+> Hệ thống hiển thị màn hình danh mục SLA của các quy trình
+3. Nhấn vào hyperlink của mã quy trình
+> Hệ thống chuyển sang màn hình chi tiết SLA của mỗi quy trình, hiển thị tất cả thông tin SLA của tác vụ, bước, quy trình thuộc về mã SLA đang hoạt động ở thời điểm hiện tại
+4. Nhấn vào tab "Quản lý hiệu lực" ở màn hình chi tiết SLA của quy trình
+> Hệ thống hiển thị các phiên bản mã SLA đã được cấu hình cho quy trình
+5. Nhấn vào hyperlink của mã SLA có trạng thái "Chờ hiệu lực"
+> Hệ thống hiển thị màn hình chi tiết SLA của mã SLA được chọn
+6. Nhấn nút "Điều chỉnh hiệu lực"
+> Hệ thống hiện modal để điền thông tin thời điểm bắt đầu hiệu lực
+7. Thiết lập các trường Giờ, Phút và Ngày bắt đầu hiệu lực và nhấn "Xác nhận" trên modal thiết lập hiệu lực
+> Hệ thống xuất hiện popup xác nhận kết thúc điều chỉnh hiệu lực
+8. Nhấn "Có" ở popup xác nhận kết thúc điều chỉnh hiệu lực
+89 B:Exceptional Flow | C:7a. Nếu user điều chỉnh thời điểm hiệu lực mới không hơn thời điểm hiện tại ít nhất 24 giờ, hệ thống sẽ hiển thị thông báo "Thời điểm bắt đầu hiệu lực mới phải hơn hiện tại ít nhất 24 giờ" > Kết thúc
+90 B:Post-condition | C:• Thời điểm bắt đầu hiệu lực của mã SLA ở trạng thái "Chờ hiệu lực" được cập nhật
+• Lịch sử cập nhật ghi nhận thời gian thay đổi
+92 B:Use Case | C:UC_SLA_06: Xem lịch sử cập nhật
+93 B:Description | C:Cho phép người dùng xem được các thông tin người và thời gian thêm mới, chỉnh sửa của các mã SLA liên quan đến quy trình
+94 B:Actor | C:Primary actor: Admin
+Supporting actor: Hệ thống
+95 B:Trigger Event | C:Admin nhấn tab "Lịch sử cập nhật" ở màn hình chi tiết SLA của quy trình
+96 B:Pre-condition | C:• Admin đã đăng nhập hệ thống
+• Admin có quyền truy cập chức năng quản lý SLA
+97 B:Basic Flow | C:1. Đăng nhập tài khoản admin trên web
+> Hệ thống hiển thị màn hình trang chủ của Admin
+2. Nhấn vào "Cấu hình ngày SLA" mục "Quản lý danh mục" tab "Quản lý mua sắm" trên thanh điều hướng
+> Hệ thống hiển thị màn hình danh mục SLA của các quy trình
+3. Nhấn vào hyperlink của mã quy trình
+> Hệ thống chuyển sang màn hình chi tiết SLA của mỗi quy trình, hiển thị tất cả thông tin SLA của tác vụ, bước, quy trình thuộc về mã SLA đang hoạt động ở thời điểm hiện tại
+4. Nhấn vào tab "Lịch sử cập nhật" ở màn hình chi tiết SLA của quy trình
+98 B:Exceptional Flow
+99 B:Post-condition | C:Xem được tất cả các hành động liên quan đến các mã SLA được tạo ra của quy trình với các thông tin: thêm mới mã SLA, chỉnh sửa chi tiết cấu hình của mã SLA ở trạng thái "Chờ hiệu lực"
