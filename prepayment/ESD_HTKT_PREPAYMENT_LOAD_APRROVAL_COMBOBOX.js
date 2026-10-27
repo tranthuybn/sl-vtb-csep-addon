@@ -249,6 +249,20 @@ function getPrepaymentApprovalAccess(prepayment, currentUser, canonicalContactRe
             status === "approved" ||
             status === "accounted";
 
+    /*
+     * Trạng thái tạo mới phụ thuộc vào luồng ban đầu của phiếu:
+     * - Luồng DMMS: chỉ initial_dmms là tạo mới.
+     * - Luồng KTTC: chỉ initial_kttc là tạo mới.
+     *
+     * Vì vậy phiếu luồng DMMS đã chuyển sang initial_kttc để KTTC tiếp nhận
+     * vẫn được phép tái phân công approval_dmms/checker.dmms.
+     */
+    var isPrepaymentCreationPhase =
+            !phase ||
+            phase === "start" ||
+            (role === "dmms" && phase === "initial_dmms") ||
+            (role === "kttc" && phase === "initial_kttc");
+
     var leaderAccess = getPrepaymentReassignmentRoleAccess(
             currentUser,
             canonicalContactResolved
@@ -277,14 +291,13 @@ function getPrepaymentApprovalAccess(prepayment, currentUser, canonicalContactRe
             (!!actor && actor === approverDmms);
 
     /*
-     * approval_kttc bắt buộc phải được xác định bằng Functional Right
-     * 0040040002000006.
-     *
-     * Không fallback theo user.approver.kttc trên record, vì nghiệp vụ đã chốt:
-     * user thuộc role approval_kttc phải có RIGHT_APPROVE_2 (0006).
+     * approval_kttc được xác định bằng Functional Right 0040040002000006.
+     * Đồng thời cho phép chính user đang giữ user.approver.kttc tái phân công
+     * role của mình trong context API không resolve đủ Functional Right.
      */
     var isApprovalKttc =
-            leaderAccess.isApprovalKttc === true;
+            leaderAccess.isApprovalKttc === true ||
+            (!!actor && actor === approverKttc);
 
     /*
      * Ma trận tái phân công mới:
@@ -307,6 +320,7 @@ function getPrepaymentApprovalAccess(prepayment, currentUser, canonicalContactRe
      *    - user.approver.final
      */
     var canDmmsLeaderReassign = !reassignmentClosed &&
+            !isPrepaymentCreationPhase &&
             role === "dmms" &&
             isApprovalDmms;
 
@@ -319,6 +333,7 @@ function getPrepaymentApprovalAccess(prepayment, currentUser, canonicalContactRe
      * - user.approver.final không được mở thêm.
      */
     var canKttcLeaderReassign = !reassignmentClosed &&
+            !isPrepaymentCreationPhase &&
             isApprovalKttc;
 
     var fieldAccess = {};
@@ -383,9 +398,12 @@ function getPrepaymentApprovalAccess(prepayment, currentUser, canonicalContactRe
         isApprovalDmms: isApprovalDmms,
         isApprovalKttc: isApprovalKttc,
 
-        // Cờ tổng quát: role lãnh đạo có thể nhìn sớm dữ liệu thuộc luồng liên quan.
-        canViewEarly: (role === "dmms" && (isApprovalDmms || isApprovalKttc)) ||
-                (role === "kttc" && isApprovalKttc),
+        /*
+         * Lãnh đạo có quyền approval được xem phiếu độc lập với
+         * initial.role/current.phase của phiếu.
+         * Phạm vi đơn vị dữ liệu vẫn do Data Permission kiểm soát ở lớp list.
+         */
+        canViewEarly: isApprovalDmms || isApprovalKttc,
 
         // Quyền edit chuẩn theo từng field.
         fieldAccess: fieldAccess
@@ -666,19 +684,13 @@ function createPrepaymentReassignmentHistory(prepaymentId, field, oldValue, newV
 
         var leadership = getPrepaymentReassignmentRoleAccess(safeCurrentUser);
 
-        if (
-                !leadership ||
-                (
-                        leadership.isApprovalDmms !== true &&
-                        leadership.isApprovalKttc !== true
-                )
-        ) {
-            print("[PP_APR][REASSIGN] Bỏ qua: User " + safeCurrentUser + " không có quyền lãnh đạo ĐMMS/KTTC.");
-            return;
-        }
-
         prepayment = new SCFile("esdHTKTprepayment", SCFILE_READONLY);
-        prepayment.setFields(["id", "initial.role"]);
+        prepayment.setFields([
+                "id",
+                "initial.role",
+                "user.approver.dmms",
+                "user.approver.kttc"
+        ]);
 
         if (
                 prepayment.doSelect(
@@ -695,10 +707,41 @@ function createPrepaymentReassignmentHistory(prepaymentId, field, oldValue, newV
                         prepayment["initial.role"]
         ).trim().toLowerCase();
 
+        var currentApprovalDmms = String(
+                prepayment["user.approver.dmms"] == null ?
+                        "" :
+                        prepayment["user.approver.dmms"]
+        ).trim().toLowerCase();
+        var canActAsApprovalDmms =
+                leadership.isApprovalDmms === true ||
+                (!!safeCurrentUser &&
+                        safeCurrentUser.toLowerCase() === currentApprovalDmms);
+
+        var currentApprovalKttc = String(
+                prepayment["user.approver.kttc"] == null ?
+                        "" :
+                        prepayment["user.approver.kttc"]
+        ).trim().toLowerCase();
+        var canActAsApprovalKttc =
+                leadership.isApprovalKttc === true ||
+                (!!safeCurrentUser &&
+                        safeCurrentUser.toLowerCase() === currentApprovalKttc);
+
+        if (
+                !leadership ||
+                (
+                        !canActAsApprovalDmms &&
+                        !canActAsApprovalKttc
+                )
+        ) {
+            print("[PP_APR][REASSIGN] Bỏ qua: User " + safeCurrentUser + " không có quyền lãnh đạo ĐMMS/KTTC.");
+            return;
+        }
+
         var canWriteReassignmentHistory = false;
 
         if (
-                leadership.isApprovalDmms === true &&
+                canActAsApprovalDmms &&
                 initialRole === "dmms" &&
                 (
                         safeField === "user.checker.dmms" ||
@@ -709,7 +752,7 @@ function createPrepaymentReassignmentHistory(prepaymentId, field, oldValue, newV
         }
 
         if (
-                leadership.isApprovalKttc === true &&
+                canActAsApprovalKttc &&
                 (
                         safeField === "user.approver.kttc" ||
                         safeField === "user.checker.final" ||
