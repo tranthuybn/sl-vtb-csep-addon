@@ -63,17 +63,13 @@ Table esdHTKTslaConfigDetail {
 }
 
 
-// payment.id references source.table (payment or prepayment); no single-table FK.
-Ref: esdHTKTslaTracking."sla.config.id" > esdHTKTslaConfig.id
 Ref: esdHTKTslaTracking."sla.config.detail.id" > esdHTKTslaConfigDetail.id
 
 // Bảng theo dõi SLA của từng vai trò trên phiếu
 // Mỗi lần SLA bị đo lại từ đầu sẽ sinh một attempt.no mới.
 Table esdHTKTslaTracking {
   id varchar [pk] 
-  "source.table" varchar [not null] // esdHTKTpayment / esdHTKTprepayment
   "payment.id" varchar // Mã phiếu tạm ứng/thanh toán/dự chi
-  "sla.config.id" varchar // Bộ cấu hình SLA được áp dụng tại thời điểm bắt đầu đo
   "sla.config.detail.id" varchar // Chi tiết SLA của vai trò được áp dụng
   "role.code" varchar // Mã vai trò đang được đo SLA
   "attempt.no" number // Lần đo SLA; tăng khi phiếu bị yêu cầu chỉnh sửa và phải đo lại từ đầu
@@ -90,7 +86,7 @@ Table esdHTKTslaTracking {
   sysmodtime datetime // OpenText SM tự cập nhật khi bản ghi được tạo hoặc sửa
 
   indexes {
-    ("source.table", "payment.id", "attempt.no", "role.code") [unique]
+    ("payment.id", "attempt.no", "role.code") [unique]
   }
 }
 
@@ -129,7 +125,6 @@ Ref: esdHTKTslaEventLog."sla.tracking.id" > esdHTKTslaTracking.id
 Table esdHTKTslaEventLog {
   id varchar [pk] 
   "sla.tracking.id" varchar // Mã theo dõi SLA; có thể null nếu bước đích chưa bắt đầu đo
-  "source.table" varchar [not null] // esdHTKTpayment / esdHTKTprepayment
   "payment.id" varchar // Mã phiếu để tra cứu nhanh lịch sử
   "event.type" varchar // START/COMPLETE/RETURN/REASSIGN/RESET/PAUSE/RESUME/CANCEL; WORKFLOW là nhật ký áp dụng sự kiện
   "event.key" varchar // ID thao tác nghiệp vụ ổn định khi retry; chỉ có trên dòng WORKFLOW

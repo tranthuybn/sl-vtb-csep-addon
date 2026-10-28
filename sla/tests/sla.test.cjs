@@ -31,6 +31,7 @@ function memoryStore() {
   };
 }
 function fixture(id='DC01',initial='dmms',rs1=true,rs2=true) {
+  if (!/^(DC|TT|TU)/.test(id)) id='DC'+id;
   const store=memoryStore();
   calendar.workingHours.forEach((x,i)=>store.put(T.hours,{id:'H'+i,'day.of.week':x.dayOfWeek,'start.time':x.startTime,'end.time':x.endTime}));
   store.put(T.config,{id:'CFG','transaction.type':'Dự chi','product.type':'Tất cả','effective.from':time('01','00:00'),'effective.to':null,status:'Đang hoạt động'});
@@ -175,13 +176,13 @@ test('Decimal budgets are fixed on tracking creation',()=>{
 const worker=load('ESD_HTKT_SLA_JOB',{lib:{ESD_HTKT_SLA_ENGINE:engine}});
 test('Batch continues after one corrupt payment and pagination reaches later IDs',()=>{
  const f=fixture('A','kttc');f.send('RETURN',time('27','08:00'),{'current.phase':'initial_kttc',status:'request_edit'});
- f.store.put(T.tracking,{id:'broken','payment.id':'B','source.table':'esdHTKTpayment','started.at':time('27','08:00'),'ended.at':null});
- f.store.put('esdHTKTpayment',{id:'B','transaction.type':'Dự chi',status:'kttc_created'});
- f.store.put(T.tracking,{id:'foreign','payment.id':'C','source.table':'esdHTKTpayment','ended.at':null});
- f.store.put('esdHTKTpayment',{id:'C','transaction.type':'Không áp dụng SLA'});
+ f.store.put(T.tracking,{id:'broken','payment.id':'DCB','started.at':time('27','08:00'),'ended.at':null});
+ f.store.put('esdHTKTpayment',{id:'DCB','transaction.type':'Dự chi',status:'kttc_created'});
+ f.store.put(T.tracking,{id:'foreign','payment.id':'DCC','ended.at':null});
+ f.store.put('esdHTKTpayment',{id:'DCC','transaction.type':'Không áp dụng SLA'});
  const rt={store:f.store,service:f.service};
- const a=worker.runBatch(rt,time('27','08:45'),{limit:1});assert.equal(a.nextCursor,'esdHTKTpayment:A');assert.equal(a.results.length,1);
- const b=worker.runBatch(rt,time('27','08:45'),{limit:10,afterPaymentId:a.nextCursor});assert.equal(b.errors.length,1);assert.equal(b.errors[0].paymentId,'esdHTKTpayment:B');assert.equal(b.nextCursor,null);
+ const a=worker.runBatch(rt,time('27','08:45'),{limit:1});assert.equal(a.nextCursor,'DCA');assert.equal(a.results.length,1);
+ const b=worker.runBatch(rt,time('27','08:45'),{limit:10,afterPaymentId:a.nextCursor});assert.equal(b.errors.length,1);assert.equal(b.errors[0].paymentId,'DCB');assert.equal(b.nextCursor,null);
 });
 test('Every interrupted write in first measured event can recover without duplicate rows',()=>{
  for(let fail=2;fail<=5;fail++) {
@@ -210,7 +211,7 @@ test('Engine temporarily uses Tất cả config without requiring payment produc
   const f=fixture('CFG-'+item.type,'kttc');f.send('CREATE',time('27','07:00'),{'transaction.type':item.type});const config=f.store.get(T.config,'CFG');
   config['transaction.type']=item.type;config['product.type']='Tất cả';f.store.put(T.config,config);
   f.send('RETURN',time('27','08:00'),{'transaction.type':item.type,'product.type':'','current.phase':'initial_kttc',status:'request_edit'});
-  assert.equal(f.tracks().length,1);assert.equal(f.tracks()[0]['sla.config.id'],'CFG');
+  assert.equal(f.tracks().length,1);assert.equal(f.store.get(T.detail,f.tracks()[0]['sla.config.detail.id'])['sla.config.id'],'CFG');assert(!Object.hasOwn(f.tracks()[0],'sla.config.id'));
  }
 });
 test('Late completion recalculates segments at actual business time',()=>{
@@ -284,22 +285,18 @@ test('Leaving creation status in same initial phase starts clock; return still m
 
 
 
-test('Payment and prepayment with identical IDs have isolated tracking, retry and job',()=>{
- const f=fixture('COLLIDE');f.send('CREATE',time('27','08:00'));
- f.send('TRANSITION',time('27','08:10'),{'current.phase':'initial_kttc',status:'dmms_initiated'},{before:{...f.payment,'current.phase':'initial_dmms'}});
- const config=f.store.get(T.config,'CFG');f.store.put(T.config,{...config,id:'PRE','transaction.type':'Tạm ứng'});
- for(const detail of f.store.list(T.detail,{}))f.store.put(T.detail,{...detail,id:'PRE.'+detail.id,'sla.config.id':'PRE'});
- const pre={...f.payment,'transaction.type':'Tạm ứng','current.phase':'start',status:'initialized'};
- f.store.put('esdHTKTprepayment',pre);
- const rt=engine.createRuntime({store:f.store});
- rt.onBusinessCommitted('CREATE',null,pre,{operationId:'OP1',eventAt:time('27','08:00'),performedBy:'actor'});
- assert.equal(f.store.list(T.tracking,{'source.table':'esdHTKTprepayment'}).length,0);
- const after={...pre,'current.phase':'initial_kttc',status:'dmms_initiated'};
+test('Document prefixes select the right table without a source field',()=>{
+ assert.equal(engine.sourceTableForId('TU001'),'esdHTKTprepayment');
+ assert.equal(engine.sourceTableForId('DC001'),'esdHTKTpayment');
+ assert.equal(engine.sourceTableForId('TT001'),'esdHTKTpayment');
+ assert.throws(()=>engine.sourceTableForId('UNKNOWN'),/UNKNOWN_DOCUMENT_PREFIX/);
+ const f=fixture('TU001');const c=f.store.get(T.config,'CFG');f.store.put(T.config,{...c,'transaction.type':'Tạm ứng'});
+ const after={...f.payment,'transaction.type':'Tạm ứng','current.phase':'initial_kttc',status:'dmms_initiated'};
+ const before={...after,'current.phase':'initial_dmms',status:'initialized'};
  f.store.put('esdHTKTprepayment',after);
- rt.onBusinessCommitted('TRANSITION',{...pre,'current.phase':'initial_dmms'},after,{operationId:'OP2',eventAt:time('27','08:20'),performedBy:'actor'});
- const tracks=f.store.list(T.tracking,{});assert.equal(tracks.length,2);assert.notEqual(tracks[0].id,tracks[1].id);
- const batch=worker.runBatch(rt,time('27','08:40'),{});assert.equal(batch.errors.length,0);assert.equal(batch.results.length,2);
- assert.equal(f.store.list(T.tracking,{'source.table':'esdHTKTprepayment'})[0]['started.at'],iso(time('27','08:20')));
+ const rt=engine.createRuntime({store:f.store});rt.onWorkflowChanged(before,{...after,sysmodcount:1,sysmodtime:time('27','08:10'),sysmoduser:'actor'});
+ assert.equal(worker.runBatch(rt,time('27','08:40'),{}).results.length,1);
+ for(const t of [T.tracking,T.event])for(const row of f.store.list(t,{}))assert(!Object.hasOwn(row,'source.table'));
 });
 
 
@@ -337,7 +334,7 @@ test('Two-record API recovers prepared writes and distinguishes prepayment',()=>
  const old={...f.payment,'transaction.type':'Tạm ứng','current.phase':'initial_dmms',status:'initialized'};
  const after={...old,'current.phase':'initial_kttc',status:'dmms_initiated',sysmodcount:2,sysmodtime:time('27','08:10'),sysmoduser:'actor'};
  f.store.failAfter(2);assert.throws(()=>rt.onWorkflowChanged(old,after),/INJECTED/);f.store.clearFailure();
- rt.onWorkflowChanged(old,after);assert.equal(f.tracks().length,1);assert.equal(f.tracks()[0]['source.table'],'esdHTKTprepayment');
+ rt.onWorkflowChanged(old,after);assert.equal(f.tracks().length,1);assert.equal(f.tracks()[0]['payment.id'],f.payment.id);
  assert.equal(rt.onWorkflowChanged(old,after).duplicate,true);
 });
 console.log('Completed',tests,'tests');

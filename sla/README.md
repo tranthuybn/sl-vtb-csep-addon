@@ -1,7 +1,86 @@
 # SLA tự tính dùng chung cho Dự chi, Tạm ứng và Thanh toán
 
-Đã triển khai engine tính và ghi dữ liệu SLA dùng chung cho `esdHTKTpayment`. Dự chi và Thanh toán dùng esdHTKTpayment; Tạm ứng dùng esdHTKTprepayment. Ba loại dùng cùng quy tắc luồng. Tạm thời `transaction.type` chọn cấu hình và `product.type` luôn dùng giá trị `"Tất cả"` vì nguồn sản phẩm trên phiếu chưa được chốt. Không có HTTP API quản trị hoặc API lịch sử. Các entry point ở đây dành cho workflow và scheduler phía server. Mã chưa được import/chạy trên SM thật; không có thay đổi trigger tự động.
+Đã triển khai engine tính và ghi dữ liệu SLA dùng chung cho các bảng phiếu. Dự chi và Thanh toán dùng esdHTKTpayment; Tạm ứng dùng esdHTKTprepayment. Ba loại dùng cùng quy tắc luồng. Tạm thời `transaction.type` chọn cấu hình và `product.type` luôn dùng giá trị `"Tất cả"` vì nguồn sản phẩm trên phiếu chưa được chốt. Không có HTTP API quản trị hoặc API lịch sử. Các entry point ở đây dành cho workflow và scheduler phía server. Mã chưa được import/chạy trên SM thật; không có thay đổi trigger tự động.
 
+
+## Bàn giao cuối phiên 28/10/2026 — đọc trước khi tiếp tục
+
+Mục này ghi lại các quyết định và công việc của cuộc chat hiện tại để tiếp tục ngày hôm sau, không cần mở lại link chia sẻ. Đây là context bàn giao, không phải bản chép nguyên văn hội thoại. Nếu mô tả cũ bên dưới khác mục này, lấy quyết định mới tại đây và đối chiếu mã thực tế.
+
+### Những yêu cầu mới đã chốt và đã sửa trong file local
+
+- Engine dùng chung Dự chi, Thanh toán, Tạm ứng. Dự chi/Thanh toán dùng esdHTKTpayment; Tạm ứng dùng esdHTKTprepayment. Người dùng xác nhận ID không trùng vì có prefix DC, TT, TU. Job đọc bảng theo prefix, không tìm thử cả hai bảng.
+- Bỏ các alias/hàm mang tên Expense trong SLA ENGINE và JOB. Hai hàm cầu nối tên Expense ở expense/ESD_HTKT_EXPENSE_WF.js vẫn là cầu nối workflow cũ, không phải engine riêng cho Dự chi. Hàm gọi mới trực tiếp không cần qua cầu nối này.
+- role.code thống nhất theo dbdict: user.created.dmms, user.checker.kttc, user.checker.dmms, user.approver.dmms, user.approver.kttc, user.checker.final, user.approver.final. user.created.dmms là mã vai trò, người tạo thực tế vẫn lấy field created.by. Không dùng các mã CB_DE_NGHI/CB_KTTC/RA_SOAT_1/PHE_DUYET_DM/PHE_DUYET_KTTC/RA_SOAT_2/PHE_DUYET_TQ cho dữ liệu mới.
+- Người dùng làm rõ chỉ bỏ đo khi status dmms_created/kttc_created, không bỏ toàn bộ phase initial_dmms/initial_kttc. Engine cũng coi initialized (thấy trong workflow Tạm ứng) là tạo mới, không đo. CREATE không mở Tracking/Segment. ĐMMS gửi sang KTTC bắt đầu đo KTTC; KTTC tạo gửi PD KTTC bắt đầu đo PD KTTC. RETURN về request_edit vẫn bắt đầu maker vòng mới.
+- Đã bỏ field source.table khỏi ENGINE, JOB, Tracking, EventLog và schema. Không thêm lại để chống trùng ID vì prefix đã phân biệt. Tracking/EventLog ID không ghép bảng nguồn. Engine vẫn có hàm/biến nội bộ xác định bảng; đó không phải field dữ liệu.
+- Đã bỏ sla.config.id khỏi Tracking, cả danh sách field đọc/ghi, câu tạo Tracking và Ref dbdict. Tracking chỉ giữ sla.config.detail.id; suy ra Config qua ConfigDetail.sla.config.id. ConfigDetail.sla.config.id vẫn giữ. SLA tính từ sla.minutes chốt trên Tracking, không cần đọc lại định mức Config mỗi lượt.
+- Unique index Tracking hiện là (payment.id, attempt.no, role.code); payment.id giữ nguyên ID phiếu gồm prefix. Không tạo FK payment.id chỉ trỏ esdHTKTpayment vì phiếu TU nằm bảng khác.
+
+### API workflow hiện tại và điều kiện phải xác nhận trên SM
+
+Lời gọi gọn đã được triển khai, không phải tên hàm đề xuất nữa:
+
+```javascript
+lib.ESD_HTKT_SLA_ENGINE.onWorkflowChanged(oldRecord, record);
+```
+
+- oldRecord là bản trước của chính thao tác; record là bản sau đã lưu thành công. Hàm tự nhận diện CREATE/TRANSITION/RETURN/CANCEL/REASSIGN; bỏ qua thay đổi không liên quan và cập nhật sau khi kết thúc. Thay status không khớp chuyển phase được hỗ trợ thì báo lỗi, không tự đoán.
+- Chỉ truyền oldRecord=null khi tạo mới có status tạo mới; phiếu đang xử lý mà thiếu bản trước sẽ báo SLA_REQUIRE_OLD_RECORD. Không đọc lại DB sau chuyển bước để thay bản trước.
+- record sau lưu cần sysmodcount, sysmodtime, sysmoduser. Wrapper lấy operationId từ sysmodcount + thời điểm sysmodtime; eventAt từ sysmodtime, performedBy từ sysmoduser. Không dùng Date mới/UUID mới mỗi retry. Retry phải giữ đúng hai record và metadata của thao tác ban đầu.
+- Chưa xác nhận SM thực tế có sysmodcount ở Rule Set, kiểu datetime sysmodtime có được toMillis đọc đúng, hay sysmoduser có còn là người thao tác sau các cập nhật trung gian. Thiếu field wrapper sẽ báo lỗi rõ. Nếu cần adapter, dùng createRuntime(adapterOptions).onWorkflowChanged(oldRecord, record), hoặc cấu hình tập trung sau khi xác minh kiểu SM.
+- onBusinessCommitted(kind,before,after,context) vẫn còn làm API cấp thấp cho caller có context ổn định riêng. Hai API cùng dùng một engine, không gọi cả hai cho cùng thao tác.
+- transaction.type vẫn cần đúng giá trị Dự chi/Tạm ứng/Thanh toán để chọn Config. Nếu record Tạm ứng không có field này thực tế, phải chuẩn hóa object đầu vào; chưa xác nhận field trên SM.
+
+### Điểm đang dừng: kiểm tra oldRecord trong Rule Set
+
+Người dùng gửi ảnh Process Designer của workflow ESD_HTKT_PAYMENT, bảng esdHTKTpayment; chọn phase CB DMMS, tab Rule Sets. Có các tab On enter, After successful enter, On exit, Initialization, On display, On update, After successful update.
+
+Đã hướng dẫn gắn Rule Set Run JavaScript ở After successful enter của phase ĐÍCH, vì chạy sau khi vào phase thành công. Dùng cùng logic tại các phase KTTC, RS1, PD ĐMMS, PD KTTC, RS2, cấp thẩm quyền, End và maker khi trả sửa. REASSIGN cần điểm sau lưu người xử lý ngay cả khi phase không đổi. Chỉ chọn một nguồn gọi cho mỗi thao tác, không gắn hai tab rồi tự tạo hai sự kiện.
+
+Câu hỏi gần nhất của người dùng: Rule Set có nhận diện oldRecord không? Đã trả lời tài liệu OpenText có record/oldRecord, phân biệt hoa thường; oldReocrd là sai chính tả, oldrecord là biến khác. Tuy nhiên CHƯA kiểm chứng After successful enter trên hệ thống này còn giữ bản trước đúng thao tác. Đây là việc đầu tiên nên làm ngày mai.
+
+Mẫu kiểm tra đã gửi:
+
+```javascript
+if (typeof oldRecord === "undefined" || !oldRecord) {
+    throw new Error("Rule Set không có biến oldRecord");
+}
+lib.ESD_HTKT_SLA_ENGINE.onWorkflowChanged(oldRecord, record);
+```
+
+Thử CB ĐMMS -> CB KTTC: oldRecord.current.phase phải initial_dmms, record.current.phase phải initial_kttc; đồng thời đối chiếu status trước/sau và sysmodcount/sysmodtime/sysmoduser. Đoạn kiểm tra thiếu oldRecord chỉ dành thử chuyển bước, không dùng để chặn CREATE vốn cho phép null. Nếu oldRecord không tồn tại/đã bị thay, phải giữ snapshot trước thao tác qua context action/process phù hợp; không giả định var ở Rule Set này sẽ tồn tại ở Rule Set khác.
+
+Nguồn đã đối chiếu:
+- https://docs.microfocus.com/doc/Service_Manager/9.80/AddPhase (After successful enter và After successful update).
+- https://docs.microfocus.com/doc/425/9.71/runactiononrelatedrecords (record/oldRecord; chưa chứng minh lifecycle chính xác trong Rule Set đang dùng).
+
+### Job và PREPARED — đã giải thích cho người dùng
+
+- JOB.runBatch(runtime,asOf,batch) hiện đọc TOÀN BỘ Tracking bằng store.list(...,{}), rồi lọc ended.at rỗng trong JavaScript. EventLog truy vấn processing.status=PREPARED. Gộp payment.id, loại trùng, sort tăng dần, xử lý tối đa limit (mặc định 100); afterPaymentId/nextCursor là ID phiếu. limit chưa giảm số Tracking đọc từ DB.
+- Mỗi phiếu đọc bảng theo TU/DC/TT, bỏ qua không tìm thấy/transaction.type không hỗ trợ; retryPrepared trước rồi refresh. Prefix lạ hiện có thể làm lỗi ngay lúc thu danh sách trước vòng try/catch từng phiếu; chưa tối ưu phần này.
+- Refresh chỉ xử lý Tracking mở: tính lại Tracking.due.at, Tracking.status và TimeSegment.working.minutes (segment mở tính đến asOf). Code ghi lại toàn bộ row đã đọc nhưng chỉ ba field nghiệp vụ này tính lại; có thể được SM tự cập nhật sysmodtime/sysmoduser. Không đổi status/phase phiếu, không gửi mail, không tự kết thúc Tracking.
+- Phiếu approved/accounted/cancelled còn Tracking mở thì báo SLA_MISSING_TERMINAL_WORKFLOW_EVENT, không tự đóng thay workflow.
+- EventLog WORKFLOW PREPARED = đã lưu kế hoạch ghi JSON nhưng chưa xác nhận áp dụng xong tất cả Tracking/Segment/log. Ghi xong chuyển APPLIED. Nếu lỗi giữa chừng, retry/job áp dụng lại kế hoạch để hoàn tất, không sinh thao tác mới. Log chi tiết không dùng processing.status.
+- PREPARED là trạng thái kỹ thuật; tồn tại ngắn trong ghi bình thường, kéo dài có thể do gián đoạn. Không phải trạng thái SLA hay trạng thái phiếu. Job phục hồi có thể ghi nhiều field/bản ghi theo kế hoạch cũ, không chỉ ba field refresh nêu trên.
+
+### File đã sửa và bằng chứng kiểm tra
+
+Đã sửa local: sla/ESD_HTKT_SLA_ENGINE.js, sla/ESD_HTKT_SLA_JOB.js, sla/tests/sla.test.cjs, dbdict/SLA.sql và sla/README.md. Lần kiểm tra code cuối sau bỏ sla.config.id ở Tracking: node --check engine đạt; node tests/sla.test.cjs đạt 27/27. Job đã được kiểm tra cú pháp sau thay prefix. Bộ test là Node với store/SCFile giả lập, KHÔNG phải SM tích hợp.
+
+Chưa import SL, chưa sửa dbdict thật, chưa gắn Rule Set/scheduler, chưa chạy/migration dữ liệu SM trong chat này. Người dùng nói đã có SL/dbdict và đã thay đổi trước đó, nhưng không suy ra các thay đổi local mới đã được đưa lên SM. Cần đối chiếu bản thực tế trước khi triển khai. Không tự làm API quản trị/UI/frontend/mail vì vẫn ngoài phạm vi đã chốt.
+
+### Thứ tự tiếp tục ngày mai
+
+1. Xác nhận oldRecord và metadata ngay trong Rule Set After successful enter trên môi trường thử nghiệm; lấy kết quả thực tế trước khi tiếp tục thiết kế cầu nối.
+2. Xác nhận SM datetime/date adapter và transaction.type của Tạm ứng; đối chiếu status/phase thực tế vì workflow có thể gán status ở bước khác với tên phase.
+3. Đối chiếu dbdict đang có với SLA.sql (DBML): không source.table, không Tracking.sla.config.id, đúng role.code và unique index, đủ kích thước ID/JSON/decimal.
+4. Import bản SL đúng và gắn lời gọi hai record tại điểm thành công, một nguồn duy nhất; kiểm tra không ghi SLA khi ký/chuyển bước thất bại.
+5. Chạy hai nhánh, TU/DC/TT, RS bật/tắt, trả sửa, xóa, đổi người, retry PREPARED, lịch nghỉ, quá hạn; scheduler/job chỉ sau khi workflow đã ghi đúng.
+
+Câu mở chat để tiếp tục:
+
+> Đọc C:/workspace/sl/sla/README.md, ưu tiên mục Bàn giao cuối phiên 28/10/2026. Tiếp tục nối onWorkflowChanged(oldRecord,record) ở Rule Set After successful enter. Xác minh oldRecord, sysmodcount/sysmodtime/sysmoduser và datetime trên SM trước. Tạm ứng dùng esdHTKTprepayment; DC/TT dùng esdHTKTpayment, prefix ID duy nhất; không source.table và không Tracking.sla.config.id. Không giả định code local đã import SM.
 
 ## Bàn giao để tiếp tục trên máy khác
 
@@ -116,15 +195,13 @@ Không tự đoán datetime theo locale. Nếu SM trả sysmodtime ở kiểu ch
 
 Gắn tại After successful enter để bắt chuyển bước; REASSIGN cần điểm sau lưu người xử lý (có thể After successful update nếu luồng đó chạy workflow). Một lần nghiệp vụ chọn một nguồn gọi, không tự gắn đồng thời hai tab. Entry point onBusinessCommitted vẫn giữ cho caller cần truyền context rõ ràng.
 
-## Bảng nguồn và API dùng chung
+## Bảng phiếu và API dùng chung
 
-Dự chi/Thanh toán: esdHTKTpayment. Tạm ứng: esdHTKTprepayment. Engine xác định bảng từ transaction.type (Tạm ứng chọn prepayment), snapshot thêm source.table. Record Tạm ứng truyền vào phải có transaction.type = "Tạm ứng"; nếu field thực tế không có, caller phải bổ sung giá trị này vào object snapshot trước/sau. Không đo dmms_created/kttc_created/initialized.
+ID có prefix duy nhất: DC = Dự chi, TT = Thanh toán, TU = Tạm ứng. Không lưu trường bảng nguồn trong Tracking, EventLog hoặc snapshot. payment.id là ID đầy đủ gồm prefix. Unique index Tracking: (payment.id, attempt.no, role.code). Không có FK chỉ trỏ bảng payment vì phiếu TU nằm ở bảng khác.
 
-Tracking và EventLog bổ sung source.table; payment.id giữ tên cũ nhưng mang ID phiếu tại bảng nguồn tương ứng. Unique index Tracking đổi thành (source.table, payment.id, attempt.no, role.code); bỏ FK chỉ trỏ esdHTKTpayment. ID Tracking/EventLog mới bao gồm bảng nguồn. Segment vẫn tham chiếu Tracking.
+Job và service.refresh(id, asOf) nhận diện TU để đọc esdHTKTprepayment, DC/TT để đọc esdHTKTpayment. Prefix không nhận diện được sẽ báo lỗi. nextCursor là ID phiếu, truyền nguyên lại qua afterPaymentId. Engine vẫn dùng transaction.type trên record để chọn cấu hình SLA; phiếu Tạm ứng phải có transaction.type = "Tạm ứng" trong dữ liệu truyền vào.
 
-Đã bỏ các alias mang tên Expense khỏi ENGINE và JOB. Dùng calculateTransactionTracking, service.applyEvent, service.refresh(id, asOf, sourceTable), service.retryPrepared(id, sourceTable), buildBaseline/installBaseline và JOB.runBatch. Nếu gọi refresh/retry không truyền bảng thì mặc định esdHTKTpayment. Job dùng source.table của Tracking/EventLog; cursor nextCursor là chuỗi bảng:ID và phải truyền nguyên lại vào afterPaymentId.
-
-Trước import bản mới, cập nhật dbdict và chuyển đổi dữ liệu SLA cũ: thêm source.table đúng nguồn, chuyển ID Tracking/EventLog và các tham chiếu Segment/EventLog, chuyển role.code cũ và xử lý PREPARED theo kế hoạch cũ. Không chỉ thêm field rồi chạy job trên dữ liệu cũ. Chưa thực hiện migration trên SM; chưa có kiểm thử SM thực tế. Việc tuần tự hóa thao tác/job dùng cặp (source.table, payment.id).
+Đã bỏ alias Expense khỏi ENGINE/JOB. Dùng calculateTransactionTracking, service.applyEvent, service.refresh, service.retryPrepared, buildBaseline/installBaseline và JOB.runBatch. Tuần tự hóa thao tác/job theo payment.id. ID Tracking/EventLog không cần thành phần bảng nguồn. Nếu đã có dữ liệu từ bản trung gian sử dụng ID chứa bảng nguồn, cần đối chiếu/chuyển đổi ID và tham chiếu trước khi chạy bản mới; chưa thay đổi dữ liệu SM.
 
 ## Luồng nghiệp vụ
 
@@ -234,3 +311,5 @@ Job là tùy chọn. Chỉ cần chạy định kỳ nếu muốn `status` của
 Chạy `node tests/sla.test.cjs` bằng Node để kiểm thử logic và lưu trữ mô phỏng. Có kiểm tra hai nhánh FSD, các bước tùy chọn, mốc RS2, nghỉ trưa/cuối tuần/lễ, giây lẻ, đổi người, trả sửa, xóa, retry và lỗi ghi giữa chừng.
 
 Chưa có kết nối SM trong phiên làm việc này. Trước khi dùng thật cần import các SL, tạo dbdict/index, nhập lịch đã duyệt, xác nhận adapter date/time, nối Rule Sets và scheduler nếu cần, rồi chạy kiểm thử tích hợp trên SM. Chưa thay trigger `esdHTKTpayment.activity.update.js` và chưa tự gắn rule vào workflow.
+
+Tracking chỉ lưu sla.config.detail.id, không lưu sla.config.id. Tra bộ cấu hình qua ConfigDetail.sla.config.id. Định mức vẫn chốt tại Tracking.sla.minutes; phép tính không đổi.

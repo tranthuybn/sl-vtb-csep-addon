@@ -30,8 +30,13 @@ function slaPolicyApi() { return {buildCommands:buildCommands}; }
 function sourceTableFor(record) {
     var type = String(record["transaction.type"] || "");
     var table = type === "Tạm ứng" ? "esdHTKTprepayment" : "esdHTKTpayment";
-    if (record["source.table"] && record["source.table"] !== table) throw new Error("SLA_SOURCE_TABLE_MISMATCH");
     return table;
+}
+function sourceTableForId(id) {
+    id = String(id || "");
+    if (/^TU/.test(id)) return "esdHTKTprepayment";
+    if (/^(DC|TT)/.test(id)) return "esdHTKTpayment";
+    throw new Error("SLA_UNKNOWN_DOCUMENT_PREFIX: " + id);
 }
 function isInitialStatus(status) {
     return status === "dmms_created" || status === "kttc_created" || status === "initialized";
@@ -323,9 +328,9 @@ var SLA_FIELDS = {
     esdHTKTslaHoliday: "id,holiday.date,holiday.name,holiday.type,note,created.by,created.at",
     esdHTKTslaConfig: "id,transaction.type,product.type,effective.from,effective.to,status",
     esdHTKTslaConfigDetail: "id,sla.config.id,role.code,role.name,sla.hours,is.active",
-    esdHTKTslaTracking: "id,payment.id,source.table,sla.config.id,sla.config.detail.id,role.code,attempt.no,started.at,ended.at,due.at,sla.minutes,current.assignee,status,created.at,end.reason,result",
+    esdHTKTslaTracking: "id,payment.id,sla.config.detail.id,role.code,attempt.no,started.at,ended.at,due.at,sla.minutes,current.assignee,status,created.at,end.reason,result",
     esdHTKTslaTimeSegment: "id,sla.tracking.id,segment.no,started.at,ended.at,working.minutes,start.event,end.event,assignee,created.at",
-    esdHTKTslaEventLog: "id,sla.tracking.id,payment.id,source.table,event.type,event.at,from.status,to.status,from.phase,to.phase,role.code,performed.by,assignee,data,created.at,processing.status,event.key"
+    esdHTKTslaEventLog: "id,sla.tracking.id,payment.id,event.type,event.at,from.status,to.status,from.phase,to.phase,role.code,performed.by,assignee,data,created.at,processing.status,event.key"
 };
 function quoteValue(value) {
     return '"' + String(value).replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"';
@@ -472,9 +477,9 @@ function createService(store, calendarLib, calculator, policyRules, options) {
         }
         return result;
     }
-    function journalId(paymentId, eventId, sourceTable) { return key(["EVENT", sourceTable, paymentId, eventId]); }
+    function journalId(paymentId, eventId, sourceTable) { return key(["EVENT", paymentId, eventId]); }
     function assertNoPending(paymentId, except, sourceTable) {
-        var list = rows(SLA_T.event, {"payment.id": paymentId, "source.table": sourceTable || "esdHTKTpayment"}), i;
+        var list = rows(SLA_T.event, {"payment.id": paymentId}), i;
         for (i = 0; i < list.length; i++) {
             if (list[i]["processing.status"] === "PREPARED" && list[i].id !== except) {
                 throw new Error("SLA_PENDING_EVENT_RETRY_FIRST: " + list[i].id);
@@ -504,14 +509,14 @@ function createService(store, calendarLib, calculator, policyRules, options) {
         }
         assertNoPending(paymentId, null, sourceTable);
         var atMs = instant(event.eventAt), at = iso(atMs), journalAttempt = 1;
-        var journals = rows(SLA_T.event, {"payment.id": paymentId, "source.table": sourceTable || "esdHTKTpayment"}), i, j;
+        var journals = rows(SLA_T.event, {"payment.id": paymentId}), i, j;
         for (i = 0; i < journals.length; i++) {
             if (journals[i]["processing.status"] === "APPLIED") journalAttempt = Math.max(journalAttempt, Number(JSON.parse(journals[i].data).attempt || 1));
             if (journals[i]["processing.status"] === "APPLIED" && instant(journals[i]["event.at"]) > atMs) {
                 throw new Error("SLA_OUT_OF_ORDER_EVENT");
             }
         }
-        var all = rows(SLA_T.tracking, {"payment.id": paymentId, "source.table": sourceTable || "esdHTKTpayment"}), attempt = journalAttempt, active = {}, plan = [], command, row, segments;
+        var all = rows(SLA_T.tracking, {"payment.id": paymentId}), attempt = journalAttempt, active = {}, plan = [], command, row, segments;
         for (i = 0; i < all.length; i++) {
             attempt = Math.max(attempt, Number(all[i]["attempt.no"]));
             if (blank(all[i]["ended.at"])) {
@@ -526,7 +531,7 @@ function createService(store, calendarLib, calculator, policyRules, options) {
         if (event.kind === "CREATE" && (all.length || journals.length)) throw new Error("SLA_PAYMENT_ALREADY_INITIALIZED");
         function log(type, role, trackingId, actor, data, suffix) {
             addWrite(plan, SLA_T.event, {id: key([rootId, type, role || "ALL", suffix || ""]),
-                "sla.tracking.id": trackingId || null, "payment.id": paymentId, "source.table": sourceTable,
+                "sla.tracking.id": trackingId || null, "payment.id": paymentId,
                 "event.type": type, "event.at": at, "from.status": event.before ? event.before.status : null,
                 "to.status": event.after.status, "from.phase": event.before ? event.before["current.phase"] : null,
                 "to.phase": event.after["current.phase"], "role.code": role || null,
@@ -582,9 +587,9 @@ function createService(store, calendarLib, calculator, policyRules, options) {
                 var detail = selected.detail;
                 var hours = Number(detail["sla.hours"]);
                 if (!isFinite(hours) || hours <= 0) throw new Error("SLA_INVALID_HOURS");
-                var tid = key([sourceTable, paymentId, attempt, command.role]);
+                var tid = key([paymentId, attempt, command.role]);
                 if (store.get(SLA_T.tracking, tid)) throw new Error("SLA_TRACKING_ALREADY_EXISTS: " + tid);
-                row = {id: tid, "payment.id": paymentId, "source.table": sourceTable, "sla.config.id": selected.config.id,
+                row = {id: tid, "payment.id": paymentId,
                     "sla.config.detail.id": detail.id,
                     "role.code": command.role, "attempt.no": attempt, "started.at": at, "ended.at": null,
                     "sla.minutes": hours * 60, "current.assignee": command.assignee,
@@ -625,7 +630,7 @@ function createService(store, calendarLib, calculator, policyRules, options) {
                 log("REASSIGN", command.role, state.row.id, command.assignee, {from: command.oldAssignee, to: command.assignee});
             }
         }
-        var journal = {id: rootId, "payment.id": paymentId, "source.table": sourceTable, "event.type": "WORKFLOW",
+        var journal = {id: rootId, "payment.id": paymentId, "event.type": "WORKFLOW",
             "event.at": at, "event.key": String(event.id), "performed.by": event.performedBy,
             "from.status": event.before ? event.before.status : null, "to.status": event.after.status,
             "from.phase": event.before ? event.before["current.phase"] : null, "to.phase": event.after["current.phase"],
@@ -633,18 +638,18 @@ function createService(store, calendarLib, calculator, policyRules, options) {
         store.put(SLA_T.event, journal); return commit(journal);
     }
     function refresh(paymentId, asOf, sourceTable) {
-        sourceTable = sourceTable || "esdHTKTpayment";
+        sourceTable = sourceTable || sourceTableForId(paymentId);
         if (sourceTable !== "esdHTKTpayment" && sourceTable !== "esdHTKTprepayment") throw new Error("SLA_INVALID_SOURCE_TABLE");
         var payment = store.get(sourceTable, paymentId);
         if (payment) sourceTableFor(payment);
         if (!payment) throw new Error("SLA_PAYMENT_NOT_FOUND");
         assertNoPending(paymentId, null, sourceTable);
         if (payment.status === "cancelled" || payment.status === "approved" || payment.status === "accounted") {
-            var dangling = rows(SLA_T.tracking, {"payment.id": paymentId, "source.table": sourceTable || "esdHTKTpayment"}), d;
+            var dangling = rows(SLA_T.tracking, {"payment.id": paymentId}), d;
             for (d = 0; d < dangling.length; d++) if (blank(dangling[d]["ended.at"])) throw new Error("SLA_MISSING_TERMINAL_WORKFLOW_EVENT");
             return {success: true, paymentId: paymentId, calculated: 0};
         }
-        var atMs = instant(asOf), at = iso(atMs), list = rows(SLA_T.tracking, {"payment.id": paymentId, "source.table": sourceTable || "esdHTKTpayment"});
+        var atMs = instant(asOf), at = iso(atMs), list = rows(SLA_T.tracking, {"payment.id": paymentId});
         var count = 0, i, j, row, segments, result;
         // Validate every active tracking before writing any result for this payment.
         var prepared = [];
@@ -662,7 +667,7 @@ function createService(store, calendarLib, calculator, policyRules, options) {
         return {success: true, paymentId: paymentId, calculated: count};
     }
     function retryPrepared(paymentId, sourceTable) {
-        var list = rows(SLA_T.event, {"payment.id": paymentId, "source.table": sourceTable || "esdHTKTpayment", "processing.status": "PREPARED"});
+        var list = rows(SLA_T.event, {"payment.id": paymentId, "processing.status": "PREPARED"});
         if (list.length > 1) throw new Error("SLA_MULTIPLE_PENDING_EVENTS_REQUIRE_RECONCILIATION");
         return list.length ? commit(list[0]) : {success: true, writes: 0};
     }
@@ -695,7 +700,6 @@ function snapshot(record) {
         var value = record[names[i]];
         out[names[i]] = value === true || value === 1 || String(value) === "true" || String(value) === "1";
     }
-    out["source.table"] = sourceTableFor(record);
     return out;
 }
 /** Workflow entry point: both records must belong to the same committed operation. */

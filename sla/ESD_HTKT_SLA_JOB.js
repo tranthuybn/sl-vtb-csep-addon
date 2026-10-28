@@ -21,9 +21,8 @@ function runBatch(runtime, asOf, batch) {
     if (!isFinite(limit) || limit < 1 || limit !== Math.floor(limit)) throw new Error("SLA_INVALID_BATCH_LIMIT");
     var store = runtime.store, ids = {}, list = store.list("esdHTKTslaTracking", {}), i, id;
     function collect(row) {
-        var table = row["source.table"];
-        if (table !== "esdHTKTpayment" && table !== "esdHTKTprepayment") throw new Error("SLA_MISSING_SOURCE_TABLE");
-        ids[table + ":" + String(row["payment.id"])] = {id:String(row["payment.id"]),table:table};
+        var table = lib.ESD_HTKT_SLA_ENGINE.sourceTableForId(row["payment.id"]);
+        ids[String(row["payment.id"])] = {id:String(row["payment.id"]),table:table};
     }
     for (i = 0; i < list.length; i++) if (!list[i]["ended.at"]) collect(list[i]);
     list = store.list("esdHTKTslaEventLog", {"processing.status": "PREPARED"});
