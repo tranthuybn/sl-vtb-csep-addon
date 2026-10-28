@@ -5,9 +5,9 @@
  * Version     : 2.0.0
  *
  * Chức năng   : Tính thời gian theo lịch làm việc và ghi toàn bộ vòng đời SLA:
- *               Tracking, Time Segment, EventLog và AlertHistory.
- * Phạm vi     : Engine dùng chung cho các loại giao dịch. Quy tắc chuyển phase theo
- *               transaction.type được ủy quyền cho ESD_HTKT_SLA_POLICY.
+ *               Tracking, Time Segment và EventLog.
+ * Phạm vi     : Engine dùng chung cho các loại giao dịch và chứa trực tiếp quy tắc
+ *               chuyển phase/role của luồng SLA.
  * Entry point : snapshot(), createRuntime(), buildBaseline() và installBaseline().
  * Môi trường  : OpenText Service Manager (JavaScript ES5 Engine).
  * -----------------------------------------------------------------------------
@@ -20,6 +20,103 @@ function slaCalendarApi() {
 function slaCalculatorApi() {
     return {calculateTracking:calculateTracking, calculateTransactionTracking:calculateTransactionTracking,
         calculateExpenseTracking:calculateExpenseTracking};
+}
+function slaPolicyApi() { return {buildCommands:buildCommands}; }
+
+/* =============================================================================
+ * POLICY LUỒNG SLA DÙNG CHUNG
+ * Chuyển sự kiện workflow thành START/COMPLETE/RETURN/REASSIGN/CANCEL.
+ * ============================================================================= */
+var SLA_ROLES = {
+    initial_dmms: "CB_DE_NGHI", initial_kttc: "CB_KTTC", check_dmms: "RA_SOAT_1",
+    approval_dmms: "PHE_DUYET_DM", approval_kttc: "PHE_DUYET_KTTC",
+    check_final: "RA_SOAT_2", approval_final: "PHE_DUYET_TQ"
+};
+var SLA_ACTORS = {
+    CB_DE_NGHI: "created.by", CB_KTTC: "user.checker.kttc", RA_SOAT_1: "user.checker.dmms",
+    PHE_DUYET_DM: "user.approver.dmms", PHE_DUYET_KTTC: "user.approver.kttc",
+    RA_SOAT_2: "user.checker.final", PHE_DUYET_TQ: "user.approver.final"
+};
+function isTrue(value) { return value === true || value === 1 || value === "true" || value === "1"; }
+function makerRole(payment) {
+    if (payment["initial.role"] === "dmms") return "CB_DE_NGHI";
+    if (payment["initial.role"] === "kttc") return "CB_KTTC";
+    throw new Error("SLA_INVALID_INITIAL_ROLE");
+}
+function assignee(payment, role) {
+    if (role === "CB_KTTC" && payment["initial.role"] === "kttc") return String(payment["created.by"] || "");
+    return String(payment[SLA_ACTORS[role]] || "");
+}
+function buildWorkflowCommands(event) {
+    var after = event.after, before = event.before || {}, commands = [], kind = event.kind;
+    var transactionType = after ? String(after["transaction.type"] || "") : "";
+    if (transactionType !== "Dự chi" && transactionType !== "Tạm ứng" && transactionType !== "Thanh toán") {
+        throw new Error("SLA_UNSUPPORTED_TRANSACTION_TYPE: " + transactionType);
+    }
+    if (!after.id || !event.id || !event.performedBy) throw new Error("SLA_MISSING_EVENT_ID_OR_ACTOR");
+    if (before.id && String(before.id) !== String(after.id)) throw new Error("SLA_PAYMENT_MISMATCH");
+    var from = String(before["current.phase"] || ""), to = String(after["current.phase"] || "");
+    var role, key;
+    function start(r) { commands.push({type: "START", role: r, assignee: assignee(after, r)}); }
+    if (kind === "CREATE") {
+        if (after.status !== "dmms_created" && after.status !== "kttc_created") throw new Error("SLA_INVALID_CREATE_STATUS");
+        start(makerRole(after));
+    } else if (kind === "RETURN") {
+        if (after.status !== "request_edit" || before.status === "request_edit") throw new Error("SLA_INVALID_RETURN");
+        commands.push({type: "RETURN_ALL"}); start(makerRole(after));
+    } else if (kind === "CANCEL") {
+        if (after.status !== "cancelled") throw new Error("SLA_INVALID_CANCEL");
+        commands.push({type: "CANCEL_ALL"});
+    } else if (kind === "REASSIGN") {
+        if (before["initial.role"] !== after["initial.role"] ||
+                isTrue(before["require.check.level1"]) !== isTrue(after["require.check.level1"]) ||
+                isTrue(before["require.check.level2"]) !== isTrue(after["require.check.level2"])) throw new Error("SLA_REASSIGN_MUST_NOT_CHANGE_ROUTE");
+        if (before.status !== after.status || from !== to) throw new Error("SLA_REASSIGN_MUST_NOT_CHANGE_STEP");
+        if (after.status === "cancelled" || after.status === "approved" || after.status === "accounted") throw new Error("SLA_REASSIGN_CLOSED_PAYMENT");
+        for (role in SLA_ACTORS) if (Object.prototype.hasOwnProperty.call(SLA_ACTORS, role)) {
+            key = SLA_ACTORS[role];
+            if (String(before[key] || "") !== String(after[key] || "")) {
+                commands.push({type: "REASSIGN", role: role, assignee: assignee(after, role), oldAssignee: assignee(before, role)});
+            }
+        }
+        if (!commands.length) throw new Error("SLA_NO_ASSIGNEE_CHANGE");
+    } else if (kind === "TRANSITION") {
+        if (after.status === "request_edit" || after.status === "cancelled") throw new Error("SLA_USE_RETURN_OR_CANCEL_EVENT");
+        // The workflow initially routes start -> maker; this does not finish the maker SLA.
+        if (from === "start" && ((to === "initial_dmms" && makerRole(after) === "CB_DE_NGHI") ||
+                (to === "initial_kttc" && makerRole(after) === "CB_KTTC"))) return [];
+        if (!SLA_ROLES[from] || from === to) throw new Error("SLA_INVALID_PHASE_TRANSITION");
+        if (before.status === "approved" || before.status === "accounted" || before.status === "cancelled") throw new Error("SLA_PAYMENT_ALREADY_FINISHED");
+        var expected = {
+            initial_dmms: "initial_kttc",
+            initial_kttc: after["initial.role"] === "kttc" ? "approval_kttc" :
+                isTrue(after["require.check.level1"]) ? "check_dmms" : "approval_dmms",
+            check_dmms: "approval_dmms", approval_dmms: "approval_kttc",
+            approval_kttc: isTrue(after["require.check.level2"]) ? "check_final" : "approval_final",
+            check_final: "approval_final", approval_final: "end"
+        };
+        if (to !== expected[from]) throw new Error("SLA_UNEXPECTED_NEXT_PHASE: " + from + " -> " + to);
+        if (after["initial.role"] === "kttc" && (from === "initial_dmms" || from === "check_dmms" || from === "approval_dmms")) {
+            throw new Error("SLA_PHASE_NOT_IN_KTTC_FLOW");
+        }
+        role = SLA_ROLES[from];
+        commands.push({type: "COMPLETE", role: role});
+        if (to === "end") {
+            if (from !== "approval_final" || after.status !== "approved") throw new Error("SLA_INVALID_FINAL_APPROVAL");
+        } else {
+            if (!SLA_ROLES[to]) throw new Error("SLA_UNKNOWN_TARGET_PHASE");
+            start(SLA_ROLES[to]);
+        }
+        // Quy tắc dùng chung: nhánh ĐMMS bắt đầu RS2 sau khi PD ĐMMS hoàn thành.
+        if (from === "approval_dmms" && isTrue(after["require.check.level2"])) start("RA_SOAT_2");
+        // Nhánh KTTC bắt đầu RS2 khi PD KTTC chuyển sang check_final.
+    } else throw new Error("SLA_UNKNOWN_EVENT_KIND: " + kind);
+    return commands;
+}
+
+
+function buildCommands(event) {
+    return buildWorkflowCommands(event);
 }
 
 /* =============================================================================
@@ -47,7 +144,7 @@ function dateKey(day) {
     return d.getUTCFullYear() + "-" + pad2(d.getUTCMonth() + 1) + "-" + pad2(d.getUTCDate());
 }
 function clockMinutes(value) {
-    var m = /^(\d{2}):(\d{2})(?::00)?$/.exec(String(value));
+    var m = /^(\d{2}):(\d{2})$/.exec(String(value));
     if (!m || Number(m[1]) > 23 || Number(m[2]) > 59) throw new Error("SLA_INVALID_WORKING_TIME: " + value);
     return Number(m[1]) * 60 + Number(m[2]);
 }
@@ -135,7 +232,7 @@ function addWorkingMinutes(calendar, start, minutes) {
 /* =============================================================================
  * TÍNH TOÁN SLA
  * ============================================================================= */
-function calculateTracking(calendarLib, calendar, tracking, segments, asOf, thresholds) {
+function calculateTracking(calendarLib, calendar, tracking, segments, asOf) {
     if (!calendarLib || !tracking || !segments || !segments.length) throw new Error("SLA_MISSING_INPUT");
     var c = calendarLib.compileCalendar(calendar);
     var now = calendarLib.toMillis(asOf);
@@ -145,11 +242,6 @@ function calculateTracking(calendarLib, calendar, tracking, segments, asOf, thre
     var budget = tracking.slaMinutes;
     if (typeof budget !== "number" || !isFinite(budget) || budget <= 0) throw new Error("SLA_INVALID_BUDGET");
     if (end < start || end > now) throw new Error("SLA_INVALID_TRACKING_RANGE");
-    thresholds = thresholds || { stage1: 0.7, stage2: 0.9 };
-    var r1 = thresholds.stage1, r2 = thresholds.stage2;
-    if (typeof r1 !== "number" || typeof r2 !== "number" || !(r1 > 0 && r1 < r2 && r2 < 1)) {
-        throw new Error("SLA_INVALID_ALERT_THRESHOLDS");
-    }
     var rows = [], i, segment, a, b, open, previousEnd = start;
     for (i = 0; i < segments.length; i++) {
         segment = segments[i]; a = calendarLib.toMillis(segment.startedAt);
@@ -174,8 +266,6 @@ function calculateTracking(calendarLib, calendar, tracking, segments, asOf, thre
     }
     pausedMs += calendarLib.workingMillis(c, previousEnd, end);
     var budgetMs = budget * 60000, remainingMs = budgetMs - totalMs;
-    var level = totalMs >= budgetMs ? "STAGE_3" :
-        totalMs >= budgetMs * r2 ? "STAGE_2" : totalMs >= budgetMs * r1 ? "STAGE_1" : "NONE";
     // An actual deadline can be recovered from segments once the budget is consumed.
     // Before consumption: initial budget plus excluded working time in gaps (pauses).
     // While paused the future resume instant is unknown, so no reliable dueAt exists.
@@ -196,23 +286,18 @@ function calculateTracking(calendarLib, calendar, tracking, segments, asOf, thre
         remainingMinutes: remainingMs / 60000, dueAt: due,
         status: closed ? "Đã kết thúc" : remainingMs <= 0 ? "Vi phạm" : "Trong thời gian",
         isRunning: !closed && running, isBreached: remainingMs <= 0,
-        alertStatus: level,
-        // Thresholds reached are informational; send only for open tracking and dedupe in persistence.
-        reachedStages: totalMs >= budgetMs ? ["STAGE_1_70", "STAGE_2_90", "STAGE_3_BREACH"] :
-            totalMs >= budgetMs * r2 ? ["STAGE_1_70", "STAGE_2_90"] :
-            totalMs >= budgetMs * r1 ? ["STAGE_1_70"] : [],
-        canAlert: !closed && running, segments: results, calculatedAt: new Date(end)
+        segments: results, calculatedAt: new Date(end)
     };
 }
 
 // Entry point dùng chung; mỗi Tracking được tính độc lập.
-function calculateTransactionTracking(calendarLib, calendar, payment, tracking, segments, asOf, thresholds) {
+function calculateTransactionTracking(calendarLib, calendar, payment, tracking, segments, asOf) {
     if (!payment || !payment["transaction.type"]) throw new Error("SLA_MISSING_TRANSACTION_TYPE");
     if (!payment.id || tracking.paymentId !== String(payment.id)) throw new Error("SLA_PAYMENT_MISMATCH");
-    return calculateTracking(calendarLib, calendar, tracking, segments, asOf, thresholds);
+    return calculateTracking(calendarLib, calendar, tracking, segments, asOf);
 }
-function calculateExpenseTracking(calendarLib, calendar, payment, tracking, segments, asOf, thresholds) {
-    return calculateTransactionTracking(calendarLib, calendar, payment, tracking, segments, asOf, thresholds);
+function calculateExpenseTracking(calendarLib, calendar, payment, tracking, segments, asOf) {
+    return calculateTransactionTracking(calendarLib, calendar, payment, tracking, segments, asOf);
 }
 
 
@@ -221,14 +306,12 @@ function calculateExpenseTracking(calendarLib, calendar, payment, tracking, segm
  * ============================================================================= */
 var SLA_FIELDS = {
     esdHTKTpayment: "id,transaction.type,initial.role,current.phase,status,created.by,current.executor,require.check.level1,require.check.level2,user.checker.kttc,user.checker.dmms,user.approver.dmms,user.approver.kttc,user.checker.final,user.approver.final",
-    esdHTKTslaCalendar: "id,name,timezone,created.by,created.at,updated.by,updated.at",
-    esdHTKTslaWorkingHour: "id,calendar.id,day.of.week,start.time,end.time",
-    esdHTKTslaHoliday: "id,calendar.id,holiday.date,holiday.name,holiday.type,note,created.by,created.at",
-    esdHTKTslaConfig: "id,transaction.type,product.type,calendar.id,effective.from,effective.to,status",
-    esdHTKTslaConfigDetail: "id,sla.config.id,role.code,role.name,step.order,sla.hours,alert.stage1.rate,alert.stage2.rate,is.active",
-    esdHTKTslaTracking: "id,payment.id,sla.config.id,sla.config.detail.id,calendar.id,role.code,attempt.no,started.at,ended.at,due.at,sla.minutes,elapsed.minutes,remaining.minutes,current.assignee,status,alert.status,last.calculated.at,created.at,updated.at,alert.stage1.rate,alert.stage2.rate,end.reason,result",
+    esdHTKTslaWorkingHour: "id,day.of.week,start.time,end.time",
+    esdHTKTslaHoliday: "id,holiday.date,holiday.name,holiday.type,note,created.by,created.at",
+    esdHTKTslaConfig: "id,transaction.type,product.type,effective.from,effective.to,status",
+    esdHTKTslaConfigDetail: "id,sla.config.id,role.code,role.name,sla.hours,is.active",
+    esdHTKTslaTracking: "id,payment.id,sla.config.id,sla.config.detail.id,role.code,attempt.no,started.at,ended.at,due.at,sla.minutes,current.assignee,status,created.at,end.reason,result",
     esdHTKTslaTimeSegment: "id,sla.tracking.id,segment.no,started.at,ended.at,working.minutes,start.event,end.event,assignee,created.at",
-    esdHTKTslaAlertHistory: "id,sla.tracking.id,alert.stage,threshold.rate,recipient.user,recipient.email,triggered.at,sent.at,send.status,retry.count,error.message,created.at,updated.at",
     esdHTKTslaEventLog: "id,sla.tracking.id,payment.id,event.type,event.at,from.status,to.status,from.phase,to.phase,role.code,performed.by,assignee,data,created.at,processing.status,event.key"
 };
 function quoteValue(value) {
@@ -281,7 +364,6 @@ function createStore(options) {
                         if (!options.encodeInstant && !isFinite(value.getTime())) throw new Error("SLA_INVALID_WRITE_TIMESTAMP");
                     }
                     if (value !== null && names[i] === "holiday.date" && options.encodeDate) value = options.encodeDate(value);
-                    if (value !== null && (names[i] === "start.time" || names[i] === "end.time") && options.encodeTime) value = options.encodeTime(value);
                     f[names[i]] = value;
                 }
             }
@@ -291,8 +373,7 @@ function createStore(options) {
     }
     return { get: get, list: list, put: put,
         decodeInstant: options.decodeInstant || function(value) { return value; },
-        decodeDate: options.decodeDate || function(value) { return String(value); },
-        decodeTime: options.decodeTime || function(value) { return String(value); }
+        decodeDate: options.decodeDate || function(value) { return String(value); }
     };
 }
 
@@ -301,9 +382,9 @@ function createStore(options) {
  * DỊCH VỤ VÒNG ĐỜI SLA
  * ============================================================================= */
 var SLA_T = { config: "esdHTKTslaConfig", detail: "esdHTKTslaConfigDetail",
-    calendar: "esdHTKTslaCalendar", hours: "esdHTKTslaWorkingHour", holiday: "esdHTKTslaHoliday",
+    hours: "esdHTKTslaWorkingHour", holiday: "esdHTKTslaHoliday",
     tracking: "esdHTKTslaTracking", segment: "esdHTKTslaTimeSegment",
-    event: "esdHTKTslaEventLog", alert: "esdHTKTslaAlertHistory" };
+    event: "esdHTKTslaEventLog" };
 function createService(store, calendarLib, calculator, policyRules, options) {
     options = options || {};
     function clone(x) { return JSON.parse(JSON.stringify(x)); }
@@ -317,16 +398,14 @@ function createService(store, calendarLib, calculator, policyRules, options) {
     function rows(table, filter) { return store.list(table, filter || {}); }
     function blank(x) { return x === null || typeof x === "undefined" || x === ""; }
     function truth(x) { return x === true || x === 1 || x === "true" || x === "1"; }
-    function loadCalendar(id) {
-        var meta = store.get(SLA_T.calendar, id), result, list, i;
-        if (!meta) throw new Error("SLA_CALENDAR_NOT_FOUND: " + id);
-        result = {timezone: String(meta.timezone), workingHours: [], holidays: []};
-        list = rows(SLA_T.hours, {"calendar.id": id});
+    function loadCalendar() {
+        var result = {timezone: "Asia/Ho_Chi_Minh", workingHours: [], holidays: []};
+        var list = rows(SLA_T.hours, {}), i;
         for (i = 0; i < list.length; i++) result.workingHours.push({
             dayOfWeek: Number(list[i]["day.of.week"]),
-            startTime: store.decodeTime(list[i]["start.time"]), endTime: store.decodeTime(list[i]["end.time"])
+            startTime: String(list[i]["start.time"]), endTime: String(list[i]["end.time"])
         });
-        list = rows(SLA_T.holiday, {"calendar.id": id});
+        list = rows(SLA_T.holiday, {});
         for (i = 0; i < list.length; i++) result.holidays.push(store.decodeDate(list[i]["holiday.date"]));
         calendarLib.compileCalendar(result); return result;
     }
@@ -351,10 +430,10 @@ function createService(store, calendarLib, calculator, policyRules, options) {
         details = rows(SLA_T.detail, {"sla.config.id": config.id, "role.code": role});
         if (details.length !== 1) throw new Error("SLA_EXPECT_ONE_ROLE_DETAIL: " + role);
         if (!truth(details[0]["is.active"])) return null;
-        return { config: config, detail: details[0], calendar: loadCalendar(config["calendar.id"]) };
+        return { config: config, detail: details[0], calendar: loadCalendar() };
     }
     function hydrateTracking(row) {
-        var out = clone(row), names = ["started.at", "ended.at", "due.at", "last.calculated.at", "created.at", "updated.at"], i;
+        var out = clone(row), names = ["started.at", "ended.at", "due.at", "created.at"], i;
         for (i = 0; i < names.length; i++) if (!blank(row[names[i]])) out[names[i]] = iso(instant(row[names[i]]));
         return out;
     }
@@ -370,27 +449,15 @@ function createService(store, calendarLib, calculator, policyRules, options) {
     function calculate(row, segments, at) {
         var data = [], i;
         for (i = 0; i < segments.length; i++) data.push({startedAt: segments[i]["started.at"], endedAt: segments[i]["ended.at"]});
-        var result = calculator.calculateTracking(calendarLib, loadCalendar(row["calendar.id"]), {
+        var result = calculator.calculateTracking(calendarLib, loadCalendar(), {
             startedAt: row["started.at"], endedAt: row["ended.at"], slaMinutes: Number(row["sla.minutes"])
-        }, data, at, {stage1: Number(row["alert.stage1.rate"]), stage2: Number(row["alert.stage2.rate"])});
+        }, data, at);
         row["due.at"] = result.dueAt ? result.dueAt.toISOString() : null;
-        row["elapsed.minutes"] = result.elapsedMinutes; row["remaining.minutes"] = result.remainingMinutes;
-        row.status = result.status; row["alert.status"] = result.alertStatus;
-        row["last.calculated.at"] = at; row["updated.at"] = at;
+        row.status = result.status;
         for (i = 0; i < result.segments.length; i++) {
             segments[result.segments[i].inputIndex]["working.minutes"] = result.segments[i].workingMinutes;
         }
         return result;
-    }
-    function thresholdAt(row, segments, rate) {
-        var calendar = calendarLib.compileCalendar(loadCalendar(row["calendar.id"]));
-        var needed = Number(row["sla.minutes"]) * rate * 60000, i, used;
-        for (i = 0; i < segments.length; i++) {
-            used = Number(segments[i]["working.minutes"]) * 60000;
-            if (used >= needed) return iso(calendarLib.addMillis(calendar, instant(segments[i]["started.at"]), needed));
-            needed -= used;
-        }
-        throw new Error("SLA_THRESHOLD_NOT_REACHED");
     }
     function journalId(paymentId, eventId) { return key(["EVENT", paymentId, eventId]); }
     function assertNoPending(paymentId, except) {
@@ -452,29 +519,22 @@ function createService(store, calendarLib, calculator, policyRules, options) {
                 "created.at": at, "processing.status": null, "event.key": null });
         }
         function persist(state) {
-            calculate(state.row, state.segments, at);
+            var calculation = calculate(state.row, state.segments, at);
             for (var n = 0; n < state.segments.length; n++) addWrite(plan, SLA_T.segment, state.segments[n]);
             addWrite(plan, SLA_T.tracking, state.row);
+            return calculation;
         }
         function close(role, reason) {
-            var state = active[role], n;
+            var state = active[role], n, calculation;
             if (!state) throw new Error("SLA_ACTIVE_TRACKING_NOT_FOUND: " + role);
             for (n = 0; n < state.segments.length; n++) if (blank(state.segments[n]["ended.at"])) {
                 state.segments[n]["ended.at"] = at; state.segments[n]["end.event"] = reason;
             }
             state.row["ended.at"] = at; state.row["end.reason"] = reason;
-            persist(state);
-            state.row.result = reason === "COMPLETE" ? (state.row["remaining.minutes"] <= 0 ? "BREACHED" : "MET") : "NOT_EVALUATED";
+            calculation = persist(state);
+            state.row.result = reason === "COMPLETE" ? (calculation.isBreached ? "BREACHED" : "MET") : "NOT_EVALUATED";
             addWrite(plan, SLA_T.tracking, state.row);
             log(reason, role, state.row.id, state.row["current.assignee"]);
-            var pendingAlerts = rows(SLA_T.alert, {"sla.tracking.id": state.row.id}), ai;
-            for (ai = 0; ai < pendingAlerts.length; ai++) {
-                if (pendingAlerts[ai]["send.status"] === "Chờ gửi" || pendingAlerts[ai]["send.status"] === "Gửi lỗi") {
-                    pendingAlerts[ai]["send.status"] = "Đã hủy"; pendingAlerts[ai]["updated.at"] = at;
-                    if (instant(pendingAlerts[ai]["triggered.at"]) > atMs) pendingAlerts[ai]["error.message"] = "Mốc cảnh báo nằm sau thời điểm kết thúc nghiệp vụ thực tế";
-                    addWrite(plan, SLA_T.alert, pendingAlerts[ai]);
-                }
-            }
             delete active[role];
         }
         for (i = 0; i < commands.length; i++) {
@@ -510,11 +570,9 @@ function createService(store, calendarLib, calculator, policyRules, options) {
                 var tid = key([paymentId, attempt, command.role]);
                 if (store.get(SLA_T.tracking, tid)) throw new Error("SLA_TRACKING_ALREADY_EXISTS: " + tid);
                 row = {id: tid, "payment.id": paymentId, "sla.config.id": selected.config.id,
-                    "sla.config.detail.id": detail.id, "calendar.id": selected.config["calendar.id"],
+                    "sla.config.detail.id": detail.id,
                     "role.code": command.role, "attempt.no": attempt, "started.at": at, "ended.at": null,
                     "sla.minutes": hours * 60, "current.assignee": command.assignee,
-                    "alert.stage1.rate": blank(detail["alert.stage1.rate"]) ? 0.7 : Number(detail["alert.stage1.rate"]),
-                    "alert.stage2.rate": blank(detail["alert.stage2.rate"]) ? 0.9 : Number(detail["alert.stage2.rate"]),
                     "end.reason": null, result: null, "created.at": at};
                 segments = [{id: key([tid, "SEG", 1]), "sla.tracking.id": tid, "segment.no": 1,
                     "started.at": at, "ended.at": null, "working.minutes": 0,
@@ -569,13 +627,12 @@ function createService(store, calendarLib, calculator, policyRules, options) {
             return {success: true, paymentId: paymentId, calculated: 0};
         }
         var atMs = instant(asOf), at = iso(atMs), list = rows(SLA_T.tracking, {"payment.id": paymentId});
-        var count = 0, i, j, row, segments, result, stages, stage, rate, aid, alert;
+        var count = 0, i, j, row, segments, result;
         // Validate every active tracking before writing any result for this payment.
         var prepared = [];
         for (i = 0; i < list.length; i++) {
             if (!blank(list[i]["ended.at"])) continue;
             row = hydrateTracking(list[i]);
-            if (!blank(row["last.calculated.at"]) && instant(row["last.calculated.at"]) > atMs) throw new Error("SLA_STALE_REFRESH");
             segments = loadSegments(row.id); result = calculate(row, segments, at);
             prepared.push({row: row, segments: segments, result: result});
         }
@@ -583,17 +640,6 @@ function createService(store, calendarLib, calculator, policyRules, options) {
             row = prepared[i].row; segments = prepared[i].segments; result = prepared[i].result;
             for (j = 0; j < segments.length; j++) store.put(SLA_T.segment, segments[j]);
             store.put(SLA_T.tracking, row); count++;
-            if (!result.canAlert || payment.status === "cancelled" || payment.status === "approved" || payment.status === "accounted") continue;
-            stages = result.reachedStages;
-            for (j = 0; j < stages.length; j++) {
-                stage = stages[j]; rate = stage === "STAGE_1_70" ? Number(row["alert.stage1.rate"]) : stage === "STAGE_2_90" ? Number(row["alert.stage2.rate"]) : 1;
-                aid = key([row.id, "ALERT", stage]); if (store.get(SLA_T.alert, aid)) continue;
-                alert = {id: aid, "sla.tracking.id": row.id, "alert.stage": stage, "threshold.rate": rate,
-                    "recipient.user": row["current.assignee"], "recipient.email": options.resolveEmail ? options.resolveEmail(row["current.assignee"]) : null,
-                    "triggered.at": thresholdAt(row, segments, rate), "sent.at": null, "send.status": "Chờ gửi", "retry.count": 0,
-                    "error.message": null, "created.at": at, "updated.at": at};
-                store.put(SLA_T.alert, alert);
-            }
         }
         return {success: true, paymentId: paymentId, calculated: count};
     }
@@ -640,16 +686,7 @@ function createRuntime(options) {
     options = options || {};
     var store = options.store || createStore(options);
     var calendar = slaCalendarApi();
-    var service = createService(store, calendar, slaCalculatorApi(),
-        lib.ESD_HTKT_SLA_POLICY, {resolveEmail: options.resolveEmail || function(user) {
-            var f = new SCFile("contacts", SCFILE_READONLY), rc;
-            try {
-                rc = f.doSelect('contact.name=' + quoteValue(user));
-                if (rc === RC_NO_MORE) return null;
-                if (rc !== RC_SUCCESS) throw new Error("SLA_CONTACT_LOOKUP_FAILED: " + rc);
-                return String(f.email || "");
-            } finally { if (typeof f.close === "function") f.close(); }
-        }});
+    var service = createService(store, calendar, slaCalculatorApi(), slaPolicyApi(), {});
     function onBusinessCommitted(kind, before, after, context) {
         if (!after) throw new Error("SLA_MISSING_PAYMENT");
         context = context || {};
@@ -666,19 +703,18 @@ function createRuntime(options) {
  * KHỞI TẠO CẤU HÌNH
  * ============================================================================= */
 function buildBaseline(calendarLib, args) {
-    if (!args || !args.calendarId || !args.configId || !args.effectiveFrom || !args.performedBy ||
+    if (!args || !args.configId || !args.effectiveFrom || !args.performedBy ||
             Object.prototype.toString.call(args.holidays) !== "[object Array]") throw new Error("SLA_MISSING_BASELINE_INPUT");
     var start = calendarLib.toMillis(args.effectiveFrom);
     var end = args.effectiveTo ? calendarLib.toMillis(args.effectiveTo) : null;
     if (end !== null && end <= start) throw new Error("SLA_INVALID_EFFECTIVE_RANGE");
     var c = {timezone: "Asia/Ho_Chi_Minh", workingHours: [], holidays: args.holidays}, writes = [], d, i;
-    writes.push({table: "esdHTKTslaCalendar", row: {id: args.calendarId, name: args.calendarId, timezone: c.timezone}});
     for (d = 1; d <= 5; d++) {
         var slots = [["08:00", "12:00"], ["13:00", "17:00"]];
         for (i = 0; i < slots.length; i++) {
             c.workingHours.push({dayOfWeek:d,startTime:slots[i][0],endTime:slots[i][1]});
-            writes.push({table:"esdHTKTslaWorkingHour",row:{id:args.calendarId+".H."+d+"."+i,
-                "calendar.id":args.calendarId,"day.of.week":d,"start.time":slots[i][0],"end.time":slots[i][1]}});
+            writes.push({table:"esdHTKTslaWorkingHour",row:{id:"WH."+d+"."+i,
+                "day.of.week":d,"start.time":slots[i][0],"end.time":slots[i][1]}});
         }
     }
     calendarLib.compileCalendar(c);
@@ -686,28 +722,34 @@ function buildBaseline(calendarLib, args) {
     for (i = 0; i < args.holidays.length; i++) {
         if (seen[args.holidays[i]]) throw new Error("SLA_DUPLICATE_HOLIDAY");
         seen[args.holidays[i]] = true;
-        writes.push({table:"esdHTKTslaHoliday",row:{id:args.calendarId+".OFF."+args.holidays[i],
-            "calendar.id":args.calendarId,"holiday.date":args.holidays[i],"holiday.name":"Ngày nghỉ được phê duyệt",
+        writes.push({table:"esdHTKTslaHoliday",row:{id:"OFF."+args.holidays[i],
+            "holiday.date":args.holidays[i],"holiday.name":"Ngày nghỉ được phê duyệt",
             "holiday.type":"OTHER","created.by":args.performedBy,"created.at":new Date().toISOString()}});
     }
     var transactionType = String(args.transactionType || "Dự chi");
     var productType = "Tất cả";
     writes.push({table:"esdHTKTslaConfig",row:{id:args.configId,"transaction.type":transactionType,"product.type":productType,
-        "calendar.id":args.calendarId,"effective.from":new Date(start).toISOString(),
+        "effective.from":new Date(start).toISOString(),
         "effective.to":end === null ? null : new Date(end).toISOString(),status:"Đang hoạt động"}});
     // Source: Thông tin SLA.xlsx, Danh mục SLA, row 19. Order follows actual workflow.
     var roles = [["CB_DE_NGHI",2],["CB_KTTC",3],["RA_SOAT_1",3],["PHE_DUYET_DM",6],
         ["PHE_DUYET_KTTC",6],["RA_SOAT_2",4.5],["PHE_DUYET_TQ",9]];
     for (i = 0; i < roles.length; i++) writes.push({table:"esdHTKTslaConfigDetail",row:{
         id:args.configId+"."+roles[i][0],"sla.config.id":args.configId,"role.code":roles[i][0],
-        "role.name":roles[i][0],"step.order":i+1,"sla.hours":roles[i][1],
-        "alert.stage1.rate":0.7,"alert.stage2.rate":0.9,"is.active":true}});
+        "role.name":roles[i][0],"sla.hours":roles[i][1],"is.active":true}});
     return writes;
 }
 function installBaseline(store, calendarLib, args) {
     var writes = buildBaseline(calendarLib,args), i;
     // Use on an unpublished new version only; interrupted setup requires a new version ID.
-    for (i = 0; i < writes.length; i++) if (store.get(writes[i].table,writes[i].row.id)) throw new Error("SLA_BASELINE_ID_ALREADY_EXISTS: "+writes[i].row.id);
+    // Giờ làm việc/ngày nghỉ là cấu hình toàn hệ thống và được phép ghi đè.
+    // Config/ConfigDetail vẫn dùng ID riêng để bảo vệ lịch sử cấu hình SLA.
+    for (i = 0; i < writes.length; i++) {
+        if ((writes[i].table === "esdHTKTslaConfig" || writes[i].table === "esdHTKTslaConfigDetail") &&
+                store.get(writes[i].table,writes[i].row.id)) {
+            throw new Error("SLA_BASELINE_ID_ALREADY_EXISTS: "+writes[i].row.id);
+        }
+    }
     var configs=store.list("esdHTKTslaConfig",{"transaction.type":String(args.transactionType || "Dự chi"),"product.type":"Tất cả"});
     var start=calendarLib.toMillis(args.effectiveFrom),end=args.effectiveTo?calendarLib.toMillis(args.effectiveTo):Infinity;
     for(i=0;i<configs.length;i++) {

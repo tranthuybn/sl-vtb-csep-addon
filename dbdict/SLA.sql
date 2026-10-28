@@ -3,47 +3,25 @@
 // ================================================================
 
 
-// LỊCH TÍNH SLA
-// Mặc định: Asia/Ho_Chi_Minh; thứ Hai-thứ Sáu, 08:00-12:00 và 13:00-17:00.
-// Chỉ cộng phần giao của khoảng đo với các ca làm việc, loại trừ ngày nghỉ.
-// Một ngày nghỉ áp dụng toàn ngày theo múi giờ của lịch; không cần khai báo cuối tuần.
-// Lịch đã được Tracking tham chiếu phải giữ nguyên để đối soát; thay đổi lịch/ngày nghỉ
-// bằng cách tạo phiên bản lịch mới và gắn vào phiên bản Config mới.
-Table esdHTKTslaCalendar {
-  id varchar [pk] // Mã phiên bản lịch
-  name varchar // Tên lịch, ví dụ VTB 2027 phiên bản 1
-  timezone varchar // IANA timezone; mặc định Asia/Ho_Chi_Minh
-  description text
-  "created.by" varchar
-  "created.at" datetime
-  "updated.by" varchar
-  "updated.at" datetime
-}
-
-Ref: esdHTKTslaWorkingHour."calendar.id" > esdHTKTslaCalendar.id
-
-// Mỗi dòng là một ca làm việc lặp lại theo tuần; các ca cùng ngày không chồng lấn.
+// LỊCH TÍNH SLA DÙNG CHUNG TOÀN HỆ THỐNG
+// Mỗi dòng là một ca làm việc lặp lại theo tuần;
 // Lịch chuẩn có 10 dòng: 2 ca/ngày x 5 ngày; không có dòng cho thứ Bảy/Chủ nhật.
 Table esdHTKTslaWorkingHour {
   id varchar [pk]
-  "calendar.id" varchar [not null]
   "day.of.week" number [not null] // ISO: 1=thứ Hai ... 7=Chủ nhật
-  "start.time" time [not null] // Giờ địa phương, ví dụ 08:00 hoặc 13:00
-  "end.time" time [not null] // Phải lớn hơn start.time, ví dụ 12:00 hoặc 17:00
+  "start.time" varchar(5) [not null] // Character, định dạng HH:mm, ví dụ 08:00
+  "end.time" varchar(5) [not null] // Character HH:mm; phải lớn hơn start.time
 
   indexes {
-    ("calendar.id", "day.of.week", "start.time") [unique]
+    ("day.of.week", "start.time") [unique]
   }
 }
-
-Ref: esdHTKTslaHoliday."calendar.id" > esdHTKTslaCalendar.id
 
 // Mỗi dòng là một ngày không tính SLA (lễ, Tết, nghỉ bù hoặc ngày nghỉ đặc biệt).
 // Kỳ nghỉ nhiều ngày tạo từng dòng theo ngày thực tế; không tự suy diễn nghỉ bù.
 Table esdHTKTslaHoliday {
   id varchar [pk]
-  "calendar.id" varchar [not null]
-  "holiday.date" date [not null] // Ngày theo timezone của Calendar
+  "holiday.date" date [not null] // Ngày nghỉ
   "holiday.name" varchar // Tên ngày nghỉ
   "holiday.type" varchar // PUBLIC_HOLIDAY/TET/COMPENSATORY_LEAVE/OTHER
   note text
@@ -51,11 +29,9 @@ Table esdHTKTslaHoliday {
   "created.at" datetime
 
   indexes {
-    ("calendar.id", "holiday.date") [unique]
+    ("holiday.date") [unique]
   }
 }
-
-Ref: esdHTKTslaConfig."calendar.id" > esdHTKTslaCalendar.id
 
 // Bảng cấu hình SLA
 // Mỗi bản ghi đại diện cho một bộ SLA áp dụng theo loại giao dịch và nghiệp vụ/sản phẩm.
@@ -63,15 +39,13 @@ Table esdHTKTslaConfig {
   id varchar [pk] // Mã cấu hình SLA
   "transaction.type" varchar // Loại giao dịch (Tạm ứng/Thanh toán/Dự chi)
   "product.type" varchar // Tạm thời dùng "Tất cả"; nguồn sản phẩm trên phiếu chưa chốt
-  "calendar.id" varchar [not null] // Phiên bản lịch dùng để tính SLA
   "effective.from" datetime // Thời điểm bắt đầu áp dụng
   "effective.to" datetime // Thời điểm kết thúc áp dụng; null nếu đang áp dụng
   status varchar // Trạng thái cấu hình (Chờ hiệu lực/Đang hoạt động/Không hoạt động)
-  description text // Ghi chú cho bộ cấu hình
   "created.by" varchar // Người tạo cấu hình
   "created.at" datetime // Thời điểm tạo cấu hình
-  "updated.by" varchar // Người cập nhật gần nhất
-  "updated.at" datetime // Thời điểm cập nhật gần nhất
+  sysmoduser varchar(60) // OpenText SM tự ghi người tạo hoặc cập nhật gần nhất
+  sysmodtime datetime // OpenText SM tự cập nhật khi bản ghi được tạo hoặc sửa
 }
 
 
@@ -79,28 +53,16 @@ Ref: esdHTKTslaConfigDetail."sla.config.id" > esdHTKTslaConfig.id
 
 // Bảng chi tiết SLA theo vai trò xử lý
 // Một bộ cấu hình có nhiều dòng tương ứng với các vai trò trong quy trình.
-// Phase nghiệp vụ: initial_dmms/initial_kttc/check_dmms/approval_dmms/
-// approval_kttc/check_final/approval_final. Không suy ra vai trò chỉ từ nhãn trạng thái.
-// Mốc RS2 do nghiệp vụ chốt: bắt đầu khi Phê duyệt ĐMMS chuyển thành công;
-// kết thúc khi RS2 xác nhận chuyển sang Phê duyệt cấp có thẩm quyền.
-// Mốc bắt đầu RS2 không chờ đến khi Phê duyệt KTTC hoàn thành. Vì vậy khoảng đo
-// RS2 có thể bao gồm thời gian phase approval_kttc; không ép mỗi phiếu chỉ có 1 Tracking đang mở.
-// Chỉ tạo RS2 nếu luồng có RS2. Không dùng step.order để tự suy ra mốc bắt đầu SLA.
 Table esdHTKTslaConfigDetail {
   id varchar [pk] // Khóa kỹ thuật chi tiết cấu hình SLA
   "sla.config.id" varchar // Mã cấu hình SLA
-  "role.code" varchar // Mã vai trò xử lý (CB_DE_NGHI/RA_SOAT_1/PHE_DUYET_DM/CB_KTTC/...)
+  "role.code" varchar // Mã vai trò xử lý (user.created.dmms/user.checker.kttc/user.checker.dmms/user.approver.dmms/user.approver.kttc/user.checker.final/user.approver.final)
   "role.name" varchar // Tên vai trò hiển thị
-  "step.order" number // Thứ tự xử lý của vai trò trong luồng
   "sla.hours" decimal // Số giờ làm việc cam kết của vai trò
-  "alert.stage1.rate" decimal // Tỷ lệ cảnh báo mức 1; mặc định 0.7
-  "alert.stage2.rate" decimal // Tỷ lệ cảnh báo mức 2; mặc định 0.9
   "is.active" bool // Có áp dụng SLA cho vai trò này hay không (mặc định là true)
-  note text // Ghi chú cấu hình
 }
 
 
-Ref: esdHTKTslaTracking."calendar.id" > esdHTKTslaCalendar.id
 Ref: esdHTKTslaTracking."payment.id" > esdHTKTpayment.id
 Ref: esdHTKTslaTracking."sla.config.id" > esdHTKTslaConfig.id
 Ref: esdHTKTslaTracking."sla.config.detail.id" > esdHTKTslaConfigDetail.id
@@ -112,25 +74,19 @@ Table esdHTKTslaTracking {
   "payment.id" varchar // Mã phiếu tạm ứng/thanh toán/dự chi
   "sla.config.id" varchar // Bộ cấu hình SLA được áp dụng tại thời điểm bắt đầu đo
   "sla.config.detail.id" varchar // Chi tiết SLA của vai trò được áp dụng
-  "calendar.id" varchar [not null] // Chốt từ Config khi bắt đầu lần đo, dùng cho elapsed và due
   "role.code" varchar // Mã vai trò đang được đo SLA
   "attempt.no" number // Lần đo SLA; tăng khi phiếu bị yêu cầu chỉnh sửa và phải đo lại từ đầu
   "started.at" datetime // Thời điểm bắt đầu đo SLA của lần hiện tại
   "ended.at" datetime // Thời điểm kết thúc đo SLA; null nếu chưa kết thúc
   "due.at" datetime // Hạn xử lý dự kiến sau khi loại trừ ngoài giờ và ngày nghỉ/lễ
-  "alert.stage1.rate" decimal // Chốt ngưỡng cảnh báo từ ConfigDetail khi bắt đầu lần đo
-  "alert.stage2.rate" decimal // Không thay đổi theo chỉnh sửa cấu hình sau này
   "end.reason" varchar // COMPLETE/RETURN/CANCEL; null khi đang đo
   result varchar // MET/BREACHED/NOT_EVALUATED; null khi chưa kết thúc
   "sla.minutes" decimal // Tổng số phút làm việc cam kết, quy đổi từ sla.hours
-  "elapsed.minutes" decimal // Số phút làm việc đã sử dụng
-  "remaining.minutes" decimal // Số phút làm việc còn lại
   "current.assignee" varchar // Người đang được giao xử lý
   status varchar // Trạng thái SLA (Chưa tính/Trong thời gian/Vi phạm/Đã kết thúc)
-  "alert.status" varchar // Trạng thái cảnh báo (NONE/STAGE_1/STAGE_2/STAGE_3)
-  "last.calculated.at" datetime // Thời điểm gần nhất hệ thống tính lại SLA
   "created.at" datetime // Thời điểm tạo bản ghi theo dõi
-  "updated.at" datetime // Thời điểm cập nhật gần nhất
+  sysmoduser varchar(60) // OpenText SM tự ghi người tạo hoặc cập nhật gần nhất
+  sysmodtime datetime // OpenText SM tự cập nhật khi bản ghi được tạo hoặc sửa
 
   indexes {
     ("payment.id", "attempt.no", "role.code") [unique]
@@ -163,32 +119,6 @@ Table esdHTKTslaTimeSegment {
   }
 }
 
-
-
-Ref: esdHTKTslaAlertHistory."sla.tracking.id" > esdHTKTslaTracking.id
-
-// Bảng lịch sử cảnh báo SLA
-// Mỗi tracking chỉ gửi một lần cho mỗi stage; cần kiểm tra trùng theo
-// sla.tracking.id + alert.stage trước khi tạo yêu cầu gửi mail.
-Table esdHTKTslaAlertHistory {
-  id varchar [pk] // Khóa kỹ thuật cảnh báo
-  "sla.tracking.id" varchar // Mã theo dõi SLA
-  "alert.stage" varchar // Mức cảnh báo (STAGE_1_70/STAGE_2_90/STAGE_3_BREACH)
-  "threshold.rate" decimal // Tỷ lệ thời gian SLA tại lúc phát sinh cảnh báo (0.7/0.9/1.0)
-  "recipient.user" varchar // Người đang xử lý nhận cảnh báo
-  "recipient.email" varchar // Địa chỉ email nhận cảnh báo
-  "triggered.at" datetime // Thời điểm đạt ngưỡng cảnh báo
-  "sent.at" datetime // Thời điểm gửi email thành công
-  "send.status" varchar // Trạng thái gửi (Chờ gửi/Đã gửi/Gửi lỗi)
-  "retry.count" number // Số lần gửi lại
-  "error.message" text // Nội dung lỗi gửi mail gần nhất
-  "created.at" datetime // Thời điểm tạo cảnh báo
-  "updated.at" datetime // Thời điểm cập nhật gần nhất
-
-  indexes {
-    ("sla.tracking.id", "alert.stage") [unique]
-  }
-}
 
 
 Ref: esdHTKTslaEventLog."sla.tracking.id" > esdHTKTslaTracking.id
@@ -235,9 +165,8 @@ Table esdHTKTslaEventLog {
 // Dự chi, Tạm ứng và Thanh toán dùng chung quy tắc luồng. Tạm thời chỉ dùng
 // transaction.type và cấu hình product.type="Tất cả" để chạy luồng trước.
 // Các trường phút dùng decimal để giữ giây lẻ; không làm tròn qua từng segment.
-// result dùng quy ước remaining.minutes <= 0 là BREACHED (thống nhất hiển thị và cảnh báo).
+// result được chốt MET/BREACHED bằng kết quả tính nội bộ tại thời điểm hoàn thành.
 // WORKFLOW.data chứa fingerprint + toàn bộ kế hoạch ghi JSON, cần text đủ lớn.
 // PREPARED phải được retry cùng event.key trước sự kiện tiếp theo trên cùng phiếu.
 // Phải tuần tự hóa xử lý sự kiện/job theo payment.id ở tầng vận hành; các upsert
 // nhiều bảng không tự tạo thành transaction. PK id và các unique index phải tồn tại trong SM.
-// AlertHistory.send.status bổ sung Đã hủy cho cảnh báo chưa gửi khi SLA đã kết thúc.

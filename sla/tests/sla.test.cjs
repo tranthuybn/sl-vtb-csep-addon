@@ -11,7 +11,7 @@ function load(name, extras = {}) {
 const engine = load('ESD_HTKT_SLA_ENGINE');
 const cal = engine;
 const calc = engine;
-const rules = load('ESD_HTKT_SLA_POLICY');
+const rules = engine;
 const T = engine.SLA_T;
 const calendar = {timezone:'Asia/Ho_Chi_Minh',workingHours:[],holidays:[]};
 for (let d=1;d<=5;d++) for (const [a,b] of [['08:00','12:00'],['13:00','17:00']]) calendar.workingHours.push({dayOfWeek:d,startTime:a,endTime:b});
@@ -26,20 +26,19 @@ function memoryStore() {
     get(t,id){return clone(db[t]?.[id] || null);},
     list(t,filter){return Object.values(db[t]||{}).filter(x=>Object.entries(filter).every(([k,v])=>String(x[k])===String(v))).map(clone);},
     put(t,row){writes++;if(writes===failAt)throw Error('INJECTED_WRITE_FAILURE');(db[t] ||= {})[row.id] = clone(row);},
-    decodeInstant:x=>x,decodeTime:x=>x,decodeDate:x=>x,
+    decodeInstant:x=>x,decodeDate:x=>x,
     failAfter(n){failAt=writes+n;}, clearFailure(){failAt=null;}
   };
 }
 function fixture(id='DC01',initial='dmms',rs1=true,rs2=true) {
   const store=memoryStore();
-  store.put(T.calendar,{id:'CAL',timezone:calendar.timezone});
-  calendar.workingHours.forEach((x,i)=>store.put(T.hours,{id:'H'+i,'calendar.id':'CAL','day.of.week':x.dayOfWeek,'start.time':x.startTime,'end.time':x.endTime}));
-  store.put(T.config,{id:'CFG','transaction.type':'Dự chi','product.type':'Tất cả','calendar.id':'CAL','effective.from':time('01','00:00'),'effective.to':null,status:'Đang hoạt động'});
+  calendar.workingHours.forEach((x,i)=>store.put(T.hours,{id:'H'+i,'day.of.week':x.dayOfWeek,'start.time':x.startTime,'end.time':x.endTime}));
+  store.put(T.config,{id:'CFG','transaction.type':'Dự chi','product.type':'Tất cả','effective.from':time('01','00:00'),'effective.to':null,status:'Đang hoạt động'});
   const roles=['CB_DE_NGHI','CB_KTTC','RA_SOAT_1','PHE_DUYET_DM','PHE_DUYET_KTTC','RA_SOAT_2','PHE_DUYET_TQ'];
-  roles.forEach(role=>store.put(T.detail,{id:role,'sla.config.id':'CFG','role.code':role,'sla.hours':1,'alert.stage1.rate':.7,'alert.stage2.rate':.9,'is.active':true}));
+  roles.forEach(role=>store.put(T.detail,{id:role,'sla.config.id':'CFG','role.code':role,'sla.hours':1,'is.active':true}));
   let payment={id,'transaction.type':'Dự chi','initial.role':initial,'current.phase':'start',status:initial+'_created','created.by':'maker','require.check.level1':rs1,'require.check.level2':rs2,'user.checker.kttc':'kttc','user.checker.dmms':'rs1','user.approver.dmms':'pd_dmms','user.approver.kttc':'pd_kttc','user.checker.final':'rs2','user.approver.final':'pd_final'};
   store.put('esdHTKTpayment',payment);
-  const service=engine.createService(store,cal,calc,rules,{resolveEmail:u=>u+'@test.invalid'});
+  const service=engine.createService(store,cal,calc,rules,{});
   let seq=0;
   const events=[];
   function send(kind,at,patch={},extra={}) {
@@ -64,13 +63,14 @@ test('Invalid calendars, overlapping shifts and ambiguous datetimes fail',()=>{
  assert.throws(()=>cal.compileCalendar({...calendar,timezone:'UTC'}),/TIMEZONE/);
  assert.throws(()=>cal.compileCalendar({...calendar,holidays:['2026-02-30']}),/HOLIDAY/);
  assert.throws(()=>cal.toMillis('27/10/2026 08:00:00'),/INVALID_INSTANT/);
+ assert.throws(()=>cal.compileCalendar({...calendar,workingHours:[{dayOfWeek:1,startTime:'08:00:00',endTime:'12:00'}]}),/WORKING_TIME/);
 });
 test('Fractional minutes are preserved; exact deadline is breach; closed breach remains visible',()=>{
  const start=time('27','08:00'),end='2026-10-27T08:00:30+07:00';
  let x=calc.calculateTracking(cal,calendar,{startedAt:start,slaMinutes:60},[{startedAt:start}],end);
  assert.equal(x.elapsedMinutes,.5);
  x=calc.calculateTracking(cal,calendar,{startedAt:start,endedAt:time('27','09:00'),slaMinutes:60},[{startedAt:start,endedAt:time('27','09:00')}],time('27','09:10'));
- assert.equal(x.isBreached,true);assert.equal(x.status,'Đã kết thúc');assert.equal(x.canAlert,false);
+ assert.equal(x.isBreached,true);assert.equal(x.status,'Đã kết thúc');
 });
 test('Pause gaps excluded; due date moves; overlapping segments rejected',()=>{
  const start=time('27','08:00');
@@ -93,7 +93,8 @@ test('Full DMMS flow persists all roles; RS2 starts early and keeps original tra
  f.send('TRANSITION',time('27','09:00'),{'current.phase':'approval_final',status:'checked'});
  f.send('TRANSITION',time('27','09:10'),{'current.phase':'end',status:'approved'});
  assert.equal(f.tracks().length,7);assert(f.tracks().every(x=>x['ended.at']&&x['end.reason']==='COMPLETE'));
- rs=f.tracks().find(x=>x['role.code']==='RA_SOAT_2');assert.equal(rs['elapsed.minutes'],20);
+ rs=f.tracks().find(x=>x['role.code']==='RA_SOAT_2');
+ assert.equal(f.store.list(T.segment,{'sla.tracking.id':rs.id})[0]['working.minutes'],20);
  assert.equal(f.store.list(T.segment,{}).length,7);assert(f.store.list(T.event,{}).some(x=>x['processing.status']==='APPLIED'));
 });
 test('KTTC-created bypasses RS1/PD DMMS and starts RS2 at entry to RS2',()=>{
@@ -128,7 +129,7 @@ test('Reassignment splits segments without resetting deadline; future role has n
  const old=f.tracks().find(x=>x['role.code']==='CB_KTTC');
  f.send('REASSIGN',time('27','08:30'),{'user.checker.kttc':'new-kttc'});
  const now=f.tracks().find(x=>x['role.code']==='CB_KTTC');
- assert.equal(now.id,old.id);assert.equal(now['due.at'],old['due.at']);assert.equal(now['elapsed.minutes'],20);
+ assert.equal(now.id,old.id);assert.equal(now['due.at'],old['due.at']);
  const seg=f.store.list(T.segment,{'sla.tracking.id':now.id});assert.equal(seg.length,2);assert.equal(seg[0]['end.event'],'REASSIGN');
 });
 test('Return closes all concurrent clocks and creates attempt 2 including maker; cancel preserves history',()=>{
@@ -140,18 +141,10 @@ test('Return closes all concurrent clocks and creates attempt 2 including maker;
  f.send('TRANSITION',time('27','08:40'),{'current.phase':'approval_kttc',status:'dmms_approved'});
  f.send('RETURN',time('27','08:50'),{'current.phase':'initial_dmms',status:'request_edit'});
  assert.equal(f.tracks().filter(x=>x['end.reason']==='RETURN').length,2);
- const maker=f.tracks().find(x=>x['attempt.no']===2);assert.equal(maker['role.code'],'CB_DE_NGHI');assert.equal(maker['elapsed.minutes'],0);
+ const maker=f.tracks().find(x=>x['attempt.no']===2);assert.equal(maker['role.code'],'CB_DE_NGHI');
  f.send('CANCEL',time('27','09:00'),{status:'cancelled','current.phase':'end'});
  assert(f.tracks().every(x=>x['ended.at']));assert.equal(f.tracks().find(x=>x['attempt.no']===2)['end.reason'],'CANCEL');
- const before=f.store.list(T.alert,{}).length;f.service.refreshExpense(f.payment.id,time('27','10:00'));assert.equal(f.store.list(T.alert,{}).length,before);
-});
-test('Alerts 70/90/breach recorded once with actual crossing time and current recipient',()=>{
- const f=fixture('DC04','kttc');f.send('CREATE',time('27','08:00'));
- f.service.refreshExpense(f.payment.id,time('27','08:43'));
- let alerts=f.store.list(T.alert,{});assert.equal(alerts.length,1);assert.equal(alerts[0]['triggered.at'],iso(time('27','08:42')));
- f.service.refreshExpense(f.payment.id,time('27','09:10'));f.service.refreshExpense(f.payment.id,time('27','09:10'));
- alerts=f.store.list(T.alert,{});assert.equal(alerts.length,3);assert(alerts.every(x=>x['recipient.user']==='maker'));
- assert.equal(f.tracks()[0]['remaining.minutes'],-10);
+ f.service.refreshExpense(f.payment.id,time('27','10:00'));
 });
 test('Retry same event is idempotent; changed payload, stale events, missing config rejected',()=>{
  const f=fixture();const e=f.send('CREATE',time('27','08:00'));const n=f.store.list(T.segment,{}).length;
@@ -159,7 +152,8 @@ test('Retry same event is idempotent; changed payload, stale events, missing con
  assert.throws(()=>f.service.applyExpenseEvent({...e,performedBy:'different'}),/ID_REUSED/);
  f.service.refreshExpense(f.payment.id,time('27','08:10'));
  f.service.applyExpenseEvent({id:'DELAYED',kind:'TRANSITION',eventAt:time('27','08:05'),performedBy:'actor',before:{...f.payment,'current.phase':'initial_dmms'},after:{...f.payment,'current.phase':'initial_kttc',status:'dmms_initiated'}});
- assert.equal(f.tracks().find(x=>x['role.code']==='CB_DE_NGHI')['elapsed.minutes'],5);
+ const makerTrack=f.tracks().find(x=>x['role.code']==='CB_DE_NGHI');
+ assert.equal(f.store.list(T.segment,{'sla.tracking.id':makerTrack.id})[0]['working.minutes'],5);
  assert.throws(()=>f.service.applyExpenseEvent({id:'STALE',kind:'TRANSITION',eventAt:time('27','08:04'),performedBy:'actor',before:{...f.payment,'current.phase':'initial_kttc'},after:{...f.payment,'current.phase':'check_dmms',status:'kttc_checked'}}),/OUT_OF_ORDER/);
  const bad=fixture('NO-CFG');bad.store.db[T.config]={};assert.throws(()=>bad.send('CREATE',time('27','08:00')),/EXPECT_ONE_EFFECTIVE_CONFIG/);
 });
@@ -171,37 +165,14 @@ test('Interrupted multi-table writes recover from PREPARED; later operations can
  f.service.applyExpenseEvent(f.events[0]);assert.equal(f.tracks().length,1);assert.equal(f.store.list(T.segment,{}).length,1);
  assert(f.store.list(T.event,{}).some(x=>x['processing.status']==='APPLIED'));
 });
-test('Configuration thresholds copied and decimal budgets supported',()=>{
- const f=fixture();f.store.put(T.detail,{...f.store.get(T.detail,'CB_DE_NGHI'),'sla.hours':1.125,'alert.stage1.rate':.6});
+test('Decimal budgets are fixed on tracking creation',()=>{
+ const f=fixture();f.store.put(T.detail,{...f.store.get(T.detail,'CB_DE_NGHI'),'sla.hours':1.125});
  f.send('CREATE',time('27','08:00'));assert.equal(f.tracks()[0]['sla.minutes'],67.5);
- f.store.put(T.detail,{...f.store.get(T.detail,'CB_DE_NGHI'),'sla.hours':99,'alert.stage1.rate':.1});
- f.service.refreshExpense(f.payment.id,time('27','08:41'));
- assert.equal(f.tracks()[0]['sla.minutes'],67.5);assert.equal(f.tracks()[0]['alert.stage1.rate'],.6);assert.equal(f.store.list(T.alert,{}).length,1);
+ f.store.put(T.detail,{...f.store.get(T.detail,'CB_DE_NGHI'),'sla.hours':99});
+ f.service.refreshExpense(f.payment.id,time('27','08:48'));
+ assert.equal(f.tracks()[0]['sla.minutes'],67.5);
 });
 const worker=load('ESD_HTKT_SLA_JOB',{lib:{ESD_HTKT_SLA_ENGINE:engine}});
-test('Alert worker retries failures, updates status, cancels closed SLA and deduplicates sent mail',()=>{
- const f=fixture('MAIL','kttc');f.send('CREATE',time('27','08:00'));
- f.service.refreshExpense(f.payment.id,time('27','08:45'));
- const rt={store:f.store,service:f.service};
- let outcome=worker.dispatchPendingAlerts(rt,()=>{throw Error('SMTP down');},time('27','08:46'));
- assert.equal(outcome.success,false);assert.equal(f.store.list(T.alert,{})[0]['retry.count'],1);
- let calls=0;
- outcome=worker.dispatchPendingAlerts(rt,p=>{calls++;assert(p.id);return {success:true};},time('27','08:47'));
- assert.equal(outcome.sent,1);worker.dispatchPendingAlerts(rt,()=>{calls++;return {success:true};},time('27','08:48'));assert.equal(calls,1);
- f.service.refreshExpense(f.payment.id,time('27','08:55'));
- f.send('CANCEL',time('27','08:56'),{status:'cancelled','current.phase':'end'});
- outcome=worker.dispatchPendingAlerts(rt,()=>{throw Error('must not send');},time('27','08:57'));
- assert.equal(outcome.cancelled,0);assert.equal(f.store.list(T.alert,{}).filter(x=>x['send.status']==='Đã hủy').length,1);
-});
-test('Pending alert follows reassigned current actor at dispatch',()=>{
- const f=fixture('MAIL-REASSIGN');f.send('CREATE',time('27','08:00'));
- f.send('TRANSITION',time('27','08:01'),{'current.phase':'initial_dmms'});
- f.send('TRANSITION',time('27','08:10'),{'current.phase':'initial_kttc',status:'dmms_initiated'});
- f.service.refreshExpense(f.payment.id,time('27','08:53'));
- f.send('REASSIGN',time('27','08:54'),{'user.checker.kttc':'replacement'});
- worker.dispatchPendingAlerts({store:f.store,service:f.service},p=>{assert.equal(p.recipientUser,'replacement');return {success:true,recipientEmail:'replacement@test.invalid'};},time('27','08:55'));
- assert.equal(f.store.list(T.alert,{})[0]['recipient.user'],'replacement');
-});
 test('Batch continues after one corrupt payment and pagination reaches later IDs',()=>{
  const f=fixture('A','kttc');f.send('CREATE',time('27','08:00'));
  f.store.put(T.tracking,{id:'broken','payment.id':'B','started.at':time('27','08:00'),'ended.at':null});
@@ -242,22 +213,25 @@ test('Engine temporarily uses Tất cả config without requiring payment produc
   assert.equal(f.tracks().length,1);assert.equal(f.tracks()[0]['sla.config.id'],'CFG');
  }
 });
-test('Late completion recalculates actual elapsed time and cancels spurious pending thresholds',()=>{
+test('Late completion recalculates segments at actual business time',()=>{
  const f=fixture('LATE','kttc');f.send('CREATE',time('27','08:00'));
  f.send('TRANSITION',time('27','08:01'),{'current.phase':'initial_kttc'});
- f.service.refreshExpense(f.payment.id,time('27','09:10'));assert.equal(f.store.list(T.alert,{}).length,3);
+ f.service.refreshExpense(f.payment.id,time('27','09:10'));
  f.send('TRANSITION',time('27','08:30'),{'current.phase':'approval_kttc',status:'kttc_checked'});
- assert.equal(f.tracks().find(x=>x['role.code']==='CB_KTTC')['elapsed.minutes'],30);
- assert(f.store.list(T.alert,{}).every(x=>x['send.status']==='Đã hủy'));
+ const tracking=f.tracks().find(x=>x['role.code']==='CB_KTTC');
+ assert.equal(f.store.list(T.segment,{'sla.tracking.id':tracking.id})[0]['working.minutes'],30);
+ assert.equal(tracking.result,'MET');
 });
 test('Bootstrap publishes config last and rejects overlap; seeds approved holiday rows',()=>{
  const boot=engine;const st=memoryStore();const writes=[];
  const put=st.put.bind(st);st.put=(t,row)=>{writes.push(t);put(t,row);};
- const args={calendarId:'YEAR',configId:'DC',effectiveFrom:time('01','00:00'),performedBy:'admin',holidays:['2026-10-28']};
+ const args={configId:'DC',effectiveFrom:time('01','00:00'),performedBy:'admin',holidays:['2026-10-28']};
  boot.installExpenseBaseline(st,cal,args);
  assert.equal(writes.at(-1),T.config);assert.equal(st.list(T.detail,{}).length,7);assert.equal(st.list(T.hours,{}).length,10);
  assert.equal(st.get(T.detail,'DC.RA_SOAT_2')['sla.hours'],4.5);assert.equal(st.list(T.holiday,{}).length,1);
- assert.throws(()=>boot.installExpenseBaseline(st,cal,{...args,calendarId:'YEAR2',configId:'DC2'}),/EFFECTIVE_OVERLAP/);
+ boot.installBaseline(st,cal,{...args,configId:'TA',transactionType:'Tạm ứng'});
+ assert.equal(st.list(T.hours,{}).length,10);assert.equal(st.list(T.holiday,{}).length,1);
+ assert.throws(()=>boot.installExpenseBaseline(st,cal,{...args,configId:'DC2'}),/EFFECTIVE_OVERLAP/);
 });
 test('SCFile adapter converts timestamp writes',()=>{
  const db={};const OK=0,NONE=9,DUP=48;

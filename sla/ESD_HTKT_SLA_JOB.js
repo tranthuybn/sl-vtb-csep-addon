@@ -1,21 +1,20 @@
 /**
  * ScriptLibrary: ESD_HTKT_SLA_JOB
  * -----------------------------------------------------------------------------
- * Module      : HTKT - Job định kỳ và gửi cảnh báo SLA
- * Version     : 2.0.0
+ * Module      : HTKT - Job tính lại trạng thái SLA
+ * Version     : 2.1.0
  *
- * Chức năng   : Quét các Tracking đang mở, phục hồi EventLog PREPARED, tính lại SLA,
- *               tạo cảnh báo và gửi/retry cảnh báo qua mail adapter do caller cung cấp.
- * Điểm gọi    : SM Scheduler gọi runBatch() và dispatchPendingAlerts() định kỳ.
- * Phân trang  : Theo payment ID hoặc alert ID; tiếp tục bằng nextCursor đến khi null.
- * Lưu ý       : Không tự đăng ký scheduler, không cung cấp API quản trị. Mail adapter
- *               chỉ trả success sau khi cổng mail chấp nhận và nên chống trùng bằng ID.
+ * Chức năng   : Quét Tracking đang mở, phục hồi EventLog PREPARED và tính lại
+ *               due.at/status. Không lưu elapsed/remaining và không gửi email.
+ * Điểm gọi    : SM Scheduler gọi runBatch() định kỳ nếu cần cập nhật trạng thái
+ *               vi phạm của Tracking đang mở.
  * Môi trường  : OpenText Service Manager (JavaScript ES5 Engine).
  * -----------------------------------------------------------------------------
  */
 function isSupportedTransactionType(value) {
     return value === "Dự chi" || value === "Tạm ứng" || value === "Thanh toán";
 }
+
 function runBatch(runtime, asOf, batch) {
     batch = batch || {};
     var limit = typeof batch.limit === "undefined" ? 100 : Number(batch.limit);
@@ -34,73 +33,13 @@ function runBatch(runtime, asOf, batch) {
             if (!payment || !isSupportedTransactionType(String(payment["transaction.type"] || ""))) continue;
             runtime.service.retryPrepared(id);
             results.push(runtime.service.refresh(id, asOf));
-        } catch (error) { errors.push({paymentId: id, error: String(error.message || error)}); }
+        } catch (error) {
+            errors.push({paymentId: id, error: String(error.message || error)});
+        }
     }
     return {success: errors.length === 0, results: results, errors: errors,
         nextCursor: i < keys.length ? keys[i - 1] : null};
 }
 
-// sendEmail(alertPayload) must return {success:true} only after the mail gateway accepts it.
-// Pass alertPayload.id to the mail gateway as its idempotency key. Without gateway
-// deduplication, send-success followed by a DB failure can cause a duplicate email on retry.
-function dispatchPendingAlerts(runtime, sendEmail, asOf, batch) {
-    if (typeof sendEmail !== "function") throw new Error("SLA_MAIL_SENDER_REQUIRED");
-    batch = batch || {};
-    var store = runtime.store, rows = store.list("esdHTKTslaAlertHistory", {}), ids = [], i;
-    var limit = typeof batch.limit === "undefined" ? 100 : Number(batch.limit);
-    if (!isFinite(limit) || limit < 1 || limit !== Math.floor(limit)) throw new Error("SLA_INVALID_BATCH_LIMIT");
-    for (i = 0; i < rows.length; i++) if ((rows[i]["send.status"] === "Chờ gửi" || rows[i]["send.status"] === "Gửi lỗi") && rows[i].id > (batch.afterAlertId || "")) ids.push(rows[i].id);
-    ids.sort();
-    var sent = 0, cancelled = 0, errors = [], processed = 0, stamp = new Date(lib.ESD_HTKT_SLA_ENGINE.toMillis(store.decodeInstant(asOf))).toISOString();
-    for (i = 0; i < ids.length && processed < limit; i++) {
-        processed++;
-        try {
-            var candidate = store.get("esdHTKTslaAlertHistory", ids[i]);
-            var tracking = store.get("esdHTKTslaTracking", candidate["sla.tracking.id"]);
-            if (!tracking) throw new Error("SLA_ALERT_TRACKING_NOT_FOUND");
-            (function() {
-                var a = store.get("esdHTKTslaAlertHistory", candidate.id);
-                var t = store.get("esdHTKTslaTracking", candidate["sla.tracking.id"]);
-                var p = store.get("esdHTKTpayment", t["payment.id"]);
-                if (a["send.status"] !== "Chờ gửi" && a["send.status"] !== "Gửi lỗi") return;
-                if (!p || !isSupportedTransactionType(String(p["transaction.type"] || ""))) return;
-                var pending = store.list("esdHTKTslaEventLog", {"payment.id": t["payment.id"], "processing.status": "PREPARED"});
-                if (pending.length) throw new Error("SLA_PENDING_EVENT_RETRY_FIRST");
-                a["updated.at"] = stamp;
-                if (t["ended.at"] || p.status === "cancelled" || p.status === "approved" || p.status === "accounted") {
-                    a["send.status"] = "Đã hủy"; store.put("esdHTKTslaAlertHistory", a); cancelled++; return;
-                }
-                // A delayed business event can rewind a calculation to its actual timestamp.
-                // Wait for the next refresh rather than sending an alert not currently reached.
-                if (Number(t["elapsed.minutes"]) < Number(t["sla.minutes"]) * Number(a["threshold.rate"])) return;
-                // Resolve the person currently assigned, including reassignment after threshold detection.
-                if (a["recipient.user"] !== t["current.assignee"]) {
-                    a["recipient.user"] = t["current.assignee"];
-                    a["recipient.email"] = null;
-                }
-                try {
-                    var outcome = sendEmail({id: a.id, paymentId: t["payment.id"], trackingId: t.id,
-                        recipientUser: a["recipient.user"], recipientEmail: a["recipient.email"],
-                        stage: a["alert.stage"], thresholdRate: a["threshold.rate"], dueAt: t["due.at"],
-                        elapsedMinutes: t["elapsed.minutes"], remainingMinutes: t["remaining.minutes"]});
-                    if (!outcome || outcome.success !== true) throw new Error("SLA_MAIL_GATEWAY_NOT_ACCEPTED");
-                    if (outcome.recipientEmail) a["recipient.email"] = outcome.recipientEmail;
-                    a["send.status"] = "Đã gửi"; a["sent.at"] = stamp; a["error.message"] = null;
-                } catch (mailError) {
-                    a["send.status"] = "Gửi lỗi"; a["retry.count"] = Number(a["retry.count"] || 0) + 1;
-                    a["error.message"] = String(mailError.message || mailError);
-                }
-                // DB failures are not swallowed as mail errors; retry with gateway idempotency key.
-                store.put("esdHTKTslaAlertHistory", a);
-                if (a["send.status"] === "Đã gửi") sent++;
-                else errors.push({alertId: a.id, error: a["error.message"]});
-            }());
-        } catch (error) { errors.push({alertId: ids[i], error: String(error.message || error)}); }
-    }
-    return {success: errors.length === 0, sent: sent, cancelled: cancelled, errors: errors,
-        nextCursor: i < ids.length ? ids[i - 1] : null};
-}
-
-// Tương thích scheduler cũ.
+// Tương thích scheduler cũ trong giai đoạn chuyển đổi.
 function runExpenseBatch(runtime, asOf, batch) { return runBatch(runtime, asOf, batch); }
-
