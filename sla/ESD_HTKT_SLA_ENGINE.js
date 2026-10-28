@@ -8,7 +8,7 @@
  *               Tracking, Time Segment và EventLog.
  * Phạm vi     : Engine dùng chung cho các loại giao dịch và chứa trực tiếp quy tắc
  *               chuyển phase/role của luồng SLA.
- * Entry point : snapshot(), createRuntime(), buildBaseline() và installBaseline().
+ * Entry point : onWorkflowChanged(), snapshot(), createRuntime(), buildBaseline() và installBaseline().
  * Môi trường  : OpenText Service Manager (JavaScript ES5 Engine).
  * -----------------------------------------------------------------------------
  */
@@ -18,8 +18,7 @@ function slaCalendarApi() {
         addMillis:addMillis, getWorkingMinutes:getWorkingMinutes, addWorkingMinutes:addWorkingMinutes};
 }
 function slaCalculatorApi() {
-    return {calculateTracking:calculateTracking, calculateTransactionTracking:calculateTransactionTracking,
-        calculateExpenseTracking:calculateExpenseTracking};
+    return {calculateTracking:calculateTracking, calculateTransactionTracking:calculateTransactionTracking};
 }
 function slaPolicyApi() { return {buildCommands:buildCommands}; }
 
@@ -27,24 +26,35 @@ function slaPolicyApi() { return {buildCommands:buildCommands}; }
  * POLICY LUỒNG SLA DÙNG CHUNG
  * Chuyển sự kiện workflow thành START/COMPLETE/RETURN/REASSIGN/CANCEL.
  * ============================================================================= */
+
+function sourceTableFor(record) {
+    var type = String(record["transaction.type"] || "");
+    var table = type === "Tạm ứng" ? "esdHTKTprepayment" : "esdHTKTpayment";
+    if (record["source.table"] && record["source.table"] !== table) throw new Error("SLA_SOURCE_TABLE_MISMATCH");
+    return table;
+}
+function isInitialStatus(status) {
+    return status === "dmms_created" || status === "kttc_created" || status === "initialized";
+}
+
 var SLA_ROLES = {
-    initial_dmms: "CB_DE_NGHI", initial_kttc: "CB_KTTC", check_dmms: "RA_SOAT_1",
-    approval_dmms: "PHE_DUYET_DM", approval_kttc: "PHE_DUYET_KTTC",
-    check_final: "RA_SOAT_2", approval_final: "PHE_DUYET_TQ"
+    initial_dmms: "user.created.dmms", initial_kttc: "user.checker.kttc", check_dmms: "user.checker.dmms",
+    approval_dmms: "user.approver.dmms", approval_kttc: "user.approver.kttc",
+    check_final: "user.checker.final", approval_final: "user.approver.final"
 };
 var SLA_ACTORS = {
-    CB_DE_NGHI: "created.by", CB_KTTC: "user.checker.kttc", RA_SOAT_1: "user.checker.dmms",
-    PHE_DUYET_DM: "user.approver.dmms", PHE_DUYET_KTTC: "user.approver.kttc",
-    RA_SOAT_2: "user.checker.final", PHE_DUYET_TQ: "user.approver.final"
+    "user.created.dmms": "created.by", "user.checker.kttc": "user.checker.kttc", "user.checker.dmms": "user.checker.dmms",
+    "user.approver.dmms": "user.approver.dmms", "user.approver.kttc": "user.approver.kttc",
+    "user.checker.final": "user.checker.final", "user.approver.final": "user.approver.final"
 };
 function isTrue(value) { return value === true || value === 1 || value === "true" || value === "1"; }
 function makerRole(payment) {
-    if (payment["initial.role"] === "dmms") return "CB_DE_NGHI";
-    if (payment["initial.role"] === "kttc") return "CB_KTTC";
+    if (payment["initial.role"] === "dmms") return "user.created.dmms";
+    if (payment["initial.role"] === "kttc") return "user.checker.kttc";
     throw new Error("SLA_INVALID_INITIAL_ROLE");
 }
 function assignee(payment, role) {
-    if (role === "CB_KTTC" && payment["initial.role"] === "kttc") return String(payment["created.by"] || "");
+    if (role === "user.checker.kttc" && payment["initial.role"] === "kttc") return String(payment["created.by"] || "");
     return String(payment[SLA_ACTORS[role]] || "");
 }
 function buildWorkflowCommands(event) {
@@ -57,9 +67,9 @@ function buildWorkflowCommands(event) {
     if (before.id && String(before.id) !== String(after.id)) throw new Error("SLA_PAYMENT_MISMATCH");
     var from = String(before["current.phase"] || ""), to = String(after["current.phase"] || "");
     var role, key;
-    function start(r) { commands.push({type: "START", role: r, assignee: assignee(after, r)}); }
+    function start(r) { if (isInitialStatus(after.status)) return; commands.push({type: "START", role: r, assignee: assignee(after, r)}); }
     if (kind === "CREATE") {
-        if (after.status !== "dmms_created" && after.status !== "kttc_created") throw new Error("SLA_INVALID_CREATE_STATUS");
+        if (!isInitialStatus(after.status)) throw new Error("SLA_INVALID_CREATE_STATUS");
         start(makerRole(after));
     } else if (kind === "RETURN") {
         if (after.status !== "request_edit" || before.status === "request_edit") throw new Error("SLA_INVALID_RETURN");
@@ -83,8 +93,12 @@ function buildWorkflowCommands(event) {
     } else if (kind === "TRANSITION") {
         if (after.status === "request_edit" || after.status === "cancelled") throw new Error("SLA_USE_RETURN_OR_CANCEL_EVENT");
         // The workflow initially routes start -> maker; this does not finish the maker SLA.
-        if (from === "start" && ((to === "initial_dmms" && makerRole(after) === "CB_DE_NGHI") ||
-                (to === "initial_kttc" && makerRole(after) === "CB_KTTC"))) return [];
+        if (from === "start" && ((to === "initial_dmms" && makerRole(after) === "user.created.dmms") ||
+                (to === "initial_kttc" && makerRole(after) === "user.checker.kttc"))) return [];
+        if (from === to && (isInitialStatus(before.status)) &&
+                !isInitialStatus(after.status) && (to === "initial_dmms" || to === "initial_kttc")) {
+            start(SLA_ROLES[to]); return commands;
+        }
         if (!SLA_ROLES[from] || from === to) throw new Error("SLA_INVALID_PHASE_TRANSITION");
         if (before.status === "approved" || before.status === "accounted" || before.status === "cancelled") throw new Error("SLA_PAYMENT_ALREADY_FINISHED");
         var expected = {
@@ -100,7 +114,8 @@ function buildWorkflowCommands(event) {
             throw new Error("SLA_PHASE_NOT_IN_KTTC_FLOW");
         }
         role = SLA_ROLES[from];
-        commands.push({type: "COMPLETE", role: role});
+        if (!isInitialStatus(before.status))
+            commands.push({type: "COMPLETE", role: role});
         if (to === "end") {
             if (from !== "approval_final" || after.status !== "approved") throw new Error("SLA_INVALID_FINAL_APPROVAL");
         } else {
@@ -108,7 +123,7 @@ function buildWorkflowCommands(event) {
             start(SLA_ROLES[to]);
         }
         // Quy tắc dùng chung: nhánh ĐMMS bắt đầu RS2 sau khi PD ĐMMS hoàn thành.
-        if (from === "approval_dmms" && isTrue(after["require.check.level2"])) start("RA_SOAT_2");
+        if (from === "approval_dmms" && isTrue(after["require.check.level2"])) start("user.checker.final");
         // Nhánh KTTC bắt đầu RS2 khi PD KTTC chuyển sang check_final.
     } else throw new Error("SLA_UNKNOWN_EVENT_KIND: " + kind);
     return commands;
@@ -296,23 +311,21 @@ function calculateTransactionTracking(calendarLib, calendar, payment, tracking, 
     if (!payment.id || tracking.paymentId !== String(payment.id)) throw new Error("SLA_PAYMENT_MISMATCH");
     return calculateTracking(calendarLib, calendar, tracking, segments, asOf);
 }
-function calculateExpenseTracking(calendarLib, calendar, payment, tracking, segments, asOf) {
-    return calculateTransactionTracking(calendarLib, calendar, payment, tracking, segments, asOf);
-}
 
 
 /* =============================================================================
  * LƯU TRỮ SCFILE VÀ KHÓA
  * ============================================================================= */
 var SLA_FIELDS = {
+    esdHTKTprepayment: "id,transaction.type,initial.role,current.phase,status,created.by,current.executor,require.check.level1,require.check.level2,user.checker.kttc,user.checker.dmms,user.approver.dmms,user.approver.kttc,user.checker.final,user.approver.final",
     esdHTKTpayment: "id,transaction.type,initial.role,current.phase,status,created.by,current.executor,require.check.level1,require.check.level2,user.checker.kttc,user.checker.dmms,user.approver.dmms,user.approver.kttc,user.checker.final,user.approver.final",
     esdHTKTslaWorkingHour: "id,day.of.week,start.time,end.time",
     esdHTKTslaHoliday: "id,holiday.date,holiday.name,holiday.type,note,created.by,created.at",
     esdHTKTslaConfig: "id,transaction.type,product.type,effective.from,effective.to,status",
     esdHTKTslaConfigDetail: "id,sla.config.id,role.code,role.name,sla.hours,is.active",
-    esdHTKTslaTracking: "id,payment.id,sla.config.id,sla.config.detail.id,role.code,attempt.no,started.at,ended.at,due.at,sla.minutes,current.assignee,status,created.at,end.reason,result",
+    esdHTKTslaTracking: "id,payment.id,source.table,sla.config.id,sla.config.detail.id,role.code,attempt.no,started.at,ended.at,due.at,sla.minutes,current.assignee,status,created.at,end.reason,result",
     esdHTKTslaTimeSegment: "id,sla.tracking.id,segment.no,started.at,ended.at,working.minutes,start.event,end.event,assignee,created.at",
-    esdHTKTslaEventLog: "id,sla.tracking.id,payment.id,event.type,event.at,from.status,to.status,from.phase,to.phase,role.code,performed.by,assignee,data,created.at,processing.status,event.key"
+    esdHTKTslaEventLog: "id,sla.tracking.id,payment.id,source.table,event.type,event.at,from.status,to.status,from.phase,to.phase,role.code,performed.by,assignee,data,created.at,processing.status,event.key"
 };
 function quoteValue(value) {
     return '"' + String(value).replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"';
@@ -459,9 +472,9 @@ function createService(store, calendarLib, calculator, policyRules, options) {
         }
         return result;
     }
-    function journalId(paymentId, eventId) { return key(["EVENT", paymentId, eventId]); }
-    function assertNoPending(paymentId, except) {
-        var list = rows(SLA_T.event, {"payment.id": paymentId}), i;
+    function journalId(paymentId, eventId, sourceTable) { return key(["EVENT", sourceTable, paymentId, eventId]); }
+    function assertNoPending(paymentId, except, sourceTable) {
+        var list = rows(SLA_T.event, {"payment.id": paymentId, "source.table": sourceTable || "esdHTKTpayment"}), i;
         for (i = 0; i < list.length; i++) {
             if (list[i]["processing.status"] === "PREPARED" && list[i].id !== except) {
                 throw new Error("SLA_PENDING_EVENT_RETRY_FIRST: " + list[i].id);
@@ -478,25 +491,27 @@ function createService(store, calendarLib, calculator, policyRules, options) {
     }
     function applyEvent(event) {
         var commands = policyRules.buildCommands(event);
-        var paymentId = String(event.after.id), rootId = journalId(paymentId, event.id);
+        var sourceTable = sourceTableFor(event.after);
+        if (event.before && sourceTableFor(event.before) !== sourceTable) throw new Error("SLA_SOURCE_TABLE_CHANGED");
+        var paymentId = String(event.after.id), rootId = journalId(paymentId, event.id, sourceTable);
         var existing = store.get(SLA_T.event, rootId);
         // Stable JSON payload protects an operation ID from being reused for another business action.
         var input = clone(event), fingerprint = JSON.stringify(input);
         if (existing) {
             if (JSON.parse(existing.data).fingerprint !== fingerprint) throw new Error("SLA_EVENT_ID_REUSED_WITH_DIFFERENT_INPUT");
             if (existing["processing.status"] === "APPLIED") return {success: true, duplicate: true, eventId: event.id};
-            assertNoPending(paymentId, rootId); return commit(existing);
+            assertNoPending(paymentId, rootId, sourceTable); return commit(existing);
         }
-        assertNoPending(paymentId);
+        assertNoPending(paymentId, null, sourceTable);
         var atMs = instant(event.eventAt), at = iso(atMs), journalAttempt = 1;
-        var journals = rows(SLA_T.event, {"payment.id": paymentId}), i, j;
+        var journals = rows(SLA_T.event, {"payment.id": paymentId, "source.table": sourceTable || "esdHTKTpayment"}), i, j;
         for (i = 0; i < journals.length; i++) {
             if (journals[i]["processing.status"] === "APPLIED") journalAttempt = Math.max(journalAttempt, Number(JSON.parse(journals[i].data).attempt || 1));
             if (journals[i]["processing.status"] === "APPLIED" && instant(journals[i]["event.at"]) > atMs) {
                 throw new Error("SLA_OUT_OF_ORDER_EVENT");
             }
         }
-        var all = rows(SLA_T.tracking, {"payment.id": paymentId}), attempt = journalAttempt, active = {}, plan = [], command, row, segments;
+        var all = rows(SLA_T.tracking, {"payment.id": paymentId, "source.table": sourceTable || "esdHTKTpayment"}), attempt = journalAttempt, active = {}, plan = [], command, row, segments;
         for (i = 0; i < all.length; i++) {
             attempt = Math.max(attempt, Number(all[i]["attempt.no"]));
             if (blank(all[i]["ended.at"])) {
@@ -511,7 +526,7 @@ function createService(store, calendarLib, calculator, policyRules, options) {
         if (event.kind === "CREATE" && (all.length || journals.length)) throw new Error("SLA_PAYMENT_ALREADY_INITIALIZED");
         function log(type, role, trackingId, actor, data, suffix) {
             addWrite(plan, SLA_T.event, {id: key([rootId, type, role || "ALL", suffix || ""]),
-                "sla.tracking.id": trackingId || null, "payment.id": paymentId,
+                "sla.tracking.id": trackingId || null, "payment.id": paymentId, "source.table": sourceTable,
                 "event.type": type, "event.at": at, "from.status": event.before ? event.before.status : null,
                 "to.status": event.after.status, "from.phase": event.before ? event.before["current.phase"] : null,
                 "to.phase": event.after["current.phase"], "role.code": role || null,
@@ -556,7 +571,7 @@ function createService(store, calendarLib, calculator, policyRules, options) {
             } else if (command.type === "START") {
                 // RS2 started early at ĐMMS approval keeps its original clock on entry to check_final.
                 if (active[command.role]) {
-                    if (command.role !== "RA_SOAT_2" || String(event.after["current.phase"]) !== "check_final") {
+                    if (command.role !== "user.checker.final" || String(event.after["current.phase"]) !== "check_final") {
                         throw new Error("SLA_ROLE_ALREADY_RUNNING: " + command.role);
                     }
                     continue;
@@ -567,9 +582,9 @@ function createService(store, calendarLib, calculator, policyRules, options) {
                 var detail = selected.detail;
                 var hours = Number(detail["sla.hours"]);
                 if (!isFinite(hours) || hours <= 0) throw new Error("SLA_INVALID_HOURS");
-                var tid = key([paymentId, attempt, command.role]);
+                var tid = key([sourceTable, paymentId, attempt, command.role]);
                 if (store.get(SLA_T.tracking, tid)) throw new Error("SLA_TRACKING_ALREADY_EXISTS: " + tid);
-                row = {id: tid, "payment.id": paymentId, "sla.config.id": selected.config.id,
+                row = {id: tid, "payment.id": paymentId, "source.table": sourceTable, "sla.config.id": selected.config.id,
                     "sla.config.detail.id": detail.id,
                     "role.code": command.role, "attempt.no": attempt, "started.at": at, "ended.at": null,
                     "sla.minutes": hours * 60, "current.assignee": command.assignee,
@@ -610,23 +625,26 @@ function createService(store, calendarLib, calculator, policyRules, options) {
                 log("REASSIGN", command.role, state.row.id, command.assignee, {from: command.oldAssignee, to: command.assignee});
             }
         }
-        var journal = {id: rootId, "payment.id": paymentId, "event.type": "WORKFLOW",
+        var journal = {id: rootId, "payment.id": paymentId, "source.table": sourceTable, "event.type": "WORKFLOW",
             "event.at": at, "event.key": String(event.id), "performed.by": event.performedBy,
             "from.status": event.before ? event.before.status : null, "to.status": event.after.status,
             "from.phase": event.before ? event.before["current.phase"] : null, "to.phase": event.after["current.phase"],
             "created.at": at, "processing.status": "PREPARED", data: JSON.stringify({fingerprint: fingerprint, attempt: attempt, writes: plan})};
         store.put(SLA_T.event, journal); return commit(journal);
     }
-    function refresh(paymentId, asOf) {
-        var payment = store.get("esdHTKTpayment", paymentId);
+    function refresh(paymentId, asOf, sourceTable) {
+        sourceTable = sourceTable || "esdHTKTpayment";
+        if (sourceTable !== "esdHTKTpayment" && sourceTable !== "esdHTKTprepayment") throw new Error("SLA_INVALID_SOURCE_TABLE");
+        var payment = store.get(sourceTable, paymentId);
+        if (payment) sourceTableFor(payment);
         if (!payment) throw new Error("SLA_PAYMENT_NOT_FOUND");
-        assertNoPending(paymentId);
+        assertNoPending(paymentId, null, sourceTable);
         if (payment.status === "cancelled" || payment.status === "approved" || payment.status === "accounted") {
-            var dangling = rows(SLA_T.tracking, {"payment.id": paymentId}), d;
+            var dangling = rows(SLA_T.tracking, {"payment.id": paymentId, "source.table": sourceTable || "esdHTKTpayment"}), d;
             for (d = 0; d < dangling.length; d++) if (blank(dangling[d]["ended.at"])) throw new Error("SLA_MISSING_TERMINAL_WORKFLOW_EVENT");
             return {success: true, paymentId: paymentId, calculated: 0};
         }
-        var atMs = instant(asOf), at = iso(atMs), list = rows(SLA_T.tracking, {"payment.id": paymentId});
+        var atMs = instant(asOf), at = iso(atMs), list = rows(SLA_T.tracking, {"payment.id": paymentId, "source.table": sourceTable || "esdHTKTpayment"});
         var count = 0, i, j, row, segments, result;
         // Validate every active tracking before writing any result for this payment.
         var prepared = [];
@@ -643,8 +661,8 @@ function createService(store, calendarLib, calculator, policyRules, options) {
         }
         return {success: true, paymentId: paymentId, calculated: count};
     }
-    function retryPrepared(paymentId) {
-        var list = rows(SLA_T.event, {"payment.id": paymentId, "processing.status": "PREPARED"});
+    function retryPrepared(paymentId, sourceTable) {
+        var list = rows(SLA_T.event, {"payment.id": paymentId, "source.table": sourceTable || "esdHTKTpayment", "processing.status": "PREPARED"});
         if (list.length > 1) throw new Error("SLA_MULTIPLE_PENDING_EVENTS_REQUIRE_RECONCILIATION");
         return list.length ? commit(list[0]) : {success: true, writes: 0};
     }
@@ -653,15 +671,12 @@ function createService(store, calendarLib, calculator, policyRules, options) {
             if (!event || !event.after || !event.after.id) throw new Error("SLA_MISSING_PAYMENT");
             return applyEvent(event);
         },
-        refresh: function(paymentId, asOf) {
-            return refresh(paymentId, asOf);
+        refresh: function(paymentId, asOf, sourceTable) {
+            return refresh(paymentId, asOf, sourceTable);
         },
-        retryPrepared: function(paymentId) {
-            return retryPrepared(paymentId);
-        },
-        // Tương thích với caller cũ trong giai đoạn chuyển đổi.
-        applyExpenseEvent: function(event) { return applyEvent(event); },
-        refreshExpense: function(paymentId, asOf) { return refresh(paymentId, asOf); }
+        retryPrepared: function(paymentId, sourceTable) {
+            return retryPrepared(paymentId, sourceTable);
+        }
     };
 }
 
@@ -680,8 +695,42 @@ function snapshot(record) {
         var value = record[names[i]];
         out[names[i]] = value === true || value === 1 || String(value) === "true" || String(value) === "1";
     }
+    out["source.table"] = sourceTableFor(record);
     return out;
 }
+/** Workflow entry point: both records must belong to the same committed operation. */
+function workflowChangeKind(before, after) {
+    if (!after || !after.id) throw new Error("SLA_MISSING_PAYMENT");
+    var type = String(after["transaction.type"] || "");
+    if (type !== "Dự chi" && type !== "Tạm ứng" && type !== "Thanh toán")
+        throw new Error("SLA_UNSUPPORTED_TRANSACTION_TYPE: " + type);
+    if (!before || !before.id) {
+        if (!isInitialStatus(after.status)) throw new Error("SLA_REQUIRE_OLD_RECORD");
+        return "CREATE";
+    }
+    if (before.id !== after.id) throw new Error("SLA_PAYMENT_MISMATCH");
+    if (sourceTableFor(before) !== sourceTableFor(after) || before["transaction.type"] !== after["transaction.type"])
+        throw new Error("SLA_SOURCE_TABLE_CHANGED");
+    var phaseChanged = before["current.phase"] !== after["current.phase"];
+    var statusChanged = before.status !== after.status;
+    if (after.status === "cancelled" && before.status !== "cancelled") return "CANCEL";
+    if (after.status === "request_edit" && before.status !== "request_edit") return "RETURN";
+    // Approval ends SLA; subsequent accounting updates do not restart it.
+    if (before.status === "approved" || before.status === "accounted" || before.status === "cancelled") return null;
+    if (phaseChanged || (statusChanged && isInitialStatus(before.status) && !isInitialStatus(after.status)))
+        return "TRANSITION";
+    if (statusChanged) throw new Error("SLA_STATUS_CHANGE_WITHOUT_SUPPORTED_PHASE_TRANSITION");
+    var role, field;
+    for (role in SLA_ACTORS) if (Object.prototype.hasOwnProperty.call(SLA_ACTORS, role)) {
+        field = SLA_ACTORS[role];
+        if (String(before[field] || "") !== String(after[field] || "")) return "REASSIGN";
+    }
+    return null;
+}
+function onWorkflowChanged(oldRecord, record) {
+    return createRuntime().onWorkflowChanged(oldRecord, record);
+}
+
 function createRuntime(options) {
     options = options || {};
     var store = options.store || createStore(options);
@@ -695,7 +744,24 @@ function createRuntime(options) {
             eventAt: new Date(calendar.toMillis(store.decodeInstant(context.eventAt))).toISOString(),
             performedBy: String(context.performedBy), before: snapshot(before), after: snapshot(after)});
     }
-    return {service: service, store: store, onBusinessCommitted: onBusinessCommitted};
+    function onChanged(oldRecord, record) {
+        var before = snapshot(oldRecord), after = snapshot(record);
+        var kind = workflowChangeKind(before, after);
+        if (!kind) return {success:true, skipped:true, reason:"NO_SLA_CHANGE"};
+        // Read metadata from the saved record, never generate a new clock/ID during retry.
+        var revision = record["sysmodcount"], actor = String(record["sysmoduser"] || "");
+        if (revision === null || typeof revision === "undefined" || !/^\d+$/.test(String(revision)))
+            throw new Error("SLA_REQUIRE_COMMITTED_SYSMODCOUNT");
+        if (!record["sysmodtime"]) throw new Error("SLA_REQUIRE_COMMITTED_SYSMODTIME");
+        if (!actor) throw new Error("SLA_REQUIRE_COMMITTED_SYSMODUSER");
+        var at = new Date(calendar.toMillis(store.decodeInstant(record["sysmodtime"]))).toISOString();
+        return onBusinessCommitted(kind, before, after, {
+            operationId:"WF:" + String(revision) + ":" + at,
+            eventAt:at, performedBy:actor
+        });
+    }
+    return {service: service, store: store, onBusinessCommitted: onBusinessCommitted,
+        onWorkflowChanged:onChanged};
 }
 
 
@@ -732,8 +798,8 @@ function buildBaseline(calendarLib, args) {
         "effective.from":new Date(start).toISOString(),
         "effective.to":end === null ? null : new Date(end).toISOString(),status:"Đang hoạt động"}});
     // Source: Thông tin SLA.xlsx, Danh mục SLA, row 19. Order follows actual workflow.
-    var roles = [["CB_DE_NGHI",2],["CB_KTTC",3],["RA_SOAT_1",3],["PHE_DUYET_DM",6],
-        ["PHE_DUYET_KTTC",6],["RA_SOAT_2",4.5],["PHE_DUYET_TQ",9]];
+    var roles = [["user.created.dmms",2],["user.checker.kttc",3],["user.checker.dmms",3],["user.approver.dmms",6],
+        ["user.approver.kttc",6],["user.checker.final",4.5],["user.approver.final",9]];
     for (i = 0; i < roles.length; i++) writes.push({table:"esdHTKTslaConfigDetail",row:{
         id:args.configId+"."+roles[i][0],"sla.config.id":args.configId,"role.code":roles[i][0],
         "role.name":roles[i][0],"sla.hours":roles[i][1],"is.active":true}});
@@ -762,8 +828,4 @@ function installBaseline(store, calendarLib, args) {
     for (i = 0; i < writes.length; i++) if (writes[i].table === "esdHTKTslaConfig") store.put(writes[i].table,writes[i].row);
     return {success:true,created:writes.length};
 }
-
-// Tương thích với tên entry point cũ trong các script triển khai hiện có.
-function buildExpenseBaseline(calendarLib, args) { return buildBaseline(calendarLib, args); }
-function installExpenseBaseline(store, calendarLib, args) { return installBaseline(store, calendarLib, args); }
 

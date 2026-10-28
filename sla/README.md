@@ -1,6 +1,6 @@
 # SLA tự tính dùng chung cho Dự chi, Tạm ứng và Thanh toán
 
-Đã triển khai engine tính và ghi dữ liệu SLA dùng chung cho `esdHTKTpayment`. Dự chi, Tạm ứng và Thanh toán dùng cùng quy tắc luồng. Tạm thời `transaction.type` chọn cấu hình và `product.type` luôn dùng giá trị `"Tất cả"` vì nguồn sản phẩm trên phiếu chưa được chốt. Không có HTTP API quản trị hoặc API lịch sử. Các entry point ở đây dành cho workflow và scheduler phía server. Mã chưa được import/chạy trên SM thật; không có thay đổi trigger tự động.
+Đã triển khai engine tính và ghi dữ liệu SLA dùng chung cho `esdHTKTpayment`. Dự chi và Thanh toán dùng esdHTKTpayment; Tạm ứng dùng esdHTKTprepayment. Ba loại dùng cùng quy tắc luồng. Tạm thời `transaction.type` chọn cấu hình và `product.type` luôn dùng giá trị `"Tất cả"` vì nguồn sản phẩm trên phiếu chưa được chốt. Không có HTTP API quản trị hoặc API lịch sử. Các entry point ở đây dành cho workflow và scheduler phía server. Mã chưa được import/chạy trên SM thật; không có thay đổi trigger tự động.
 
 
 ## Bàn giao để tiếp tục trên máy khác
@@ -9,7 +9,7 @@ Cập nhật ngày 28/10/2026, múi giờ Asia/Saigon. Đọc mục này trướ
 
 ### Mục tiêu và phạm vi đã thống nhất
 
-Ban đầu dự định dùng SLA của OpenText SM, sau đó chuyển sang tự đo/tính/lưu SLA. Engine hiện dùng chung cho Dự chi, Tạm ứng và Thanh toán trong bảng `esdHTKTpayment`. Giai đoạn tạm thời chỉ phân biệt định mức bằng `transaction.type`; mọi cấu hình dùng `product.type = "Tất cả"`. Tài liệu Tạm ứng được dùng làm nguồn tham khảo luồng hai nhánh.
+Ban đầu dự định dùng SLA của OpenText SM, sau đó chuyển sang tự đo/tính/lưu SLA. Engine dùng chung policy; Dự chi/Thanh toán ở `esdHTKTpayment`, Tạm ứng ở `esdHTKTprepayment`. Giai đoạn tạm thời chỉ phân biệt định mức bằng `transaction.type`; mọi cấu hình dùng `product.type = "Tất cả"`. Tài liệu Tạm ứng được dùng làm nguồn tham khảo luồng hai nhánh.
 
 Người dùng đã làm rõ: phải ghi đủ các bảng để tròn một vòng đời SLA; không được chỉ viết hàm tính thuần. Chỉ hoãn API quản trị/tra cứu như danh sách cấu hình, quản lý lịch, xem lịch sử. Các entry point server/workflow, bootstrap triển khai và job vẫn nằm trong phạm vi.
 
@@ -21,7 +21,7 @@ Các mốc do người dùng đính chính có ưu tiên hơn nội dung sai/mâ
 - **RS2 trong nhánh KTTC tạo:** người dùng trả lời câu hỏi riêng, chọn bắt đầu khi PD KTTC chuyển sang RS2.
 - Thêm lịch/ngày nghỉ; bổ sung CANCEL và lý do kết thúc Segment do REASSIGN đã được người dùng yêu cầu.
 
-Các lựa chọn kỹ thuật hiện tại cần phân biệt với yêu cầu xác nhận trực tiếp: ưu tiên gọi từ workflow sau thành công là đánh giá của agent; nhật ký PREPARED/APPLIED và adapter mail là thiết kế triển khai. Mốc khởi tạo maker lấy lúc tạo phiếu thành công; maker vòng trả sửa chạy từ lúc trả sửa thành công; chạm hạn `remaining <= 0` là vi phạm theo sheet quy tắc hiển thị. Các lựa chọn này đã ghi trong mã/tài liệu nhưng chưa được kiểm chứng trên SM thật.
+Các lựa chọn kỹ thuật hiện tại cần phân biệt với yêu cầu xác nhận trực tiếp: ưu tiên gọi từ workflow sau thành công là đánh giá của agent; nhật ký PREPARED/APPLIED và adapter mail là thiết kế triển khai. Không đo khi status là `dmms_created`/`kttc_created`; maker vòng trả sửa chạy từ lúc trả sửa thành công; chạm hạn `remaining <= 0` là vi phạm theo sheet quy tắc hiển thị. Các lựa chọn này đã ghi trong mã/tài liệu nhưng chưa được kiểm chứng trên SM thật.
 
 ### Trạng thái mã nguồn lúc bàn giao
 
@@ -65,19 +65,19 @@ Nếu tiếp tục phần frontend, mang theo repo `C:/workspace/vtb-csep-addon`
 
 | Current phase | Vai trò / role.code |
 |---|---|
-| initial_dmms | CB đề nghị / CB_DE_NGHI |
-| initial_kttc | CB KTTC / CB_KTTC |
-| check_dmms | RS1 / RA_SOAT_1 |
-| approval_dmms | PD ĐMMS / PHE_DUYET_DM |
-| approval_kttc | PD KTTC / PHE_DUYET_KTTC |
-| check_final | RS2 / RA_SOAT_2 |
-| approval_final | Cấp có thẩm quyền / PHE_DUYET_TQ |
+| initial_dmms | CB đề nghị / user.created.dmms |
+| initial_kttc | CB KTTC / user.checker.kttc |
+| check_dmms | RS1 / user.checker.dmms |
+| approval_dmms | PD ĐMMS / user.approver.dmms |
+| approval_kttc | PD KTTC / user.approver.kttc |
+| check_final | RS2 / user.checker.final |
+| approval_final | Cấp có thẩm quyền / user.approver.final |
 
 `start` và `end` còn xuất hiện ở mã tạo phiếu/workflow; chúng là phase kỹ thuật ngoài mảng 7 phase người dùng liệt kê. Ghi đúng status/phase thực tế trước và sau trong EventLog, không suy đoán từ nhãn "Chờ phê duyệt".
 
 ### Công việc tiếp theo trên máy mới
 
-1. Đọc README và chạy lại `node tests/sla.test.cjs` từ thư mục `sl/sla` để xác nhận đủ file sau khi chuyển máy; hiện kỳ vọng 24 test pass.
+1. Đọc README và chạy lại `node tests/sla.test.cjs` từ thư mục `sl/sla` để xác nhận đủ file sau khi chuyển máy; hiện kỳ vọng 27 test pass.
 2. Đối chiếu mã và schema mới trước khi import. Xác nhận kích thước trường ID, text JSON kế hoạch ghi, decimal, PK và unique index trong dbdict SM.
 3. Trên môi trường thử nghiệm, tạo bảng/index, import 2 SL và các cầu nối workflow; nhập giờ làm việc/ngày nghỉ dùng chung, rồi bootstrap một cấu hình `product.type = "Tất cả"` cho từng `transaction.type`.
 4. Xác nhận cách SM thực tế trả/lưu datetime/date/time và điền adapter nếu cần. Không đoán chuỗi ngày theo locale.
@@ -90,13 +90,49 @@ Có thể mở chat mới trên máy khác bằng câu sau:
 
 > Tiếp tục triển khai SLA tự tính dùng chung cho Dự chi, Tạm ứng và Thanh toán. Đọc C:/workspace/sl/sla/README.md rồi đối chiếu các SL và schema. Ba loại giao dịch dùng chung policy luồng; tạm thời transaction.type chọn cấu hình và product.type luôn là "Tất cả". Phải ghi đủ vòng đời SLA, chưa làm API quản trị. Báo trạng thái thực tế và tiếp tục phần tích hợp SM còn thiếu; không giả định đã import hoặc gắn workflow.
 
+## Cập nhật tích hợp workflow ngày 28/10/2026
+
+Engine và bootstrap dùng role.code theo dbdict: user.created.dmms, user.checker.kttc, user.checker.dmms, user.approver.dmms, user.approver.kttc, user.checker.final, user.approver.final. Dữ liệu cấu hình dùng mã cũ cần được chuyển đổi trước khi dùng engine mới; chưa tự migration dữ liệu SM.
+
+Không đo ở status dmms_created/kttc_created. CREATE chỉ ghi nhật ký, không tạo Tracking/Segment. Nhánh ĐMMS gửi sang initial_kttc bắt đầu đo user.checker.kttc; nhánh KTTC gửi sang approval_kttc bắt đầu đo user.approver.kttc. request_edit vẫn đo maker theo quy tắc trả sửa đã chốt.
+
+Có thể cấu hình workflow gọi SL sau mỗi lần chuyển phase thành công. Chụp snapshot trước thao tác và truyền snapshot cùng record sau lưu vào createRuntime(options).onBusinessCommitted(kind, before, record, context), hoặc dùng cầu nối recordCommittedExpenseSlaEvent hiện có. TRANSITION cho chuyển bước thông thường; RETURN/CANCEL phải truyền đúng kind. REASSIGN gọi riêng tại điểm lưu người xử lý dù status/phase không đổi. Không gọi chỉ vì cập nhật trường khác hoặc hạch toán sau approved. Cần giữ operationId/eventAt/performedBy ổn định và context trước/sau khi retry. Chưa tự sửa cấu hình Rule Sets trên SM.
+
+## Hàm gọi trực tiếp từ Rule Set (hai record)
+
+Sau khi lưu/chuyển phase thành công, gọi:
+
+```javascript
+lib.ESD_HTKT_SLA_ENGINE.onWorkflowChanged(oldRecord, record);
+```
+
+oldRecord phải là bản trước của chính thao tác, record là bản sau đã lưu. Tên biến có phân biệt hoa/thường; xác nhận oldRecord có trong Rule Set thực tế. Chỉ truyền null khi tạo mới ở status tạo mới; thiếu bản cũ khi phiếu đang xử lý sẽ báo SLA_REQUIRE_OLD_RECORD. Không đọc lại DB sau lưu để thay cho oldRecord.
+
+Hàm tự nhận diện CREATE/TRANSITION/RETURN/CANCEL/REASSIGN, bỏ qua cập nhật không liên quan và cập nhật sau trạng thái kết thúc. Status thay đổi không thuộc chuyển bước được hỗ trợ sẽ báo lỗi để tránh bỏ sót SLA. Không đo ở các status tạo mới. Cùng dùng cho payment/prepayment như quy tắc bảng nguồn bên dưới.
+
+Để tự tạo context ổn định, record sau lưu bắt buộc có sysmodcount (số phiên bản cập nhật), sysmodtime (thời điểm lưu), sysmoduser (người lưu). event ID ghép phiên bản và thời điểm; eventAt lấy sysmodtime, performedBy lấy sysmoduser. Retry phải truyền lại đúng hai bản ghi cùng metadata ban đầu; không đọc record phiên bản mới hơn hoặc tạo Date mới. sysmoduser là người/service ghi cuối, chưa chắc là người dùng thao tác nếu có cập nhật trung gian. Gọi trước các cập nhật hệ thống làm thay đổi metadata này.
+
+Không tự đoán datetime theo locale. Nếu SM trả sysmodtime ở kiểu chưa hỗ trợ, cấu hình adapter tập trung và gọi createRuntime(adapterOptions).onWorkflowChanged(oldRecord, record). Hàm trực tiếp mặc định dùng adapter mặc định; chưa xác nhận kiểu datetime và sysmodcount trên SM thật. Thiếu metadata sẽ báo lỗi rõ, không tự sinh ID/thời gian mới.
+
+Gắn tại After successful enter để bắt chuyển bước; REASSIGN cần điểm sau lưu người xử lý (có thể After successful update nếu luồng đó chạy workflow). Một lần nghiệp vụ chọn một nguồn gọi, không tự gắn đồng thời hai tab. Entry point onBusinessCommitted vẫn giữ cho caller cần truyền context rõ ràng.
+
+## Bảng nguồn và API dùng chung
+
+Dự chi/Thanh toán: esdHTKTpayment. Tạm ứng: esdHTKTprepayment. Engine xác định bảng từ transaction.type (Tạm ứng chọn prepayment), snapshot thêm source.table. Record Tạm ứng truyền vào phải có transaction.type = "Tạm ứng"; nếu field thực tế không có, caller phải bổ sung giá trị này vào object snapshot trước/sau. Không đo dmms_created/kttc_created/initialized.
+
+Tracking và EventLog bổ sung source.table; payment.id giữ tên cũ nhưng mang ID phiếu tại bảng nguồn tương ứng. Unique index Tracking đổi thành (source.table, payment.id, attempt.no, role.code); bỏ FK chỉ trỏ esdHTKTpayment. ID Tracking/EventLog mới bao gồm bảng nguồn. Segment vẫn tham chiếu Tracking.
+
+Đã bỏ các alias mang tên Expense khỏi ENGINE và JOB. Dùng calculateTransactionTracking, service.applyEvent, service.refresh(id, asOf, sourceTable), service.retryPrepared(id, sourceTable), buildBaseline/installBaseline và JOB.runBatch. Nếu gọi refresh/retry không truyền bảng thì mặc định esdHTKTpayment. Job dùng source.table của Tracking/EventLog; cursor nextCursor là chuỗi bảng:ID và phải truyền nguyên lại vào afterPaymentId.
+
+Trước import bản mới, cập nhật dbdict và chuyển đổi dữ liệu SLA cũ: thêm source.table đúng nguồn, chuyển ID Tracking/EventLog và các tham chiếu Segment/EventLog, chuyển role.code cũ và xử lý PREPARED theo kế hoạch cũ. Không chỉ thêm field rồi chạy job trên dữ liệu cũ. Chưa thực hiện migration trên SM; chưa có kiểm thử SM thực tế. Việc tuần tự hóa thao tác/job dùng cặp (source.table, payment.id).
+
 ## Luồng nghiệp vụ
 
 Đối chiếu mục 2.1 và 2.3 của `C:/workspace/sl/tài liệu/FSD+Tạm+ứng.doc`. Quy tắc dưới đây dùng chung cho Dự chi, Tạm ứng và Thanh toán:
 
 - ĐMMS tạo: CB ĐMMS → CB KTTC → RS1 nếu bật → PD ĐMMS → PD KTTC → RS2 nếu bật → Cấp có thẩm quyền.
 - KTTC tạo: CB KTTC → PD KTTC → RS2 nếu bật → Cấp có thẩm quyền. Bỏ hoàn toàn RS1 và PD ĐMMS, kể cả khi dữ liệu cũ còn cờ RS1.
-- Phiếu vừa tạo có `current.phase = start`. Chuyển từ `start` vào bước maker không kết thúc/khởi tạo lại đồng hồ maker.
+- Phiếu vừa tạo có `current.phase = start`. Khi status còn `dmms_created`/`kttc_created` không tạo Tracking/Segment. Khi gửi xử lý thành công, bắt đầu đo bước đích tại thời điểm thao tác; không đo bù thời gian tạo mới.
 - RS2 của luồng ĐMMS tạo bắt đầu ngay khi PD ĐMMS chuyển thành công, kết thúc khi RS2 chuyển sang cấp có thẩm quyền. Đây là ngoại lệ mốc đo do người dùng chốt; có thể chạy đồng thời với PD KTTC dù thứ tự xử lý vẫn tuần tự.
 - RS2 của luồng KTTC tạo bắt đầu khi PD KTTC chuyển sang RS2, theo xác nhận của người dùng.
 - Trả sửa: kết thúc mọi Tracking đang mở của vòng cũ, giữ lịch sử, tăng vòng đo và bắt đầu ngay maker của vòng mới. Không đợi người sửa mở màn hình.
@@ -104,7 +140,7 @@ Có thể mở chat mới trên máy khác bằng câu sau:
 - Xóa: đóng mọi Tracking/Segment đang mở; không xóa lịch sử. Chỉ phát sinh sau khi nghiệp vụ xóa thành công.
 - Đã phê duyệt kết thúc đồng hồ cuối. Không đo thêm thời gian tích hợp/hạch toán.
 
-Các role.code dùng trong cấu hình: `CB_DE_NGHI`, `CB_KTTC`, `RA_SOAT_1`, `PHE_DUYET_DM`, `PHE_DUYET_KTTC`, `RA_SOAT_2`, `PHE_DUYET_TQ`.
+Các role.code dùng trong cấu hình: `user.created.dmms`, `user.checker.kttc`, `user.checker.dmms`, `user.approver.dmms`, `user.approver.kttc`, `user.checker.final`, `user.approver.final`.
 
 ## Các Script Library
 
