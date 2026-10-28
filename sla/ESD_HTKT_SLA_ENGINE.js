@@ -8,8 +8,7 @@
  *               Tracking, Time Segment, EventLog và AlertHistory.
  * Phạm vi     : Engine dùng chung cho các loại giao dịch. Quy tắc chuyển phase theo
  *               transaction.type được ủy quyền cho ESD_HTKT_SLA_POLICY.
- * Entry point : snapshot(), createRuntime(), buildExpenseBaseline() và
- *               installExpenseBaseline().
+ * Entry point : snapshot(), createRuntime(), buildBaseline() và installBaseline().
  * Môi trường  : OpenText Service Manager (JavaScript ES5 Engine).
  * -----------------------------------------------------------------------------
  */
@@ -19,7 +18,8 @@ function slaCalendarApi() {
         addMillis:addMillis, getWorkingMinutes:getWorkingMinutes, addWorkingMinutes:addWorkingMinutes};
 }
 function slaCalculatorApi() {
-    return {calculateTracking:calculateTracking, calculateExpenseTracking:calculateExpenseTracking};
+    return {calculateTracking:calculateTracking, calculateTransactionTracking:calculateTransactionTracking,
+        calculateExpenseTracking:calculateExpenseTracking};
 }
 
 /* =============================================================================
@@ -205,12 +205,14 @@ function calculateTracking(calendarLib, calendar, tracking, segments, asOf, thre
     };
 }
 
-// Expense entry point: caller maps SM dates and fields explicitly before calculation.
-// Each tracking is calculated independently (RS2 can overlap Phê duyệt KTTC).
-function calculateExpenseTracking(calendarLib, calendar, payment, tracking, segments, asOf, thresholds) {
-    if (!payment || payment["transaction.type"] !== "Dự chi") throw new Error("SLA_NOT_EXPENSE");
+// Entry point dùng chung; mỗi Tracking được tính độc lập.
+function calculateTransactionTracking(calendarLib, calendar, payment, tracking, segments, asOf, thresholds) {
+    if (!payment || !payment["transaction.type"]) throw new Error("SLA_MISSING_TRANSACTION_TYPE");
     if (!payment.id || tracking.paymentId !== String(payment.id)) throw new Error("SLA_PAYMENT_MISMATCH");
     return calculateTracking(calendarLib, calendar, tracking, segments, asOf, thresholds);
+}
+function calculateExpenseTracking(calendarLib, calendar, payment, tracking, segments, asOf, thresholds) {
+    return calculateTransactionTracking(calendarLib, calendar, payment, tracking, segments, asOf, thresholds);
 }
 
 
@@ -302,7 +304,7 @@ var SLA_T = { config: "esdHTKTslaConfig", detail: "esdHTKTslaConfigDetail",
     calendar: "esdHTKTslaCalendar", hours: "esdHTKTslaWorkingHour", holiday: "esdHTKTslaHoliday",
     tracking: "esdHTKTslaTracking", segment: "esdHTKTslaTimeSegment",
     event: "esdHTKTslaEventLog", alert: "esdHTKTslaAlertHistory" };
-function createService(store, calendarLib, calculator, expenseRules, options) {
+function createService(store, calendarLib, calculator, policyRules, options) {
     options = options || {};
     function clone(x) { return JSON.parse(JSON.stringify(x)); }
     function instant(x) { return calendarLib.toMillis(store.decodeInstant(x)); }
@@ -328,14 +330,21 @@ function createService(store, calendarLib, calculator, expenseRules, options) {
         for (i = 0; i < list.length; i++) result.holidays.push(store.decodeDate(list[i]["holiday.date"]));
         calendarLib.compileCalendar(result); return result;
     }
-    function selectDetail(role, at) {
-        // Dự chi uses the common product bucket Tất cả, not a field inferred from the payment.
-        var configs = rows(SLA_T.config, {"transaction.type": "Dự chi", "product.type": "Tất cả"});
+    function resolveProductType(payment) {
+        // Tạm thời chưa có nguồn/trường product.type chính thức trên phiếu.
+        // Dùng cấu hình chung để chạy luồng; chỉ sửa hàm này khi nghiệp vụ chốt nguồn.
+        return "Tất cả";
+    }
+    function selectDetail(role, at, payment) {
+        var transactionType = String(payment["transaction.type"] || "");
+        var productType = resolveProductType(payment);
+        var configs = rows(SLA_T.config, {"transaction.type": transactionType});
         var matches = [], i, config, details;
         for (i = 0; i < configs.length; i++) {
             config = configs[i];
             if (instant(config["effective.from"]) <= at &&
-                    (blank(config["effective.to"]) || at < instant(config["effective.to"]))) matches.push(config);
+                    (blank(config["effective.to"]) || at < instant(config["effective.to"])) &&
+                    String(config["product.type"]) === productType) matches.push(config);
         }
         if (matches.length !== 1) throw new Error("SLA_EXPECT_ONE_EFFECTIVE_CONFIG: " + matches.length);
         config = matches[0];
@@ -400,8 +409,8 @@ function createService(store, calendarLib, calculator, expenseRules, options) {
         journal["processing.status"] = "APPLIED"; store.put(SLA_T.event, journal);
         return { success: true, eventId: journal["event.key"], writes: payload.writes.length };
     }
-    function applyExpenseEvent(event) {
-        var commands = expenseRules.buildCommands(event);
+    function applyEvent(event) {
+        var commands = policyRules.buildCommands(event);
         var paymentId = String(event.after.id), rootId = journalId(paymentId, event.id);
         var existing = store.get(SLA_T.event, rootId);
         // Stable JSON payload protects an operation ID from being reused for another business action.
@@ -481,7 +490,7 @@ function createService(store, calendarLib, calculator, expenseRules, options) {
                 if (active[command.role]) close(command.role, "COMPLETE");
                 else {
                     // Inactive configured roles have no tracking; missing active ones are a data error.
-                    var disabled = selectDetail(command.role, atMs);
+                    var disabled = selectDetail(command.role, atMs, event.after);
                     if (disabled !== null) throw new Error("SLA_ACTIVE_TRACKING_NOT_FOUND: " + command.role);
                 }
             } else if (command.type === "START") {
@@ -492,7 +501,7 @@ function createService(store, calendarLib, calculator, expenseRules, options) {
                     }
                     continue;
                 }
-                var selected = selectDetail(command.role, atMs);
+                var selected = selectDetail(command.role, atMs, event.after);
                 if (selected === null) continue;
                 if (!command.assignee) throw new Error("SLA_MISSING_ASSIGNEE: " + command.role);
                 var detail = selected.detail;
@@ -550,9 +559,9 @@ function createService(store, calendarLib, calculator, expenseRules, options) {
             "created.at": at, "processing.status": "PREPARED", data: JSON.stringify({fingerprint: fingerprint, attempt: attempt, writes: plan})};
         store.put(SLA_T.event, journal); return commit(journal);
     }
-    function refreshExpense(paymentId, asOf) {
+    function refresh(paymentId, asOf) {
         var payment = store.get("esdHTKTpayment", paymentId);
-        if (!payment || payment["transaction.type"] !== "Dự chi") throw new Error("SLA_NOT_EXPENSE");
+        if (!payment) throw new Error("SLA_PAYMENT_NOT_FOUND");
         assertNoPending(paymentId);
         if (payment.status === "cancelled" || payment.status === "approved" || payment.status === "accounted") {
             var dangling = rows(SLA_T.tracking, {"payment.id": paymentId}), d;
@@ -594,16 +603,19 @@ function createService(store, calendarLib, calculator, expenseRules, options) {
         return list.length ? commit(list[0]) : {success: true, writes: 0};
     }
     return {
-        applyExpenseEvent: function(event) {
+        applyEvent: function(event) {
             if (!event || !event.after || !event.after.id) throw new Error("SLA_MISSING_PAYMENT");
-            return applyExpenseEvent(event);
+            return applyEvent(event);
         },
-        refreshExpense: function(paymentId, asOf) {
-            return refreshExpense(paymentId, asOf);
+        refresh: function(paymentId, asOf) {
+            return refresh(paymentId, asOf);
         },
         retryPrepared: function(paymentId) {
             return retryPrepared(paymentId);
-        }
+        },
+        // Tương thích với caller cũ trong giai đoạn chuyển đổi.
+        applyExpenseEvent: function(event) { return applyEvent(event); },
+        refreshExpense: function(paymentId, asOf) { return refresh(paymentId, asOf); }
     };
 }
 
@@ -639,10 +651,10 @@ function createRuntime(options) {
             } finally { if (typeof f.close === "function") f.close(); }
         }});
     function onBusinessCommitted(kind, before, after, context) {
-        if (!after || String(after["transaction.type"]) !== "Dự chi") return {success: true, skipped: true};
+        if (!after) throw new Error("SLA_MISSING_PAYMENT");
         context = context || {};
         if (!context.operationId || !context.eventAt || !context.performedBy) throw new Error("SLA_REQUIRE_STABLE_OPERATION_CONTEXT");
-        return service.applyExpenseEvent({id: String(context.operationId), kind: kind,
+        return service.applyEvent({id: String(context.operationId), kind: kind,
             eventAt: new Date(calendar.toMillis(store.decodeInstant(context.eventAt))).toISOString(),
             performedBy: String(context.performedBy), before: snapshot(before), after: snapshot(after)});
     }
@@ -653,7 +665,7 @@ function createRuntime(options) {
 /* =============================================================================
  * KHỞI TẠO CẤU HÌNH
  * ============================================================================= */
-function buildExpenseBaseline(calendarLib, args) {
+function buildBaseline(calendarLib, args) {
     if (!args || !args.calendarId || !args.configId || !args.effectiveFrom || !args.performedBy ||
             Object.prototype.toString.call(args.holidays) !== "[object Array]") throw new Error("SLA_MISSING_BASELINE_INPUT");
     var start = calendarLib.toMillis(args.effectiveFrom);
@@ -678,7 +690,9 @@ function buildExpenseBaseline(calendarLib, args) {
             "calendar.id":args.calendarId,"holiday.date":args.holidays[i],"holiday.name":"Ngày nghỉ được phê duyệt",
             "holiday.type":"OTHER","created.by":args.performedBy,"created.at":new Date().toISOString()}});
     }
-    writes.push({table:"esdHTKTslaConfig",row:{id:args.configId,"transaction.type":"Dự chi","product.type":"Tất cả",
+    var transactionType = String(args.transactionType || "Dự chi");
+    var productType = "Tất cả";
+    writes.push({table:"esdHTKTslaConfig",row:{id:args.configId,"transaction.type":transactionType,"product.type":productType,
         "calendar.id":args.calendarId,"effective.from":new Date(start).toISOString(),
         "effective.to":end === null ? null : new Date(end).toISOString(),status:"Đang hoạt động"}});
     // Source: Thông tin SLA.xlsx, Danh mục SLA, row 19. Order follows actual workflow.
@@ -690,11 +704,11 @@ function buildExpenseBaseline(calendarLib, args) {
         "alert.stage1.rate":0.7,"alert.stage2.rate":0.9,"is.active":true}});
     return writes;
 }
-function installExpenseBaseline(store, calendarLib, args) {
-    var writes = buildExpenseBaseline(calendarLib,args), i;
+function installBaseline(store, calendarLib, args) {
+    var writes = buildBaseline(calendarLib,args), i;
     // Use on an unpublished new version only; interrupted setup requires a new version ID.
     for (i = 0; i < writes.length; i++) if (store.get(writes[i].table,writes[i].row.id)) throw new Error("SLA_BASELINE_ID_ALREADY_EXISTS: "+writes[i].row.id);
-    var configs=store.list("esdHTKTslaConfig",{"transaction.type":"Dự chi","product.type":"Tất cả"});
+    var configs=store.list("esdHTKTslaConfig",{"transaction.type":String(args.transactionType || "Dự chi"),"product.type":"Tất cả"});
     var start=calendarLib.toMillis(args.effectiveFrom),end=args.effectiveTo?calendarLib.toMillis(args.effectiveTo):Infinity;
     for(i=0;i<configs.length;i++) {
         var a=calendarLib.toMillis(store.decodeInstant(configs[i]["effective.from"]));
@@ -706,4 +720,8 @@ function installExpenseBaseline(store, calendarLib, args) {
     for (i = 0; i < writes.length; i++) if (writes[i].table === "esdHTKTslaConfig") store.put(writes[i].table,writes[i].row);
     return {success:true,created:writes.length};
 }
+
+// Tương thích với tên entry point cũ trong các script triển khai hiện có.
+function buildExpenseBaseline(calendarLib, args) { return buildBaseline(calendarLib, args); }
+function installExpenseBaseline(store, calendarLib, args) { return installBaseline(store, calendarLib, args); }
 

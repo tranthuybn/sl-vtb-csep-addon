@@ -207,7 +207,7 @@ test('Batch continues after one corrupt payment and pagination reaches later IDs
  f.store.put(T.tracking,{id:'broken','payment.id':'B','started.at':time('27','08:00'),'ended.at':null});
  f.store.put('esdHTKTpayment',{id:'B','transaction.type':'Dự chi',status:'kttc_created'});
  f.store.put(T.tracking,{id:'foreign','payment.id':'C','ended.at':null});
- f.store.put('esdHTKTpayment',{id:'C','transaction.type':'Thanh toán'});
+ f.store.put('esdHTKTpayment',{id:'C','transaction.type':'Không áp dụng SLA'});
  const rt={store:f.store,service:f.service};
  const a=worker.runExpenseBatch(rt,time('27','08:45'),{limit:1});assert.equal(a.nextCursor,'A');assert.equal(a.results.length,1);
  const b=worker.runExpenseBatch(rt,time('27','08:45'),{limit:10,afterPaymentId:a.nextCursor});assert.equal(b.errors.length,1);assert.equal(b.errors[0].paymentId,'B');assert.equal(b.nextCursor,null);
@@ -222,10 +222,25 @@ test('Every interrupted write in CREATE can recover without duplicate rows',()=>
   assert.equal(f.service.applyExpenseEvent(f.events[0]).duplicate,true);
  }
 });
-test('Wrong transaction type and duplicate config fail without SLA mutation',()=>{
+test('Unsupported transaction type and duplicate config fail without SLA mutation',()=>{
  const f=fixture();const c=f.store.get(T.config,'CFG');f.store.put(T.config,{...c,id:'CFG2'});
  assert.throws(()=>f.send('CREATE',time('27','08:00')),/EXPECT_ONE_EFFECTIVE_CONFIG/);assert.equal(f.tracks().length,0);
- assert.throws(()=>rules.buildCommands({id:'X',kind:'CREATE',performedBy:'actor',after:{id:'X','transaction.type':'Thanh toán'}}),/UNSUPPORTED_TRANSACTION_TYPE/);
+ assert.throws(()=>rules.buildCommands({id:'X',kind:'CREATE',performedBy:'actor',after:{id:'X','transaction.type':'Không hỗ trợ'}}),/UNSUPPORTED_TRANSACTION_TYPE/);
+});
+test('Dự chi, Tạm ứng and Thanh toán share one workflow policy',()=>{
+ for (const transactionType of ['Dự chi','Tạm ứng','Thanh toán']) {
+  const commands=rules.buildCommands({id:'CREATE-'+transactionType,kind:'CREATE',performedBy:'actor',
+   after:{id:'X','transaction.type':transactionType,'initial.role':'kttc',status:'kttc_created','created.by':'maker'}});
+  assert.equal(commands.length,1);assert.equal(commands[0].role,'CB_KTTC');
+ }
+});
+test('Engine temporarily uses Tất cả config without requiring payment product.type',()=>{
+ for (const item of [{type:'Tạm ứng'}, {type:'Thanh toán'}]) {
+  const f=fixture('CFG-'+item.type,'kttc');const config=f.store.get(T.config,'CFG');
+  config['transaction.type']=item.type;config['product.type']='Tất cả';f.store.put(T.config,config);
+  f.send('CREATE',time('27','08:00'),{'transaction.type':item.type,'product.type':''});
+  assert.equal(f.tracks().length,1);assert.equal(f.tracks()[0]['sla.config.id'],'CFG');
+ }
 });
 test('Late completion recalculates actual elapsed time and cancels spurious pending thresholds',()=>{
  const f=fixture('LATE','kttc');f.send('CREATE',time('27','08:00'));

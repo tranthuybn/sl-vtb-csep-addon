@@ -1,6 +1,6 @@
-# SLA tự tính cho Dự chi
+# SLA tự tính dùng chung cho Dự chi, Tạm ứng và Thanh toán
 
-Đã triển khai mã nguồn tính và ghi dữ liệu SLA cho `esdHTKTpayment` có `transaction.type = "Dự chi"`. Không có HTTP API quản trị hoặc API lịch sử. Các entry point ở đây dành cho workflow và scheduler phía server. Mã chưa được import/chạy trên SM thật; không có thay đổi trigger tự động.
+Đã triển khai engine tính và ghi dữ liệu SLA dùng chung cho `esdHTKTpayment`. Dự chi, Tạm ứng và Thanh toán dùng cùng quy tắc luồng. Tạm thời `transaction.type` chọn cấu hình và `product.type` luôn dùng giá trị `"Tất cả"` vì nguồn sản phẩm trên phiếu chưa được chốt. Không có HTTP API quản trị hoặc API lịch sử. Các entry point ở đây dành cho workflow và scheduler phía server. Mã chưa được import/chạy trên SM thật; không có thay đổi trigger tự động.
 
 
 ## Bàn giao để tiếp tục trên máy khác
@@ -9,7 +9,7 @@ Cập nhật ngày 28/10/2026, múi giờ Asia/Saigon. Đọc mục này trướ
 
 ### Mục tiêu và phạm vi đã thống nhất
 
-Ban đầu dự định dùng SLA của OpenText SM, sau đó chuyển sang tự đo/tính/lưu SLA. Đợt đầu chỉ làm Dự chi trong bảng dùng chung `esdHTKTpayment`, điều kiện chính xác `transaction.type = 'Dự chi'`. Chưa mở rộng sang Thanh toán/Tạm ứng. Tài liệu Tạm ứng được dùng làm nguồn tham khảo luồng hai nhánh mà người dùng xác nhận cho triển khai này.
+Ban đầu dự định dùng SLA của OpenText SM, sau đó chuyển sang tự đo/tính/lưu SLA. Engine hiện dùng chung cho Dự chi, Tạm ứng và Thanh toán trong bảng `esdHTKTpayment`. Giai đoạn tạm thời chỉ phân biệt định mức bằng `transaction.type`; mọi cấu hình dùng `product.type = "Tất cả"`. Tài liệu Tạm ứng được dùng làm nguồn tham khảo luồng hai nhánh.
 
 Người dùng đã làm rõ: phải ghi đủ các bảng để tròn một vòng đời SLA; không được chỉ viết hàm tính thuần. Chỉ hoãn API quản trị/tra cứu như danh sách cấu hình, quản lý lịch, xem lịch sử. Các entry point server/workflow, bootstrap triển khai và job vẫn nằm trong phạm vi.
 
@@ -42,7 +42,7 @@ Nên chuyển nguyên thư mục `C:/workspace/sl` sang máy mới; tối thiể
 - `dbdict/SLA.sql` và các schema nghiệp vụ hiện có.
 - `expense/`, `payment/` và các SL dùng chung ở gốc để tiếp tục đối chiếu/tích hợp, đặc biệt `ESD_ApiCustomScript_HTKT.js`.
 - `tài liệu/FSD+Tạm+ứng.doc`: nguồn luồng, mục 2.1 và 2.3. File mang đuôi .doc nhưng thực tế là bản xuất Confluence dạng MIME/HTML; không phải Word binary thông thường.
-- `tài liệu/Thông tin SLA.xlsx`: các sheet `Danh mục SLA`, `Quy tắc đo SLA`, `Gửi mail cảnh báo + Trạng thái `. `Sheet1` là quy tắc SLA dự án/khoản mua sắm khác, **không trộn** quy tắc 24h/tính theo ngày của sheet đó vào SLA Dự chi giờ hành chính.
+- `tài liệu/Thông tin SLA.xlsx`: các sheet `Danh mục SLA`, `Quy tắc đo SLA`, `Gửi mail cảnh báo + Trạng thái `. Tạm thời gom định mức theo `transaction.type` với sản phẩm `"Tất cả"`; không trộn quy tắc tính theo ngày vào cấu hình tính theo giờ hành chính.
 - `tài liệu/Cấu hình Sla.pdf` và `tài liệu/SLA New table configure.docx`: tài liệu cấu hình cơ chế SLA SM cũ, chỉ tham khảo; không phải hướng triển khai engine hiện tại.
 
 Các tài liệu tham khảo hiện nằm trong `sl/tài liệu/`; lúc đầu hội thoại từng được đặt tại `sl/sla/`. Thư mục `sla/.analysis/` chỉ là bản text trích xuất để đọc tài liệu, không phải nguồn chuẩn và không cần cho runtime/test.
@@ -77,9 +77,9 @@ Nếu tiếp tục phần frontend, mang theo repo `C:/workspace/vtb-csep-addon`
 
 ### Công việc tiếp theo trên máy mới
 
-1. Đọc README và chạy lại `node tests/sla.test.cjs` từ thư mục `sl/sla` để xác nhận đủ file sau khi chuyển máy; hiện kỳ vọng 22 test pass.
+1. Đọc README và chạy lại `node tests/sla.test.cjs` từ thư mục `sl/sla` để xác nhận đủ file sau khi chuyển máy; hiện kỳ vọng 24 test pass.
 2. Đối chiếu mã và schema mới trước khi import. Xác nhận kích thước trường ID, text JSON kế hoạch ghi, decimal, PK và unique index trong dbdict SM.
-3. Trên môi trường thử nghiệm, tạo bảng/index, import 3 SL và SL workflow có hai hàm cầu nối; nhập phiên bản lịch và ngày nghỉ đã được duyệt, rồi bootstrap cấu hình Dự chi.
+3. Trên môi trường thử nghiệm, tạo bảng/index, import 3 SL và các cầu nối workflow; nhập phiên bản lịch/ngày nghỉ đã được duyệt, rồi bootstrap một cấu hình `product.type = "Tất cả"` cho từng `transaction.type`.
 4. Xác nhận cách SM thực tế trả/lưu datetime/date/time và điền adapter nếu cần. Không đoán chuỗi ngày theo locale.
 5. Xem Rule Sets/action thực tế của workflow `ESD_HTKT_PAYMENT` trên bảng `esdHTKTpayment`; chọn điểm gọi sau thành công, chụp snapshot trước, giữ operationId/eventAt/performedBy ổn định. Chưa có bản export cấu hình Rule Sets để sửa tự động.
 6. Nối CREATE ở sau tạo thành công; TRANSITION/RETURN/CANCEL sau nghiệp vụ thành công; REASSIGN tại điểm lưu người phê duyệt thành công. Kiểm tra việc `doUpdate()` có chạy workflow không. Không gắn hai nguồn khiến ghi hai lần.
@@ -88,11 +88,11 @@ Nếu tiếp tục phần frontend, mang theo repo `C:/workspace/vtb-csep-addon`
 
 Có thể mở chat mới trên máy khác bằng câu sau:
 
-> Tiếp tục triển khai SLA tự tính cho Dự chi. Đọc C:/workspace/sl/sla/README.md, đặc biệt mục Bàn giao để tiếp tục trên máy khác, rồi đối chiếu các SL và schema. Chỉ áp dụng esdHTKTpayment với transaction.type = 'Dự chi'; phải ghi đủ vòng đời SLA, chưa làm API quản trị. Giữ các mốc RS2 đã chốt trong README. Báo trạng thái thực tế và tiếp tục phần tích hợp SM còn thiếu; không giả định đã import hoặc gắn workflow.
+> Tiếp tục triển khai SLA tự tính dùng chung cho Dự chi, Tạm ứng và Thanh toán. Đọc C:/workspace/sl/sla/README.md rồi đối chiếu các SL và schema. Ba loại giao dịch dùng chung policy luồng; tạm thời transaction.type chọn cấu hình và product.type luôn là "Tất cả". Phải ghi đủ vòng đời SLA, chưa làm API quản trị. Báo trạng thái thực tế và tiếp tục phần tích hợp SM còn thiếu; không giả định đã import hoặc gắn workflow.
 
 ## Luồng nghiệp vụ
 
-Đối chiếu mục 2.1 và 2.3 của `C:/workspace/sl/tài liệu/FSD+Tạm+ứng.doc`, kết hợp các mốc SLA người dùng đã chốt:
+Đối chiếu mục 2.1 và 2.3 của `C:/workspace/sl/tài liệu/FSD+Tạm+ứng.doc`. Quy tắc dưới đây dùng chung cho Dự chi, Tạm ứng và Thanh toán:
 
 - ĐMMS tạo: CB ĐMMS → CB KTTC → RS1 nếu bật → PD ĐMMS → PD KTTC → RS2 nếu bật → Cấp có thẩm quyền.
 - KTTC tạo: CB KTTC → PD KTTC → RS2 nếu bật → Cấp có thẩm quyền. Bỏ hoàn toàn RS1 và PD ĐMMS, kể cả khi dữ liệu cũ còn cờ RS1.
@@ -111,10 +111,10 @@ Các role.code dùng trong cấu hình: `CB_DE_NGHI`, `CB_KTTC`, `RA_SOAT_1`, `P
 | File | Trách nhiệm |
 |---|---|
 | ESD_HTKT_SLA_ENGINE.js | Engine dùng chung: lịch, tính toán, SCFile, Tracking, Segment, EventLog, AlertHistory, runtime workflow và bootstrap cấu hình |
-| ESD_HTKT_SLA_POLICY.js | Chọn policy theo `transaction.type`; hiện thực quy tắc phase/role/command của Dự chi, là điểm mở rộng Tạm ứng và Thanh toán |
+| ESD_HTKT_SLA_POLICY.js | Quy tắc phase/role/command dùng chung cho Dự chi, Tạm ứng và Thanh toán |
 | ESD_HTKT_SLA_JOB.js | Entry point scheduler: tính lại, phục hồi PREPARED và gửi/retry cảnh báo qua mail adapter |
 
-`transaction.type` chọn policy và nhóm cấu hình. `product.type` chỉ chọn dòng định mức trong nhóm đó; không tạo engine riêng cho từng sản phẩm. Hiện policy mới kích hoạt Dự chi, các loại khác trả lỗi `SLA_UNSUPPORTED_TRANSACTION_TYPE` cho tới khi bổ sung mapping phase chính thức.
+Tạm thời engine chọn cấu hình bằng `transaction.type` và bắt buộc dòng cấu hình có `product.type = "Tất cả"`. Engine không yêu cầu `product.type` trên phiếu. Khi nghiệp vụ chốt nguồn/trường lưu sản phẩm, chỉ cần sửa `resolveProductType()` và bổ sung cấu hình chi tiết; policy luồng không thay đổi.
 
 `expense/ESD_HTKT_EXPENSE_WF.js` đã có hai hàm cầu nối `captureExpenseSlaSnapshot` và `recordCommittedExpenseSlaEvent`. Chưa gọi chúng trong validation và chưa đổi hành vi nghiệp vụ hiện tại.
 
@@ -175,7 +175,7 @@ Lỗi SLA sau khi phiếu đã lưu phải được báo rõ là lỗi ghi SLA �
 
 Dùng schema DBML `../dbdict/SLA.sql` để tạo dbdict/index thực tế. Chưa phải migration SQL có thể chạy trực tiếp. Các trường số phút dùng decimal; `EventLog.data` phải đủ lớn cho JSON kế hoạch ghi và `id` phải đủ dài cho ID ghép đã encode.
 
-`buildExpenseBaseline(calendarLib, args)` tạo bộ dữ liệu để xem trước; `installExpenseBaseline(store, calendarLib, args)` thực sự ghi dữ liệu. Args cần `calendarId`, `configId`, `effectiveFrom` (ISO có timezone), `performedBy`, `holidays` (mảng YYYY-MM-DD đã duyệt); `effectiveTo` tùy chọn. Không suy đoán ngày nghỉ từng năm; điền ngày nghỉ thật trước khi sử dụng. Không chạy bootstrap đồng thời hoặc trên version đang dùng. Nếu lỗi giữa chừng, kiểm tra và dùng version mới, không sửa lịch đã được Tracking tham chiếu.
+`buildBaseline(calendarLib, args)` tạo bộ dữ liệu để xem trước; `installBaseline(store, calendarLib, args)` thực sự ghi dữ liệu. Args cần `calendarId`, `configId`, `transactionType`, `effectiveFrom`, `performedBy` và `holidays`; `effectiveTo` tùy chọn. Bootstrap luôn ghi `product.type = "Tất cả"`. Hai tên entry point cũ cho Dự chi vẫn được giữ làm alias tương thích.
 
 Bộ giá trị Dự chi lấy từ `Thông tin SLA.xlsx`, sheet `Danh mục SLA`, dòng 19: CB đề nghị 2h; KTTC 3h; RS1 3h; PD ĐMMS 6h; PD KTTC 6h; RS2 4,5h; cấp thẩm quyền 9h. Cấu hình Dự chi có `product.type = "Tất cả"`. Hiệu lực theo khoảng `[effective.from, effective.to)`; không cho chồng lấn. Thời gian/ngưỡng cảnh báo/lịch được chốt trên Tracking khi bắt đầu bước, không lấy lại budget khi đổi người.
 
@@ -187,7 +187,7 @@ Phút giữ phần lẻ, chỉ làm tròn khi hiển thị. Theo quy tắc hiể
 
 ```javascript
 var rt = lib.ESD_HTKT_SLA_ENGINE.createRuntime(dateTimeAdapterOptions);
-var batchResult = lib.ESD_HTKT_SLA_JOB.runExpenseBatch(rt, new Date(), {limit:100});
+var batchResult = lib.ESD_HTKT_SLA_JOB.runBatch(rt, new Date(), {limit:100});
 // Nếu nextCursor != null, tiếp tục với afterPaymentId = nextCursor.
 // Một vòng kết thúc thì lần chạy định kỳ tiếp theo bắt đầu cursor rỗng.
 ```

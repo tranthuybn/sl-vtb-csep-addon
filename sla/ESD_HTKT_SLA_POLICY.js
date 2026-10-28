@@ -4,22 +4,22 @@
  * Module      : HTKT - Policy luồng SLA
  * Version     : 2.0.0
  *
- * Chức năng   : Ánh xạ sự kiện nghiệp vụ Dự chi thành các lệnh vận hành SLA
+ * Chức năng   : Ánh xạ sự kiện nghiệp vụ dùng chung thành các lệnh vận hành SLA
  *               (bắt đầu, hoàn thành, trả sửa, tái phân công và hủy).
  * Đầu vào     : Snapshot before/after bất biến của một thao tác nghiệp vụ đã thành
  *               công; event.kind gồm CREATE, TRANSITION, RETURN, REASSIGN, CANCEL.
- * Đầu ra      : Danh sách command để ESD_HTKT_SLA_SERVICE áp dụng và lưu dữ liệu.
+ * Đầu ra      : Danh sách command để ESD_HTKT_SLA_ENGINE áp dụng và lưu dữ liệu.
  * Lưu ý       : event.id phải là mã thao tác ổn định và được giữ nguyên khi retry.
- *               Chỉ xử lý esdHTKTpayment có transaction.type = "Dự chi".
+ *               Áp dụng chung cho Dự chi, Tạm ứng và Thanh toán.
  * Môi trường  : OpenText Service Manager (JavaScript ES5 Engine).
  * -----------------------------------------------------------------------------
  */
-var EXPENSE_ROLES = {
+var SLA_ROLES = {
     initial_dmms: "CB_DE_NGHI", initial_kttc: "CB_KTTC", check_dmms: "RA_SOAT_1",
     approval_dmms: "PHE_DUYET_DM", approval_kttc: "PHE_DUYET_KTTC",
     check_final: "RA_SOAT_2", approval_final: "PHE_DUYET_TQ"
 };
-var EXPENSE_ACTORS = {
+var SLA_ACTORS = {
     CB_DE_NGHI: "created.by", CB_KTTC: "user.checker.kttc", RA_SOAT_1: "user.checker.dmms",
     PHE_DUYET_DM: "user.approver.dmms", PHE_DUYET_KTTC: "user.approver.kttc",
     RA_SOAT_2: "user.checker.final", PHE_DUYET_TQ: "user.approver.final"
@@ -32,11 +32,14 @@ function makerRole(payment) {
 }
 function assignee(payment, role) {
     if (role === "CB_KTTC" && payment["initial.role"] === "kttc") return String(payment["created.by"] || "");
-    return String(payment[EXPENSE_ACTORS[role]] || "");
+    return String(payment[SLA_ACTORS[role]] || "");
 }
-function buildExpenseCommands(event) {
+function buildWorkflowCommands(event) {
     var after = event.after, before = event.before || {}, commands = [], kind = event.kind;
-    if (!after || after["transaction.type"] !== "Dự chi") throw new Error("SLA_NOT_EXPENSE");
+    var transactionType = after ? String(after["transaction.type"] || "") : "";
+    if (transactionType !== "Dự chi" && transactionType !== "Tạm ứng" && transactionType !== "Thanh toán") {
+        throw new Error("SLA_UNSUPPORTED_TRANSACTION_TYPE: " + transactionType);
+    }
     if (!after.id || !event.id || !event.performedBy) throw new Error("SLA_MISSING_EVENT_ID_OR_ACTOR");
     if (before.id && String(before.id) !== String(after.id)) throw new Error("SLA_PAYMENT_MISMATCH");
     var from = String(before["current.phase"] || ""), to = String(after["current.phase"] || "");
@@ -57,8 +60,8 @@ function buildExpenseCommands(event) {
                 isTrue(before["require.check.level2"]) !== isTrue(after["require.check.level2"])) throw new Error("SLA_REASSIGN_MUST_NOT_CHANGE_ROUTE");
         if (before.status !== after.status || from !== to) throw new Error("SLA_REASSIGN_MUST_NOT_CHANGE_STEP");
         if (after.status === "cancelled" || after.status === "approved" || after.status === "accounted") throw new Error("SLA_REASSIGN_CLOSED_PAYMENT");
-        for (role in EXPENSE_ACTORS) if (Object.prototype.hasOwnProperty.call(EXPENSE_ACTORS, role)) {
-            key = EXPENSE_ACTORS[role];
+        for (role in SLA_ACTORS) if (Object.prototype.hasOwnProperty.call(SLA_ACTORS, role)) {
+            key = SLA_ACTORS[role];
             if (String(before[key] || "") !== String(after[key] || "")) {
                 commands.push({type: "REASSIGN", role: role, assignee: assignee(after, role), oldAssignee: assignee(before, role)});
             }
@@ -69,7 +72,7 @@ function buildExpenseCommands(event) {
         // The workflow initially routes start -> maker; this does not finish the maker SLA.
         if (from === "start" && ((to === "initial_dmms" && makerRole(after) === "CB_DE_NGHI") ||
                 (to === "initial_kttc" && makerRole(after) === "CB_KTTC"))) return [];
-        if (!EXPENSE_ROLES[from] || from === to) throw new Error("SLA_INVALID_PHASE_TRANSITION");
+        if (!SLA_ROLES[from] || from === to) throw new Error("SLA_INVALID_PHASE_TRANSITION");
         if (before.status === "approved" || before.status === "accounted" || before.status === "cancelled") throw new Error("SLA_PAYMENT_ALREADY_FINISHED");
         var expected = {
             initial_dmms: "initial_kttc",
@@ -83,27 +86,23 @@ function buildExpenseCommands(event) {
         if (after["initial.role"] === "kttc" && (from === "initial_dmms" || from === "check_dmms" || from === "approval_dmms")) {
             throw new Error("SLA_PHASE_NOT_IN_KTTC_FLOW");
         }
-        role = EXPENSE_ROLES[from];
+        role = SLA_ROLES[from];
         commands.push({type: "COMPLETE", role: role});
         if (to === "end") {
             if (from !== "approval_final" || after.status !== "approved") throw new Error("SLA_INVALID_FINAL_APPROVAL");
         } else {
-            if (!EXPENSE_ROLES[to]) throw new Error("SLA_UNKNOWN_TARGET_PHASE");
-            start(EXPENSE_ROLES[to]);
+            if (!SLA_ROLES[to]) throw new Error("SLA_UNKNOWN_TARGET_PHASE");
+            start(SLA_ROLES[to]);
         }
-        // Business rule confirmed by owner: RS2 begins at ĐMMS approval, not KTTC approval.
+        // Quy tắc dùng chung: nhánh ĐMMS bắt đầu RS2 sau khi PD ĐMMS hoàn thành.
         if (from === "approval_dmms" && isTrue(after["require.check.level2"])) start("RA_SOAT_2");
-        // KTTC-created: RS2 starts only when PD KTTC transfers to check_final (owner confirmed).
+        // Nhánh KTTC bắt đầu RS2 khi PD KTTC chuyển sang check_final.
     } else throw new Error("SLA_UNKNOWN_EVENT_KIND: " + kind);
     return commands;
 }
 
 
-/* Chọn policy theo loại giao dịch. Thêm policy Tạm ứng/Thanh toán tại đây
- * mà không sao chép engine tính toán và lưu trữ. */
 function buildCommands(event) {
-    var transactionType = event && event.after ? String(event.after["transaction.type"] || "") : "";
-    if (transactionType === "Dự chi") return buildExpenseCommands(event);
-    throw new Error("SLA_UNSUPPORTED_TRANSACTION_TYPE: " + transactionType);
+    return buildWorkflowCommands(event);
 }
 

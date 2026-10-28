@@ -6,14 +6,17 @@
  *
  * Chức năng   : Quét các Tracking đang mở, phục hồi EventLog PREPARED, tính lại SLA,
  *               tạo cảnh báo và gửi/retry cảnh báo qua mail adapter do caller cung cấp.
- * Điểm gọi    : SM Scheduler gọi runExpenseBatch() và dispatchPendingAlerts() định kỳ.
+ * Điểm gọi    : SM Scheduler gọi runBatch() và dispatchPendingAlerts() định kỳ.
  * Phân trang  : Theo payment ID hoặc alert ID; tiếp tục bằng nextCursor đến khi null.
  * Lưu ý       : Không tự đăng ký scheduler, không cung cấp API quản trị. Mail adapter
  *               chỉ trả success sau khi cổng mail chấp nhận và nên chống trùng bằng ID.
  * Môi trường  : OpenText Service Manager (JavaScript ES5 Engine).
  * -----------------------------------------------------------------------------
  */
-function runExpenseBatch(runtime, asOf, batch) {
+function isSupportedTransactionType(value) {
+    return value === "Dự chi" || value === "Tạm ứng" || value === "Thanh toán";
+}
+function runBatch(runtime, asOf, batch) {
     batch = batch || {};
     var limit = typeof batch.limit === "undefined" ? 100 : Number(batch.limit);
     if (!isFinite(limit) || limit < 1 || limit !== Math.floor(limit)) throw new Error("SLA_INVALID_BATCH_LIMIT");
@@ -28,9 +31,9 @@ function runExpenseBatch(runtime, asOf, batch) {
         id = keys[i]; processed++;
         try {
             payment = store.get("esdHTKTpayment", id);
-            if (!payment || payment["transaction.type"] !== "Dự chi") continue;
+            if (!payment || !isSupportedTransactionType(String(payment["transaction.type"] || ""))) continue;
             runtime.service.retryPrepared(id);
-            results.push(runtime.service.refreshExpense(id, asOf));
+            results.push(runtime.service.refresh(id, asOf));
         } catch (error) { errors.push({paymentId: id, error: String(error.message || error)}); }
     }
     return {success: errors.length === 0, results: results, errors: errors,
@@ -60,7 +63,7 @@ function dispatchPendingAlerts(runtime, sendEmail, asOf, batch) {
                 var t = store.get("esdHTKTslaTracking", candidate["sla.tracking.id"]);
                 var p = store.get("esdHTKTpayment", t["payment.id"]);
                 if (a["send.status"] !== "Chờ gửi" && a["send.status"] !== "Gửi lỗi") return;
-                if (!p || p["transaction.type"] !== "Dự chi") return;
+                if (!p || !isSupportedTransactionType(String(p["transaction.type"] || ""))) return;
                 var pending = store.list("esdHTKTslaEventLog", {"payment.id": t["payment.id"], "processing.status": "PREPARED"});
                 if (pending.length) throw new Error("SLA_PENDING_EVENT_RETRY_FIRST");
                 a["updated.at"] = stamp;
@@ -97,4 +100,7 @@ function dispatchPendingAlerts(runtime, sendEmail, asOf, batch) {
     return {success: errors.length === 0, sent: sent, cancelled: cancelled, errors: errors,
         nextCursor: i < ids.length ? ids[i - 1] : null};
 }
+
+// Tương thích scheduler cũ.
+function runExpenseBatch(runtime, asOf, batch) { return runBatch(runtime, asOf, batch); }
 

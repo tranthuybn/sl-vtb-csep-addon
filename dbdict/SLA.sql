@@ -62,7 +62,7 @@ Ref: esdHTKTslaConfig."calendar.id" > esdHTKTslaCalendar.id
 Table esdHTKTslaConfig {
   id varchar [pk] // Mã cấu hình SLA
   "transaction.type" varchar // Loại giao dịch (Tạm ứng/Thanh toán/Dự chi)
-  "product.type" varchar // Nghiệp vụ/Sản phẩm (Mua sắm HHDV/Xây dựng cơ bản/...)
+  "product.type" varchar // Tạm thời dùng "Tất cả"; nguồn sản phẩm trên phiếu chưa chốt
   "calendar.id" varchar [not null] // Phiên bản lịch dùng để tính SLA
   "effective.from" datetime // Thời điểm bắt đầu áp dụng
   "effective.to" datetime // Thời điểm kết thúc áp dụng; null nếu đang áp dụng
@@ -228,9 +228,12 @@ Table esdHTKTslaEventLog {
 // Lưu timestamp theo một chuẩn thống nhất (khuyến nghị UTC); quy đổi sang timezone
 // của Calendar khi xác định thứ trong tuần, ca làm việc và ngày nghỉ.
 
-// BỔ SUNG CHO TRIỂN KHAI DỰ CHI
-// Dự chi do KTTC tạo: bỏ RS1 và PD ĐMMS; RS2 chỉ bắt đầu khi PD KTTC chuyển sang RS2.
-// Dự chi do ĐMMS tạo: RS2 bắt đầu từ PD ĐMMS, giữ nguyên mốc khi thực sự vào check_final.
+// QUY TẮC LUỒNG SLA DÙNG CHUNG
+// Phiếu do KTTC tạo: bỏ RS1 và PD ĐMMS; RS2 bắt đầu khi PD KTTC chuyển sang RS2.
+// Phiếu do ĐMMS tạo: đi qua RS1 nếu được cấu hình và qua PD ĐMMS; RS2 bắt đầu
+// sau khi PD ĐMMS hoàn thành và giữ nguyên mốc khi thực sự vào check_final.
+// Dự chi, Tạm ứng và Thanh toán dùng chung quy tắc luồng. Tạm thời chỉ dùng
+// transaction.type và cấu hình product.type="Tất cả" để chạy luồng trước.
 // Các trường phút dùng decimal để giữ giây lẻ; không làm tròn qua từng segment.
 // result dùng quy ước remaining.minutes <= 0 là BREACHED (thống nhất hiển thị và cảnh báo).
 // WORKFLOW.data chứa fingerprint + toàn bộ kế hoạch ghi JSON, cần text đủ lớn.
