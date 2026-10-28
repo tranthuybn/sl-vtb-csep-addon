@@ -491,11 +491,11 @@ function isSignaturePhase(record) {
  * Không tự động gắn trigger hoặc thay đổi workflow đang chạy.
  * ============================================================================= */
 function captureExpenseSlaSnapshot(record) {
-    return lib.ESD_HTKT_SLA_RUNTIME.snapshot(record);
+    return lib.ESD_HTKT_SLA_ENGINE.snapshot(record);
 }
 
 function recordCommittedExpenseSlaEvent(kind, beforeSnapshot, afterRecord, context, options) {
-    return lib.ESD_HTKT_SLA_RUNTIME.createRuntime(options || {}).onBusinessCommitted(
+    return lib.ESD_HTKT_SLA_ENGINE.createRuntime(options || {}).onBusinessCommitted(
         kind, beforeSnapshot, afterRecord, context
     );
 }

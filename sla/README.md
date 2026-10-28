@@ -21,15 +21,15 @@ Các mốc do người dùng đính chính có ưu tiên hơn nội dung sai/mâ
 - **RS2 trong nhánh KTTC tạo:** người dùng trả lời câu hỏi riêng, chọn bắt đầu khi PD KTTC chuyển sang RS2.
 - Thêm lịch/ngày nghỉ; bổ sung CANCEL và lý do kết thúc Segment do REASSIGN đã được người dùng yêu cầu.
 
-Các lựa chọn kỹ thuật hiện tại cần phân biệt với yêu cầu xác nhận trực tiếp: ưu tiên gọi từ workflow sau thành công là đánh giá của agent; bảng khóa, nhật ký PREPARED/APPLIED và adapter mail là thiết kế triển khai. Mốc khởi tạo maker lấy lúc tạo phiếu thành công; maker vòng trả sửa chạy từ lúc trả sửa thành công; chạm hạn `remaining <= 0` là vi phạm theo sheet quy tắc hiển thị. Các lựa chọn này đã ghi trong mã/tài liệu nhưng chưa được kiểm chứng trên SM thật.
+Các lựa chọn kỹ thuật hiện tại cần phân biệt với yêu cầu xác nhận trực tiếp: ưu tiên gọi từ workflow sau thành công là đánh giá của agent; nhật ký PREPARED/APPLIED và adapter mail là thiết kế triển khai. Mốc khởi tạo maker lấy lúc tạo phiếu thành công; maker vòng trả sửa chạy từ lúc trả sửa thành công; chạm hạn `remaining <= 0` là vi phạm theo sheet quy tắc hiển thị. Các lựa chọn này đã ghi trong mã/tài liệu nhưng chưa được kiểm chứng trên SM thật.
 
 ### Trạng thái mã nguồn lúc bàn giao
 
-- Có 8 SL mới trong thư mục `sla/`, một file test và README này. Danh sách/trách nhiệm chi tiết ở bên dưới.
+- Có 3 SL trong thư mục `sla/`, một file test và README này. Engine tính/ghi dùng chung; policy tách khác biệt luồng; job là entry point định kỳ.
 - Chỉ bổ sung hai hàm cầu nối ở cuối `expense/ESD_HTKT_EXPENSE_WF.js`; chưa gọi tự động từ luồng hiện tại.
-- `dbdict/SLA.sql` hiện là **DBML**, có 10 bảng, bao gồm bảng khóa vận hành bổ sung. Chưa chạy tạo bảng trong SM.
+- `dbdict/SLA.sql` hiện là **DBML**, có 9 bảng và không sử dụng bảng khóa SLA. Chưa chạy tạo bảng trong SM.
 - Không sửa `payment/esdHTKTpayment.activity.update.js`; chưa chuyển sang bắt sự kiện bằng trigger.
-- 22 kiểm thử đã pass bằng Node trên bộ lưu trữ mô phỏng, có mô phỏng SCFile/khóa và lỗi ghi. 8 SL mới và SL workflow sửa đều đã qua kiểm tra cú pháp. **Không đồng nghĩa đã kiểm thử tích hợp SM hoặc gửi mail thật.**
+- Bộ kiểm thử Node sử dụng lưu trữ mô phỏng, có mô phỏng SCFile và lỗi ghi. 3 SL và SL workflow sửa đều được kiểm tra cú pháp. **Không đồng nghĩa đã kiểm thử tích hợp SM hoặc gửi mail thật.**
 - Chưa tạo API quản trị, UI SLA hoặc API đọc lịch sử.
 
 ### File và nguồn cần mang theo
@@ -38,7 +38,7 @@ Thư mục làm việc chính của phần backend SLA là `C:/workspace/sl`, n�
 
 Nên chuyển nguyên thư mục `C:/workspace/sl` sang máy mới; tối thiểu phải có:
 
-- `sla/` gồm toàn bộ 8 SL, `README.md`, `tests/sla.test.cjs`.
+- `sla/` gồm 3 SL (`ENGINE`, `POLICY`, `JOB`), `README.md`, `tests/sla.test.cjs`.
 - `dbdict/SLA.sql` và các schema nghiệp vụ hiện có.
 - `expense/`, `payment/` và các SL dùng chung ở gốc để tiếp tục đối chiếu/tích hợp, đặc biệt `ESD_ApiCustomScript_HTKT.js`.
 - `tài liệu/FSD+Tạm+ứng.doc`: nguồn luồng, mục 2.1 và 2.3. File mang đuôi .doc nhưng thực tế là bản xuất Confluence dạng MIME/HTML; không phải Word binary thông thường.
@@ -79,7 +79,7 @@ Nếu tiếp tục phần frontend, mang theo repo `C:/workspace/vtb-csep-addon`
 
 1. Đọc README và chạy lại `node tests/sla.test.cjs` từ thư mục `sl/sla` để xác nhận đủ file sau khi chuyển máy; hiện kỳ vọng 22 test pass.
 2. Đối chiếu mã và schema mới trước khi import. Xác nhận kích thước trường ID, text JSON kế hoạch ghi, decimal, PK và unique index trong dbdict SM.
-3. Trên môi trường thử nghiệm, tạo bảng/index, import 8 SL và SL workflow có hai hàm cầu nối; nhập phiên bản lịch và ngày nghỉ đã được duyệt, rồi bootstrap cấu hình Dự chi.
+3. Trên môi trường thử nghiệm, tạo bảng/index, import 3 SL và SL workflow có hai hàm cầu nối; nhập phiên bản lịch và ngày nghỉ đã được duyệt, rồi bootstrap cấu hình Dự chi.
 4. Xác nhận cách SM thực tế trả/lưu datetime/date/time và điền adapter nếu cần. Không đoán chuỗi ngày theo locale.
 5. Xem Rule Sets/action thực tế của workflow `ESD_HTKT_PAYMENT` trên bảng `esdHTKTpayment`; chọn điểm gọi sau thành công, chụp snapshot trước, giữ operationId/eventAt/performedBy ổn định. Chưa có bản export cấu hình Rule Sets để sửa tự động.
 6. Nối CREATE ở sau tạo thành công; TRANSITION/RETURN/CANCEL sau nghiệp vụ thành công; REASSIGN tại điểm lưu người phê duyệt thành công. Kiểm tra việc `doUpdate()` có chạy workflow không. Không gắn hai nguồn khiến ghi hai lần.
@@ -110,14 +110,11 @@ Các role.code dùng trong cấu hình: `CB_DE_NGHI`, `CB_KTTC`, `RA_SOAT_1`, `P
 
 | File | Trách nhiệm |
 |---|---|
-| ESD_HTKT_SLA_CALENDAR.js | Giờ làm việc, ngày nghỉ, cộng phút để tìm hạn; UTC+07 độc lập timezone máy chủ |
-| ESD_HTKT_SLA_CALCULATOR.js | Tính tổng Segment, phút còn lại, hạn, trạng thái, mức cảnh báo |
-| ESD_HTKT_SLA_STORE.js | SCFile đọc/ghi và khóa theo phiếu bằng INSERT khóa chính |
-| ESD_HTKT_EXPENSE_SLA.js | Kiểm tra nhánh luồng và chuyển sự kiện thành thao tác đo |
-| ESD_HTKT_SLA_SERVICE.js | Ghi Tracking, Segment, EventLog, AlertHistory; xử lý gọi lại khi ghi dở |
-| ESD_HTKT_SLA_RUNTIME.js | Chụp snapshot và entry point cho workflow |
-| ESD_HTKT_SLA_SCHEDULE.js | Job tính lại, phục hồi PREPARED, gửi/retry cảnh báo qua mail adapter |
-| ESD_HTKT_SLA_BOOTSTRAP.js | Tạo phiên bản dữ liệu cấu hình/lịch ban đầu bằng thao tác triển khai tường minh |
+| ESD_HTKT_SLA_ENGINE.js | Engine dùng chung: lịch, tính toán, SCFile, Tracking, Segment, EventLog, AlertHistory, runtime workflow và bootstrap cấu hình |
+| ESD_HTKT_SLA_POLICY.js | Chọn policy theo `transaction.type`; hiện thực quy tắc phase/role/command của Dự chi, là điểm mở rộng Tạm ứng và Thanh toán |
+| ESD_HTKT_SLA_JOB.js | Entry point scheduler: tính lại, phục hồi PREPARED và gửi/retry cảnh báo qua mail adapter |
+
+`transaction.type` chọn policy và nhóm cấu hình. `product.type` chỉ chọn dòng định mức trong nhóm đó; không tạo engine riêng cho từng sản phẩm. Hiện policy mới kích hoạt Dự chi, các loại khác trả lỗi `SLA_UNSUPPORTED_TRANSACTION_TYPE` cho tới khi bổ sung mapping phase chính thức.
 
 `expense/ESD_HTKT_EXPENSE_WF.js` đã có hai hàm cầu nối `captureExpenseSlaSnapshot` và `recordCommittedExpenseSlaEvent`. Chưa gọi chúng trong validation và chưa đổi hành vi nghiệp vụ hiện tại.
 
@@ -172,9 +169,7 @@ Lỗi SLA sau khi phiếu đã lưu phải được báo rõ là lỗi ghi SLA �
 - REASSIGN/RETURN/CANCEL: ghi đủ nguyên nhân và snapshot status/phase; giữ dữ liệu cũ.
 - Job: cập nhật số phút trên Segment/Tracking; tạo mỗi Tracking + stage một AlertHistory.
 - EventLog WORKFLOW là nhật ký áp dụng thao tác: PREPARED lưu kế hoạch ghi đầy đủ trước khi cập nhật, APPLIED sau khi ghi xong. Các log chi tiết có processing.status null.
-- Bổ sung bảng vận hành `esdHTKTslaLock` để workflow, job và gửi mail không sửa cùng phiếu đồng thời. Schema hiện có 10 bảng.
-
-Khóa lấy bằng INSERT khóa chính `payment.id`, giải phóng sau xử lý. Không tự cướp khóa theo timeout: khi tiến trình chết, kiểm tra tiến trình/owner rồi mới xóa khóa bị treo, sau đó retry PREPARED. PK/index phải được tạo thật trong SM; mã JS không thay thế ràng buộc DB.
+- Không sử dụng bảng khóa SLA. Workflow, scheduler và dispatcher phải được cấu hình để không xử lý đồng thời cùng một `payment.id`. Nhật ký PREPARED/APPLIED và các unique index vẫn hỗ trợ retry/chống trùng, nhưng không thay thế việc tuần tự hóa ở tầng vận hành.
 
 ## Cấu hình và lịch ban đầu
 
@@ -191,8 +186,8 @@ Phút giữ phần lẻ, chỉ làm tròn khi hiển thị. Theo quy tắc hiể
 ## Job và cảnh báo
 
 ```javascript
-var rt = lib.ESD_HTKT_SLA_RUNTIME.createRuntime(dateTimeAdapterOptions);
-var batchResult = lib.ESD_HTKT_SLA_SCHEDULE.runExpenseBatch(rt, new Date(), {limit:100});
+var rt = lib.ESD_HTKT_SLA_ENGINE.createRuntime(dateTimeAdapterOptions);
+var batchResult = lib.ESD_HTKT_SLA_JOB.runExpenseBatch(rt, new Date(), {limit:100});
 // Nếu nextCursor != null, tiếp tục với afterPaymentId = nextCursor.
 // Một vòng kết thúc thì lần chạy định kỳ tiếp theo bắt đầu cursor rỗng.
 ```
@@ -202,7 +197,7 @@ Tần suất đề xuất 1 phút, cần cấu hình lịch chạy thực tế t
 Cảnh báo được lưu `Chờ gửi`. `triggered.at` là mốc đạt ngưỡng thật, không phải lúc job phát hiện. Mỗi stage chỉ có một dòng, số lần gửi lại cập nhật trên dòng cũ. SLA kết thúc thì không tạo cảnh báo mới và cảnh báo chưa gửi được đánh dấu `Đã hủy`. Khi gửi, người nhận được cập nhật theo người đang được giao nếu có tái phân công.
 
 ```javascript
-lib.ESD_HTKT_SLA_SCHEDULE.dispatchPendingAlerts(rt, mailAdapter, new Date(), {limit:100});
+lib.ESD_HTKT_SLA_JOB.dispatchPendingAlerts(rt, mailAdapter, new Date(), {limit:100});
 ```
 
 `mailAdapter(payload)` trả `{success:true, recipientEmail:...}` khi cổng mail nhận thành công, trả lỗi/throw khi thất bại. Adapter cần tra email từ recipientUser nếu recipientEmail chưa có. Dùng payload.id làm khóa chống trùng tại cổng mail. Nếu gửi thành công rồi ghi DB thất bại, có thể gửi lại; không hứa exactly-once khi cổng mail không hỗ trợ chống trùng.

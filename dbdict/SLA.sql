@@ -238,13 +238,3 @@ Table esdHTKTslaEventLog {
 // Phải tuần tự hóa xử lý sự kiện/job theo payment.id ở tầng vận hành; các upsert
 // nhiều bảng không tự tạo thành transaction. PK id và các unique index phải tồn tại trong SM.
 // AlertHistory.send.status bổ sung Đã hủy cho cảnh báo chưa gửi khi SLA đã kết thúc.
-
-// Khóa xử lý đồng thời theo phiếu: workflow, job và retry đều phải lấy cùng khóa.
-// Tạo bằng INSERT với PK payment.id (không SELECT rồi UPDATE); xóa khi xử lý xong.
-// Không tự cướp khóa theo timeout. Nếu tiến trình chết, vận hành kiểm tra owner/
-// acquired.at, bảo đảm tiến trình cũ đã dừng trước khi xóa khóa và retry PREPARED.
-Table esdHTKTslaLock {
-  "payment.id" varchar [pk] // Mã phiếu đang được khóa tính SLA
-  owner varchar [not null] // Token sở hữu khóa
-  "acquired.at" datetime [not null] // Thời điểm lấy khóa
-}

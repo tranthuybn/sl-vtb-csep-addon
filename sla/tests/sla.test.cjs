@@ -8,10 +8,10 @@ function load(name, extras = {}) {
   vm.runInContext(fs.readFileSync(path.join(base, name + '.js'), 'utf8'), ctx, {filename:name});
   return ctx;
 }
-const cal = load('ESD_HTKT_SLA_CALENDAR');
-const calc = load('ESD_HTKT_SLA_CALCULATOR');
-const rules = load('ESD_HTKT_EXPENSE_SLA');
-const engine = load('ESD_HTKT_SLA_SERVICE');
+const engine = load('ESD_HTKT_SLA_ENGINE');
+const cal = engine;
+const calc = engine;
+const rules = load('ESD_HTKT_SLA_POLICY');
 const T = engine.SLA_T;
 const calendar = {timezone:'Asia/Ho_Chi_Minh',workingHours:[],holidays:[]};
 for (let d=1;d<=5;d++) for (const [a,b] of [['08:00','12:00'],['13:00','17:00']]) calendar.workingHours.push({dayOfWeek:d,startTime:a,endTime:b});
@@ -21,12 +21,11 @@ let tests=0;
 function test(name,fn) {fn(); tests++; console.log('PASS',name);}
 const clone = x => JSON.parse(JSON.stringify(x));
 function memoryStore() {
-  const db = {}; let writes=0, failAt=null, locked=false;
+  const db = {}; let writes=0, failAt=null;
   return {db,
     get(t,id){return clone(db[t]?.[id] || null);},
     list(t,filter){return Object.values(db[t]||{}).filter(x=>Object.entries(filter).every(([k,v])=>String(x[k])===String(v))).map(clone);},
     put(t,row){writes++;if(writes===failAt)throw Error('INJECTED_WRITE_FAILURE');(db[t] ||= {})[row.id] = clone(row);},
-    withPaymentLock(id,fn){if(locked)throw Error('BUSY');locked=true;try{return fn();}finally{locked=false;}},
     decodeInstant:x=>x,decodeTime:x=>x,decodeDate:x=>x,
     failAfter(n){failAt=writes+n;}, clearFailure(){failAt=null;}
   };
@@ -179,7 +178,7 @@ test('Configuration thresholds copied and decimal budgets supported',()=>{
  f.service.refreshExpense(f.payment.id,time('27','08:41'));
  assert.equal(f.tracks()[0]['sla.minutes'],67.5);assert.equal(f.tracks()[0]['alert.stage1.rate'],.6);assert.equal(f.store.list(T.alert,{}).length,1);
 });
-const worker=load('ESD_HTKT_SLA_SCHEDULE',{lib:{ESD_HTKT_SLA_CALENDAR:cal}});
+const worker=load('ESD_HTKT_SLA_JOB',{lib:{ESD_HTKT_SLA_ENGINE:engine}});
 test('Alert worker retries failures, updates status, cancels closed SLA and deduplicates sent mail',()=>{
  const f=fixture('MAIL','kttc');f.send('CREATE',time('27','08:00'));
  f.service.refreshExpense(f.payment.id,time('27','08:45'));
@@ -226,7 +225,7 @@ test('Every interrupted write in CREATE can recover without duplicate rows',()=>
 test('Wrong transaction type and duplicate config fail without SLA mutation',()=>{
  const f=fixture();const c=f.store.get(T.config,'CFG');f.store.put(T.config,{...c,id:'CFG2'});
  assert.throws(()=>f.send('CREATE',time('27','08:00')),/EXPECT_ONE_EFFECTIVE_CONFIG/);assert.equal(f.tracks().length,0);
- assert.throws(()=>rules.buildCommands({id:'X',kind:'CREATE',performedBy:'actor',after:{id:'X','transaction.type':'Thanh toán'}}),/NOT_EXPENSE/);
+ assert.throws(()=>rules.buildCommands({id:'X',kind:'CREATE',performedBy:'actor',after:{id:'X','transaction.type':'Thanh toán'}}),/UNSUPPORTED_TRANSACTION_TYPE/);
 });
 test('Late completion recalculates actual elapsed time and cancels spurious pending thresholds',()=>{
  const f=fixture('LATE','kttc');f.send('CREATE',time('27','08:00'));
@@ -237,7 +236,7 @@ test('Late completion recalculates actual elapsed time and cancels spurious pend
  assert(f.store.list(T.alert,{}).every(x=>x['send.status']==='Đã hủy'));
 });
 test('Bootstrap publishes config last and rejects overlap; seeds approved holiday rows',()=>{
- const boot=load('ESD_HTKT_SLA_BOOTSTRAP');const st=memoryStore();const writes=[];
+ const boot=engine;const st=memoryStore();const writes=[];
  const put=st.put.bind(st);st.put=(t,row)=>{writes.push(t);put(t,row);};
  const args={calendarId:'YEAR',configId:'DC',effectiveFrom:time('01','00:00'),performedBy:'admin',holidays:['2026-10-28']};
  boot.installExpenseBaseline(st,cal,args);
@@ -245,11 +244,11 @@ test('Bootstrap publishes config last and rejects overlap; seeds approved holida
  assert.equal(st.get(T.detail,'DC.RA_SOAT_2')['sla.hours'],4.5);assert.equal(st.list(T.holiday,{}).length,1);
  assert.throws(()=>boot.installExpenseBaseline(st,cal,{...args,calendarId:'YEAR2',configId:'DC2'}),/EFFECTIVE_OVERLAP/);
 });
-test('SCFile adapter converts timestamp writes and uses atomic exclusive lock with release on error',()=>{
+test('SCFile adapter converts timestamp writes',()=>{
  const db={};const OK=0,NONE=9,DUP=48;
  class FakeSCFile {
   constructor(table){this._table=table;this._rows=[];this._index=-1;}
-  _pk(){return this._table==='esdHTKTslaLock'?'payment.id':'id';}
+  _pk(){return 'id';}
   _copyIn(row){for(const k of Object.keys(this))if(!k.startsWith('_'))delete this[k];if(row)Object.assign(this,row);}
   _out(){return Object.fromEntries(Object.entries(this).filter(([k])=>!k.startsWith('_')));}
   doSelect(query){
@@ -263,14 +262,9 @@ test('SCFile adapter converts timestamp writes and uses atomic exclusive lock wi
   doDelete(){delete db[this._table][this[this._pk()]];return OK;}
   close(){}
  }
- const adapter=load('ESD_HTKT_SLA_STORE',{SCFile:FakeSCFile,SCFILE_READONLY:1,RC_SUCCESS:OK,RC_NO_MORE:NONE});
+ const adapter=load('ESD_HTKT_SLA_ENGINE',{SCFile:FakeSCFile,SCFILE_READONLY:1,RC_SUCCESS:OK,RC_NO_MORE:NONE});
  const st=adapter.createStore();st.put(T.event,{id:'D','created.at':time('27','08:00')});
  assert(db[T.event].D['created.at'] instanceof Date);assert.equal(st.get(T.event,'MISSING'),null);
- st.withPaymentLock('DC',()=>{assert.throws(()=>st.withPaymentLock('DC',()=>{}),/LOCK_ACQUIRE_FAILED/);});
- assert.equal(Object.keys(db.esdHTKTslaLock).length,0);
- assert.throws(()=>st.withPaymentLock('DC',()=>{throw Error('work failure');}),/work failure/);
- assert.equal(Object.keys(db.esdHTKTslaLock).length,0);
- st.withPaymentLock('DC',()=>{});
 });
 test('Working-time addition agrees with independently counted minutes across multiple days',()=>{
  const c={...calendar,holidays:['2026-10-28']};

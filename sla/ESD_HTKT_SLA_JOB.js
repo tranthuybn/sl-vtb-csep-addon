@@ -1,6 +1,17 @@
-/** ScriptLibrary: ESD_HTKT_SLA_SCHEDULE.
- * Call from a recurring SM scheduler. No auto-registration or admin endpoints.
- * Pagination is by payment ID; continue with nextCursor until null, then restart.
+/**
+ * ScriptLibrary: ESD_HTKT_SLA_JOB
+ * -----------------------------------------------------------------------------
+ * Module      : HTKT - Job định kỳ và gửi cảnh báo SLA
+ * Version     : 2.0.0
+ *
+ * Chức năng   : Quét các Tracking đang mở, phục hồi EventLog PREPARED, tính lại SLA,
+ *               tạo cảnh báo và gửi/retry cảnh báo qua mail adapter do caller cung cấp.
+ * Điểm gọi    : SM Scheduler gọi runExpenseBatch() và dispatchPendingAlerts() định kỳ.
+ * Phân trang  : Theo payment ID hoặc alert ID; tiếp tục bằng nextCursor đến khi null.
+ * Lưu ý       : Không tự đăng ký scheduler, không cung cấp API quản trị. Mail adapter
+ *               chỉ trả success sau khi cổng mail chấp nhận và nên chống trùng bằng ID.
+ * Môi trường  : OpenText Service Manager (JavaScript ES5 Engine).
+ * -----------------------------------------------------------------------------
  */
 function runExpenseBatch(runtime, asOf, batch) {
     batch = batch || {};
@@ -37,14 +48,14 @@ function dispatchPendingAlerts(runtime, sendEmail, asOf, batch) {
     if (!isFinite(limit) || limit < 1 || limit !== Math.floor(limit)) throw new Error("SLA_INVALID_BATCH_LIMIT");
     for (i = 0; i < rows.length; i++) if ((rows[i]["send.status"] === "Chờ gửi" || rows[i]["send.status"] === "Gửi lỗi") && rows[i].id > (batch.afterAlertId || "")) ids.push(rows[i].id);
     ids.sort();
-    var sent = 0, cancelled = 0, errors = [], processed = 0, stamp = new Date(lib.ESD_HTKT_SLA_CALENDAR.toMillis(store.decodeInstant(asOf))).toISOString();
+    var sent = 0, cancelled = 0, errors = [], processed = 0, stamp = new Date(lib.ESD_HTKT_SLA_ENGINE.toMillis(store.decodeInstant(asOf))).toISOString();
     for (i = 0; i < ids.length && processed < limit; i++) {
         processed++;
         try {
             var candidate = store.get("esdHTKTslaAlertHistory", ids[i]);
             var tracking = store.get("esdHTKTslaTracking", candidate["sla.tracking.id"]);
             if (!tracking) throw new Error("SLA_ALERT_TRACKING_NOT_FOUND");
-            store.withPaymentLock(String(tracking["payment.id"]), function() {
+            (function() {
                 var a = store.get("esdHTKTslaAlertHistory", candidate.id);
                 var t = store.get("esdHTKTslaTracking", candidate["sla.tracking.id"]);
                 var p = store.get("esdHTKTpayment", t["payment.id"]);
@@ -80,9 +91,10 @@ function dispatchPendingAlerts(runtime, sendEmail, asOf, batch) {
                 store.put("esdHTKTslaAlertHistory", a);
                 if (a["send.status"] === "Đã gửi") sent++;
                 else errors.push({alertId: a.id, error: a["error.message"]});
-            });
+            }());
         } catch (error) { errors.push({alertId: ids[i], error: String(error.message || error)}); }
     }
     return {success: errors.length === 0, sent: sent, cancelled: cancelled, errors: errors,
         nextCursor: i < ids.length ? ids[i - 1] : null};
 }
+

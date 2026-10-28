@@ -1,7 +1,18 @@
-/** ScriptLibrary: ESD_HTKT_EXPENSE_SLA. Business event -> SLA commands.
- * Caller supplies immutable before/after snapshots of a SUCCESSFUL business event.
- * event.kind: CREATE / TRANSITION / RETURN / REASSIGN / CANCEL.
- * event.id: stable business operation ID (same value for retries).
+/**
+ * ScriptLibrary: ESD_HTKT_SLA_POLICY
+ * -----------------------------------------------------------------------------
+ * Module      : HTKT - Policy luồng SLA
+ * Version     : 2.0.0
+ *
+ * Chức năng   : Ánh xạ sự kiện nghiệp vụ Dự chi thành các lệnh vận hành SLA
+ *               (bắt đầu, hoàn thành, trả sửa, tái phân công và hủy).
+ * Đầu vào     : Snapshot before/after bất biến của một thao tác nghiệp vụ đã thành
+ *               công; event.kind gồm CREATE, TRANSITION, RETURN, REASSIGN, CANCEL.
+ * Đầu ra      : Danh sách command để ESD_HTKT_SLA_SERVICE áp dụng và lưu dữ liệu.
+ * Lưu ý       : event.id phải là mã thao tác ổn định và được giữ nguyên khi retry.
+ *               Chỉ xử lý esdHTKTpayment có transaction.type = "Dự chi".
+ * Môi trường  : OpenText Service Manager (JavaScript ES5 Engine).
+ * -----------------------------------------------------------------------------
  */
 var EXPENSE_ROLES = {
     initial_dmms: "CB_DE_NGHI", initial_kttc: "CB_KTTC", check_dmms: "RA_SOAT_1",
@@ -23,7 +34,7 @@ function assignee(payment, role) {
     if (role === "CB_KTTC" && payment["initial.role"] === "kttc") return String(payment["created.by"] || "");
     return String(payment[EXPENSE_ACTORS[role]] || "");
 }
-function buildCommands(event) {
+function buildExpenseCommands(event) {
     var after = event.after, before = event.before || {}, commands = [], kind = event.kind;
     if (!after || after["transaction.type"] !== "Dự chi") throw new Error("SLA_NOT_EXPENSE");
     if (!after.id || !event.id || !event.performedBy) throw new Error("SLA_MISSING_EVENT_ID_OR_ACTOR");
@@ -86,3 +97,13 @@ function buildCommands(event) {
     } else throw new Error("SLA_UNKNOWN_EVENT_KIND: " + kind);
     return commands;
 }
+
+
+/* Chọn policy theo loại giao dịch. Thêm policy Tạm ứng/Thanh toán tại đây
+ * mà không sao chép engine tính toán và lưu trữ. */
+function buildCommands(event) {
+    var transactionType = event && event.after ? String(event.after["transaction.type"] || "") : "";
+    if (transactionType === "Dự chi") return buildExpenseCommands(event);
+    throw new Error("SLA_UNSUPPORTED_TRANSACTION_TYPE: " + transactionType);
+}
+
