@@ -21,7 +21,7 @@ let tests=0;
 function test(name,fn) {fn(); tests++; console.log('PASS',name);}
 const clone = x => JSON.parse(JSON.stringify(x));
 function memoryStore() {
-  const db = {}; let writes=0, failAt=null;
+  const db = {}; let writes=0, failAt=null, sequence=0;
   function rowKey(t,row){
     if(t===T.hours)return `${row['day.of.week']}|${row['start.time']}`;
     if(t===T.holiday)return String(row['holiday.date']);
@@ -31,6 +31,7 @@ function memoryStore() {
     get(t,id){return clone(db[t]?.[id] || null);},
     list(t,filter){return Object.values(db[t]||{}).filter(x=>Object.entries(filter).every(([k,v])=>String(x[k])===String(v))).map(clone);},
     put(t,row){writes++;if(writes===failAt)throw Error('INJECTED_WRITE_FAILURE');(db[t] ||= {})[rowKey(t,row)] = clone(row);},
+    nextNumber(numberClass){assert.equal(numberClass,'esdHTKTslaTimeSegment');return String(++sequence);},
     decodeInstant:x=>x,decodeDate:x=>x,
     failAfter(n){failAt=writes+n;}, clearFailure(){failAt=null;}
   };

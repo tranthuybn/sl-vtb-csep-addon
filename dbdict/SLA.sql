@@ -93,7 +93,7 @@ Ref: esdHTKTslaTimeSegment."sla.tracking.id" > esdHTKTslaTracking.id
 // CANCEL: đóng tất cả segment và Tracking đang mở của phiếu tại cùng thời điểm;
 // chốt số phút, ngừng phát sinh cảnh báo mới, giữ nguyên lịch sử đã có.
 Table esdHTKTslaTimeSegment {
-  id varchar [pk] 
+  id varchar [pk] // Cấp tự động từ Sequential Numbers: esdHTKTslaTimeSegment
   "sla.tracking.id" varchar // Mã theo dõi SLA
   "started.at" datetime // Thời điểm bắt đầu khoảng tính
   "ended.at" datetime // Thời điểm kết thúc khoảng tính; null nếu đang chạy

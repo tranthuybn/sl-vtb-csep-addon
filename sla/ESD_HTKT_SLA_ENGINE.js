@@ -386,6 +386,17 @@ function createStore(options) {
         if (rows.length > 1) throw new Error("SLA_DUPLICATE_ID: " + table);
         return rows.length ? rows[0] : null;
     }
+    function nextNumber(numberClass) {
+        var rc = new SCDatum(), value = new SCDatum(), rcText, raw;
+        rc.setValue(-1);
+        system.functions.rtecall("getnumber", rc, value, String(numberClass));
+        rcText = String(rc.getText()).replace(/^\s+|\s+$/g, "");
+        raw = String(value.getText()).replace(/^\s+|\s+$/g, "");
+        if (/^"[^"]*"$/.test(raw) || /^'[^']*'$/.test(raw)) raw = raw.substring(1, raw.length - 1);
+        if (rcText !== "0" || !raw) throw new Error("SLA_SEQUENCE_FAILED: " + numberClass +
+            " rc=" + rcText + " number=" + raw);
+        return raw;
+    }
     function put(table, row) {
         var f = new SCFile(table), rc, exists, names = fields(table), i, identity;
         if (table === "esdHTKTslaWorkingHour") {
@@ -417,7 +428,7 @@ function createStore(options) {
             if (rc !== RC_SUCCESS) throw new Error("SLA_WRITE_FAILED: " + table + " key=" + identity + " rc=" + rc);
         } finally { if (typeof f.close === "function") f.close(); }
     }
-    return { get: get, list: list, put: put,
+    return { get: get, list: list, put: put, nextNumber: nextNumber,
         decodeInstant: options.decodeInstant || function(value) { return value; },
         decodeDate: options.decodeDate || function(value) { return String(value); }
     };
@@ -443,6 +454,13 @@ function createService(store, calendarLib, calculator, policyRules, options) {
     function rows(table, filter) { return store.list(table, filter || {}); }
     function blank(x) { return x === null || typeof x === "undefined" || x === ""; }
     function truth(x) { return x === true || x === 1 || x === "true" || x === "1"; }
+    function nextSegmentId() {
+        if (!store || typeof store.nextNumber !== "function") throw new Error("SLA_SEGMENT_SEQUENCE_PROVIDER_REQUIRED");
+        var id = String(store.nextNumber("esdHTKTslaTimeSegment") || "");
+        if (!id) throw new Error("SLA_EMPTY_SEGMENT_SEQUENCE");
+        if (store.get(SLA_T.segment, id)) throw new Error("SLA_DUPLICATE_SEGMENT_SEQUENCE: " + id);
+        return id;
+    }
     function loadCalendar() {
         var result = {timezone: "Asia/Ho_Chi_Minh", workingHours: [], holidays: []};
         var list = rows(SLA_T.hours, {}), i;
@@ -600,7 +618,7 @@ function createService(store, calendarLib, calculator, policyRules, options) {
                     "role.code": command.role, "attempt.no": attempt, "started.at": at, "ended.at": null,
                     "sla.minutes": minutes, "current.assignee": command.assignee,
                     "end.reason": null, result: null};
-                segments = [{id: key([tid, "SEG", 1]), "sla.tracking.id": tid,
+                segments = [{id: nextSegmentId(), "sla.tracking.id": tid,
                     "started.at": at, "ended.at": null, "working.minutes": 0,
                     "start.event": event.kind === "RETURN" ? "RESET" : "START", "end.event": null,
                     assignee: command.assignee}];
@@ -625,8 +643,8 @@ function createService(store, calendarLib, calculator, policyRules, options) {
                     }
                 }
                 if (found !== 1) throw new Error("SLA_EXPECT_ONE_OPEN_SEGMENT");
-                var nextSegmentId = key([state.row.id, "SEG", state.segments.length + 1]);
-                state.segments.push({id: nextSegmentId, "sla.tracking.id": state.row.id,
+                var newSegmentId = nextSegmentId();
+                state.segments.push({id: newSegmentId, "sla.tracking.id": state.row.id,
                     "started.at": at, "ended.at": null, "working.minutes": 0,
                     "start.event": "REASSIGN", "end.event": null, assignee: command.assignee});
                 state.row["current.assignee"] = command.assignee; persist(state);

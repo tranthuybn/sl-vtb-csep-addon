@@ -901,6 +901,34 @@ function createPaymentReassignmentHistory(paymentId, field, oldValue, newValue, 
     }
 }
 
+function snapshotPaymentForSla(payment) {
+    var names = [
+        "id", "transaction.type", "initial.role", "current.phase", "status",
+        "created.by", "current.executor", "require.check.level1", "require.check.level2",
+        "user.checker.kttc", "user.checker.dmms", "user.approver.dmms",
+        "user.approver.kttc", "user.checker.final", "user.approver.final",
+        "sysmodcount", "sysmodtime", "sysmoduser"
+    ];
+    var result = {}, i;
+    for (i = 0; i < names.length; i++) result[names[i]] = payment[names[i]];
+    return result;
+}
+
+function notifySlaPaymentReassigned(beforeRecord, payment) {
+    try {
+        var afterRecord = snapshotPaymentForSla(payment);
+        var result = lib.ESD_HTKT_SLA_ENGINE.onWorkflowChanged(beforeRecord, afterRecord);
+        print("[PAY_APR][SLA_REASSIGN] SUCCESS | id=" + String(afterRecord.id || "") +
+                " | result=" + JSON.stringify(result));
+        return true;
+    } catch (error) {
+        // payment.doUpdate() đã commit; không báo save thất bại và khiến client gửi lại.
+        print("[PAY_APR][SLA_REASSIGN] ERROR | id=" + String(beforeRecord.id || "") +
+                " | message=" + String(error && error.message ? error.message : error));
+        return false;
+    }
+}
+
 function savePaymentApprovalField(details) {
     return runPaymentApprovalApi(details, true);
 }
@@ -1046,6 +1074,8 @@ function runPaymentApprovalApi(details, save) {
                 (field === "user.approver.kttc" || field === "user.checker.final" ||
                         field === "user.approver.final");
 
+        var isSlaReassignment = false;
+
         if (isDuChi && !isCheckbox && previousApprovalValue &&
                 previousApprovalValue !== value && !isDuChiApprovalCreation(payment) &&
                 !initialKttcSelection) {
@@ -1067,8 +1097,10 @@ function runPaymentApprovalApi(details, save) {
                 return { success: false, code: "PAYMENT_APPROVAL_REASON_REQUIRED",
                     message: "Vui lòng nhập lý do tái phân công tối đa 60 ký tự." };
             }
+            isSlaReassignment = true;
         }
 
+        var slaBeforeRecord = isSlaReassignment ? snapshotPaymentForSla(payment) : null;
         payment[field] = value;
         var clearedField = "";
         if (isCheckbox && !value) {
@@ -1076,6 +1108,9 @@ function runPaymentApprovalApi(details, save) {
             payment[clearedField] = "";
         }
         if (payment.doUpdate() !== RC_SUCCESS) throw new Error("Không lưu được thông tin phê duyệt.");
+
+        var slaUpdated = true;
+        if (isSlaReassignment) slaUpdated = notifySlaPaymentReassigned(slaBeforeRecord, payment);
 
         if (!isCheckbox && !initialKttcSelection) {
             createPaymentReassignmentHistory(
@@ -1093,7 +1128,8 @@ function runPaymentApprovalApi(details, save) {
             data: {
                 field: field,
                 value: value,
-                clearedField: clearedField
+                clearedField: clearedField,
+                slaUpdated: slaUpdated
             }
         };
     } catch (error) {

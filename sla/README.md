@@ -290,6 +290,8 @@ Bộ giá trị Dự chi lấy từ `Thông tin SLA.xlsx`, sheet `Danh mục SLA
 
 Timestamp nghiệp vụ dùng JS Date hoặc ISO có Z/offset; không parse chuỗi ngày theo locale. Riêng `start.time` và `end.time` của `esdHTKTslaWorkingHour` là chuỗi `varchar(8)` theo định dạng `HH:mm:ss` để không phụ thuộc ngày nền và múi giờ của SM. Engine cũng chấp nhận `HH:mm` để tương thích dữ liệu thử nghiệm. Ngày nghỉ dùng YYYY-MM-DD. Version hiện hỗ trợ Asia/Ho_Chi_Minh, không hỗ trợ vùng DST.
 
+ID của `esdHTKTslaTimeSegment` được cấp bằng SM Sequential Numbers với number class `esdHTKTslaTimeSegment` qua `rtecall("getnumber", ...)`. Number class này phải tồn tại trước khi chạy SLA; cấu hình Increment = 1, không Decrement. Có thể dùng Prefix/Suffix theo chuẩn triển khai vì trường `id` là varchar, nhưng giá trị trả về phải duy nhất và không rỗng.
+
 Phút giữ phần lẻ, chỉ làm tròn khi hiển thị. Theo quy tắc hiển thị đã cung cấp, chạm hạn (`remaining <= 0`) là vi phạm; mail BREACH dùng cùng quy ước. Ngoài giờ và ngày nghỉ không tách Segment. Tạm dừng có khoảng hở sẽ được loại thời gian; khi chưa tiếp tục thì chưa xác định được hạn tương lai. Chưa thêm action tạm dừng vào luồng Dự chi vì chưa có nghiệp vụ tương ứng.
 
 ## Job tính lại trạng thái
