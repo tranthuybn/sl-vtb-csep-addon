@@ -748,6 +748,14 @@ function validateVendorAndPaymentDetails(record) {
         errorMss.push("Số tiền hoàn ứng lần này phải lớn hơn 0.");
     }
 
+    if (!isNaN(approvedInvoiceAmount) && !isNaN(payableaAmount) && !isNaN(amountField)) {
+        if (approvedInvoiceAmount === 0 && payableaAmount !== amountField) {
+            errorMss.push("Khi Giá trị hóa đơn chấp nhận bằng 0, Số tiền cấn trừ phải trả phải bằng Số tiền đề nghị thanh toán.");
+        } else if (approvedInvoiceAmount > 0 && payableaAmount > amountField) {
+            errorMss.push("Khi Giá trị hóa đơn chấp nhận lớn hơn 0, Số tiền cấn trừ phải trả phải nhỏ hơn hoặc bằng Số tiền đề nghị thanh toán.");
+        }
+    }
+
     var paymentId = String(record["payment.id"] || record.payment_id || "").trim();
     var vendorId = String(record["vendor.id"] || record.vendor_id || "").trim();
     var contractId = String(record["contract.id"] || record.contract_id || "").trim();
