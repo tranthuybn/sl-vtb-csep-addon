@@ -20,19 +20,24 @@ function runBatch(runtime, asOf, batch) {
     var limit = typeof batch.limit === "undefined" ? 100 : Number(batch.limit);
     if (!isFinite(limit) || limit < 1 || limit !== Math.floor(limit)) throw new Error("SLA_INVALID_BATCH_LIMIT");
     var store = runtime.store, ids = {}, list = store.list("esdHTKTslaTracking", {}), i, id;
-    for (i = 0; i < list.length; i++) if (!list[i]["ended.at"]) ids[String(list[i]["payment.id"])] = true;
+    function collect(row) {
+        var table = lib.ESD_HTKT_SLA_ENGINE.sourceTableForId(row["payment.id"]);
+        ids[String(row["payment.id"])] = {id:String(row["payment.id"]),table:table};
+    }
+    for (i = 0; i < list.length; i++) if (!list[i]["ended.at"]) collect(list[i]);
     list = store.list("esdHTKTslaEventLog", {"processing.status": "PREPARED"});
-    for (i = 0; i < list.length; i++) ids[String(list[i]["payment.id"])] = true;
+    for (i = 0; i < list.length; i++) collect(list[i]);
     var keys = [], payment, results = [], errors = [], processed = 0, cursor = batch.afterPaymentId || "";
     for (id in ids) if (Object.prototype.hasOwnProperty.call(ids, id) && id > cursor) keys.push(id);
     keys.sort();
     for (i = 0; i < keys.length && processed < limit; i++) {
         id = keys[i]; processed++;
         try {
-            payment = store.get("esdHTKTpayment", id);
+            var target = ids[id];
+            payment = store.get(target.table, target.id);
             if (!payment || !isSupportedTransactionType(String(payment["transaction.type"] || ""))) continue;
-            runtime.service.retryPrepared(id);
-            results.push(runtime.service.refresh(id, asOf));
+            runtime.service.retryPrepared(target.id, target.table);
+            results.push(runtime.service.refresh(target.id, asOf, target.table));
         } catch (error) {
             errors.push({paymentId: id, error: String(error.message || error)});
         }
@@ -41,5 +46,3 @@ function runBatch(runtime, asOf, batch) {
         nextCursor: i < keys.length ? keys[i - 1] : null};
 }
 
-// Tương thích scheduler cũ trong giai đoạn chuyển đổi.
-function runExpenseBatch(runtime, asOf, batch) { return runBatch(runtime, asOf, batch); }

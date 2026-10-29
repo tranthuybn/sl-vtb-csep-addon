@@ -63,8 +63,6 @@ Table esdHTKTslaConfigDetail {
 }
 
 
-Ref: esdHTKTslaTracking."payment.id" > esdHTKTpayment.id
-Ref: esdHTKTslaTracking."sla.config.id" > esdHTKTslaConfig.id
 Ref: esdHTKTslaTracking."sla.config.detail.id" > esdHTKTslaConfigDetail.id
 
 // Bảng theo dõi SLA của từng vai trò trên phiếu
@@ -72,7 +70,6 @@ Ref: esdHTKTslaTracking."sla.config.detail.id" > esdHTKTslaConfigDetail.id
 Table esdHTKTslaTracking {
   id varchar [pk] 
   "payment.id" varchar // Mã phiếu tạm ứng/thanh toán/dự chi
-  "sla.config.id" varchar // Bộ cấu hình SLA được áp dụng tại thời điểm bắt đầu đo
   "sla.config.detail.id" varchar // Chi tiết SLA của vai trò được áp dụng
   "role.code" varchar // Mã vai trò đang được đo SLA
   "attempt.no" number // Lần đo SLA; tăng khi phiếu bị yêu cầu chỉnh sửa và phải đo lại từ đầu
