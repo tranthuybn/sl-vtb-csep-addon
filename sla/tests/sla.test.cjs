@@ -301,15 +301,13 @@ test('Two-record workflow API detects events and skips unrelated changes',()=>{
  assert(f.tracks().every(x=>x['ended.at']));
  assert.equal(rt.onWorkflowChanged(rec,{...rec,status:'accounted'}).skipped,true);
 });
-test('Two-record API rejects absent old record or unstable committed metadata',()=>{
+test('Two-record API rejects absent old record and accepts missing sysmod metadata',()=>{
  const f=fixture('META'),rt=engine.createRuntime({store:f.store});
  const old={...f.payment,'current.phase':'initial_dmms'};
  const after={...old,'current.phase':'initial_kttc',status:'dmms_initiated',sysmodcount:2,sysmodtime:time('27','08:10'),sysmoduser:'actor'};
  assert.throws(()=>rt.onWorkflowChanged(null,after),/REQUIRE_OLD_RECORD/);
- for(const [field,code] of [['sysmodcount','SYSMODCOUNT'],['sysmodtime','SYSMODTIME'],['sysmoduser','SYSMODUSER']]) {
-  const bad={...after};delete bad[field];assert.throws(()=>rt.onWorkflowChanged(old,bad),new RegExp(code));
- }
- assert.equal(f.tracks().length,0);
+ const withoutMetadata={...after};delete withoutMetadata.sysmodcount;delete withoutMetadata.sysmodtime;delete withoutMetadata.sysmoduser;
+ assert.equal(rt.onWorkflowChanged(old,withoutMetadata).success,true);assert.equal(f.tracks().length,1);
 });
 test('Two-record API distinguishes prepayment',()=>{
  const f=fixture('PRE-TWO'),rt=engine.createRuntime({store:f.store});

@@ -22,6 +22,15 @@ function slaCalculatorApi() {
 }
 function slaPolicyApi() { return {buildCommands:buildCommands}; }
 
+function slaDebug(message, data) {
+    var line = "[HTKT_SLA_DEBUG] " + message;
+    if (typeof data !== "undefined") {
+        try { line += " | " + JSON.stringify(data); }
+        catch (ignore) { line += " | " + String(data); }
+    }
+    if (typeof print === "function") print(line);
+}
+
 /* =============================================================================
  * POLICY LUỒNG SLA DÙNG CHUNG
  * Chuyển sự kiện workflow thành START/COMPLETE/RETURN/REASSIGN/CANCEL.
@@ -458,9 +467,13 @@ function createService(store, calendarLib, calculator, policyRules, options) {
                     (blank(config["effective.to"]) || at < instant(config["effective.to"])) &&
                     String(config["product.type"]) === productType) matches.push(config);
         }
+        slaDebug("CONFIG_LOOKUP", {paymentId:payment.id, transactionType:transactionType,
+            productType:productType, role:role, configCount:configs.length, effectiveCount:matches.length});
         if (matches.length !== 1) throw new Error("SLA_EXPECT_ONE_EFFECTIVE_CONFIG: " + matches.length);
         config = matches[0];
         details = rows(SLA_T.detail, {"sla.config.id": config.id, "role.code": role});
+        slaDebug("DETAIL_LOOKUP", {configId:config.id, role:role, detailCount:details.length,
+            active:details.length ? details[0]["is.active"] : null});
         if (details.length !== 1) throw new Error("SLA_EXPECT_ONE_ROLE_DETAIL: " + role);
         if (!truth(details[0]["is.active"])) return null;
         return { config: config, detail: details[0], calendar: loadCalendar() };
@@ -497,11 +510,23 @@ function createService(store, calendarLib, calculator, policyRules, options) {
     }
     function addWrite(plan, table, row) { plan.push({table: table, row: clone(row)}); }
     function commit(plan, eventId) {
-        for (var i = 0; i < plan.length; i++) store.put(plan[i].table, plan[i].row);
+        slaDebug("COMMIT_BEGIN", {eventId:eventId, writes:plan.length});
+        for (var i = 0; i < plan.length; i++) {
+            slaDebug("WRITE", {table:plan[i].table, id:plan[i].row.id || null,
+                paymentId:plan[i].row["payment.id"] || null,
+                trackingId:plan[i].row["sla.tracking.id"] || null,
+                role:plan[i].row["role.code"] || null});
+            store.put(plan[i].table, plan[i].row);
+        }
+        slaDebug("COMMIT_DONE", {eventId:eventId, writes:plan.length});
         return {success: true, eventId: eventId, writes: plan.length};
     }
     function applyEvent(event) {
         var commands = policyRules.buildCommands(event);
+        slaDebug("APPLY_EVENT", {eventId:event.id, kind:event.kind, paymentId:event.after.id,
+            beforeStatus:event.before ? event.before.status : null, afterStatus:event.after.status,
+            beforePhase:event.before ? event.before["current.phase"] : null,
+            afterPhase:event.after["current.phase"], commands:commands});
         var sourceTable = sourceTableFor(event.after);
         if (event.before && sourceTableFor(event.before) !== sourceTable) throw new Error("SLA_SOURCE_TABLE_CHANGED");
         var paymentId = String(event.after.id);
@@ -692,7 +717,22 @@ function workflowChangeKind(before, after) {
     return null;
 }
 function onWorkflowChanged(oldRecord, record) {
-    return createRuntime().onWorkflowChanged(oldRecord, record);
+    slaDebug("WORKFLOW_CALL", {id:record ? record.id : null,
+        transactionType:record ? record["transaction.type"] : null,
+        oldStatus:oldRecord ? oldRecord.status : null, newStatus:record ? record.status : null,
+        oldPhase:oldRecord ? oldRecord["current.phase"] : null,
+        newPhase:record ? record["current.phase"] : null,
+        sysmodcount:record ? record["sysmodcount"] : null,
+        sysmodtime:record ? record["sysmodtime"] : null,
+        sysmoduser:record ? record["sysmoduser"] : null});
+    try {
+        var result = createRuntime().onWorkflowChanged(oldRecord, record);
+        slaDebug("WORKFLOW_RESULT", result);
+        return result;
+    } catch (error) {
+        slaDebug("WORKFLOW_ERROR", {message:String(error && error.message ? error.message : error)});
+        throw error;
+    }
 }
 
 function createRuntime(options) {
@@ -711,16 +751,26 @@ function createRuntime(options) {
     function onChanged(oldRecord, record) {
         var before = snapshot(oldRecord), after = snapshot(record);
         var kind = workflowChangeKind(before, after);
+        slaDebug("CHANGE_DETECTED", {id:after ? after.id : null, kind:kind,
+            beforeStatus:before ? before.status : null, afterStatus:after ? after.status : null,
+            beforePhase:before ? before["current.phase"] : null,
+            afterPhase:after ? after["current.phase"] : null});
         if (!kind) return {success:true, skipped:true, reason:"NO_SLA_CHANGE"};
-        // Read metadata from the saved record, never generate a new clock/ID during retry.
+        // Workflow Rule Set may not expose sysmod* fields. EventLog/idempotent replay has
+        // been removed, so fall back to the current SM time/operator when they are absent.
         var revision = record["sysmodcount"], actor = String(record["sysmoduser"] || "");
-        if (revision === null || typeof revision === "undefined" || !/^\d+$/.test(String(revision)))
-            throw new Error("SLA_REQUIRE_COMMITTED_SYSMODCOUNT");
-        if (!record["sysmodtime"]) throw new Error("SLA_REQUIRE_COMMITTED_SYSMODTIME");
-        if (!actor) throw new Error("SLA_REQUIRE_COMMITTED_SYSMODUSER");
-        var at = new Date(calendar.toMillis(store.decodeInstant(record["sysmodtime"]))).toISOString();
+        if (!actor && typeof system !== "undefined" && system.functions &&
+                typeof system.functions.operator === "function") actor = String(system.functions.operator() || "");
+        if (!actor) actor = String(record["current.executor"] || record["created.by"] || "SYSTEM");
+        var at = record["sysmodtime"] ?
+            new Date(calendar.toMillis(store.decodeInstant(record["sysmodtime"]))).toISOString() :
+            new Date().toISOString();
+        var operationKey = revision === null || typeof revision === "undefined" || revision === "" ?
+            [record.id, record.status, record["current.phase"], at].join(":") : String(revision) + ":" + at;
+        slaDebug("COMMITTED_CONTEXT", {revision:revision || null, eventAt:at, performedBy:actor,
+            usedFallback:!record["sysmodtime"] || !record["sysmoduser"]});
         return onBusinessCommitted(kind, before, after, {
-            operationId:"WF:" + String(revision) + ":" + at,
+            operationId:"WF:" + operationKey,
             eventAt:at, performedBy:actor
         });
     }

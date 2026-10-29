@@ -28,8 +28,7 @@ lib.ESD_HTKT_SLA_ENGINE.onWorkflowChanged(oldRecord, record);
 
 - oldRecord là bản trước của chính thao tác; record là bản sau đã lưu thành công. Hàm tự nhận diện CREATE/TRANSITION/RETURN/CANCEL/REASSIGN; bỏ qua thay đổi không liên quan và cập nhật sau khi kết thúc. Thay status không khớp chuyển phase được hỗ trợ thì báo lỗi, không tự đoán.
 - Chỉ truyền oldRecord=null khi tạo mới có status tạo mới; phiếu đang xử lý mà thiếu bản trước sẽ báo SLA_REQUIRE_OLD_RECORD. Không đọc lại DB sau chuyển bước để thay bản trước.
-- record sau lưu cần sysmodcount, sysmodtime, sysmoduser. Wrapper lấy operationId từ sysmodcount + thời điểm sysmodtime; eventAt từ sysmodtime, performedBy từ sysmoduser. Không dùng Date mới/UUID mới mỗi retry. Retry phải giữ đúng hai record và metadata của thao tác ban đầu.
-- Chưa xác nhận SM thực tế có sysmodcount ở Rule Set, kiểu datetime sysmodtime có được toMillis đọc đúng, hay sysmoduser có còn là người thao tác sau các cập nhật trung gian. Thiếu field wrapper sẽ báo lỗi rõ. Nếu cần adapter, dùng createRuntime(adapterOptions).onWorkflowChanged(oldRecord, record), hoặc cấu hình tập trung sau khi xác minh kiểu SM.
+- Nếu Rule Set có sysmodtime/sysmoduser thì wrapper sử dụng các giá trị đó. Khi SM không đưa các field này vào `record`, wrapper dùng thời điểm hiện tại và `system.functions.operator()`; fallback cuối là current.executor/created.by.
 - onBusinessCommitted(kind,before,after,context) vẫn còn làm API cấp thấp cho caller có context ổn định riêng. Hai API cùng dùng một engine, không gọi cả hai cho cùng thao tác.
 - transaction.type vẫn cần đúng giá trị Dự chi/Tạm ứng/Thanh toán để chọn Config. Nếu record Tạm ứng không có field này thực tế, phải chuẩn hóa object đầu vào; chưa xác nhận field trên SM.
 
@@ -188,7 +187,7 @@ oldRecord phải là bản trước của chính thao tác, record là bản sau
 
 Hàm tự nhận diện CREATE/TRANSITION/RETURN/CANCEL/REASSIGN, bỏ qua cập nhật không liên quan và cập nhật sau trạng thái kết thúc. Status thay đổi không thuộc chuyển bước được hỗ trợ sẽ báo lỗi để tránh bỏ sót SLA. Không đo ở các status tạo mới. Cùng dùng cho payment/prepayment như quy tắc bảng nguồn bên dưới.
 
-Để tự tạo context ổn định, record sau lưu bắt buộc có sysmodcount (số phiên bản cập nhật), sysmodtime (thời điểm lưu), sysmoduser (người lưu). event ID ghép phiên bản và thời điểm; eventAt lấy sysmodtime, performedBy lấy sysmoduser. Retry phải truyền lại đúng hai bản ghi cùng metadata ban đầu; không đọc record phiên bản mới hơn hoặc tạo Date mới. sysmoduser là người/service ghi cuối, chưa chắc là người dùng thao tác nếu có cập nhật trung gian. Gọi trước các cập nhật hệ thống làm thay đổi metadata này.
+Nếu record sau lưu có sysmodcount/sysmodtime/sysmoduser thì entry point ưu tiên dùng chúng. Trong Workflow Rule Set không có các field này, engine dùng thời điểm hiện tại và operator hiện tại của SM. Vì EventLog đã bỏ, caller phải bảo đảm mỗi thay đổi workflow chỉ gọi engine một lần.
 
 Không tự đoán datetime theo locale. Nếu SM trả sysmodtime ở kiểu chưa hỗ trợ, cấu hình adapter tập trung và gọi createRuntime(adapterOptions).onWorkflowChanged(oldRecord, record). Hàm trực tiếp mặc định dùng adapter mặc định; chưa xác nhận kiểu datetime và sysmodcount trên SM thật. Thiếu metadata sẽ báo lỗi rõ, không tự sinh ID/thời gian mới.
 
