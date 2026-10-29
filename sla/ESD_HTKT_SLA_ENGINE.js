@@ -174,6 +174,7 @@ function dateKey(day) {
 }
 function clockMinutes(value) {
     var hour, minute, second, m;
+    if (value && typeof value.JSDate === "function") value = value.JSDate();
     if (value && typeof value.getHours === "function") {
         hour = value.getHours(); minute = value.getMinutes(); second = value.getSeconds();
     } else {
@@ -196,7 +197,9 @@ function compileCalendar(calendar) {
         row = rows[i]; day = Number(row.dayOfWeek);
         if (day < 1 || day > 7 || day !== Math.floor(day)) throw new Error("SLA_INVALID_WEEKDAY");
         start = clockMinutes(row.startTime); end = clockMinutes(row.endTime);
-        if (end <= start) throw new Error("SLA_INVALID_WORKING_INTERVAL");
+        if (end <= start) throw new Error("SLA_INVALID_WORKING_INTERVAL: day=" + day +
+            ", start=" + String(row.startTime) + " (" + start + ")" +
+            ", end=" + String(row.endTime) + " (" + end + ")");
         if (!compiled.days[day]) compiled.days[day] = [];
         compiled.days[day].push([start, end]);
     }
@@ -777,7 +780,6 @@ function createRuntime(options) {
     return {service: service, store: store, onBusinessCommitted: onBusinessCommitted,
         onWorkflowChanged:onChanged};
 }
-
 
 /* =============================================================================
  * KHỞI TẠO CẤU HÌNH

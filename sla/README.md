@@ -288,7 +288,7 @@ Dùng schema DBML `../dbdict/SLA.sql` để tạo dbdict/index thực tế. Chư
 
 Bộ giá trị Dự chi lấy từ `Thông tin SLA.xlsx`, sheet `Danh mục SLA`, dòng 19 và lưu theo phút: CB đề nghị 120; KTTC 180; RS1 180; PD ĐMMS 360; PD KTTC 360; RS2 270; cấp thẩm quyền 540. Cấu hình Dự chi có `product.type = "Tất cả"`. Hiệu lực theo khoảng `[effective.from, effective.to)`; không cho chồng lấn. `Tracking.sla.minutes` chốt nguyên `ConfigDetail.sla.minutes` khi bắt đầu bước; Tracking đang mở dùng giờ làm việc/ngày nghỉ hiện hành khi tính lại.
 
-Timestamp dùng JS Date hoặc ISO có Z/offset; không parse chuỗi ngày theo locale. `start.time` và `end.time` là field Date/time của SM; engine chỉ lấy phần giờ, phút, giây và bỏ qua phần ngày. Chuỗi `HH:mm`/`HH:mm:ss` vẫn được hỗ trợ để tương thích adapter và dữ liệu thử nghiệm. Ngày nghỉ dùng YYYY-MM-DD. Version hiện hỗ trợ Asia/Ho_Chi_Minh, không hỗ trợ vùng DST.
+Timestamp nghiệp vụ dùng JS Date hoặc ISO có Z/offset; không parse chuỗi ngày theo locale. Riêng `start.time` và `end.time` của `esdHTKTslaWorkingHour` là chuỗi `varchar(8)` theo định dạng `HH:mm:ss` để không phụ thuộc ngày nền và múi giờ của SM. Engine cũng chấp nhận `HH:mm` để tương thích dữ liệu thử nghiệm. Ngày nghỉ dùng YYYY-MM-DD. Version hiện hỗ trợ Asia/Ho_Chi_Minh, không hỗ trợ vùng DST.
 
 Phút giữ phần lẻ, chỉ làm tròn khi hiển thị. Theo quy tắc hiển thị đã cung cấp, chạm hạn (`remaining <= 0`) là vi phạm; mail BREACH dùng cùng quy ước. Ngoài giờ và ngày nghỉ không tách Segment. Tạm dừng có khoảng hở sẽ được loại thời gian; khi chưa tiếp tục thì chưa xác định được hạn tương lai. Chưa thêm action tạm dừng vào luồng Dự chi vì chưa có nghiệp vụ tương ứng.
 

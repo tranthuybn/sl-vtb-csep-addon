@@ -8,8 +8,8 @@
 // Lịch chuẩn có 10 dòng: 2 ca/ngày x 5 ngày; không có dòng cho thứ Bảy/Chủ nhật.
 Table esdHTKTslaWorkingHour {
   "day.of.week" number [not null] // ISO: 1=thứ Hai ... 7=Chủ nhật
-  "start.time" datetime [not null] // Date/time; phần ngày không tham gia tính SLA
-  "end.time" datetime [not null] // Date/time; phải lớn hơn start.time theo phần thời gian
+  "start.time" varchar(8) [not null] // Giờ thuần túy theo định dạng HH:mm:ss, ví dụ 08:00:00
+  "end.time" varchar(8) [not null] // Giờ thuần túy HH:mm:ss; phải lớn hơn start.time
 
   indexes {
     ("day.of.week", "start.time") [pk]
