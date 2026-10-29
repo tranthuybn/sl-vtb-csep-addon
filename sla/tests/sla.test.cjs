@@ -36,7 +36,7 @@ function fixture(id='DC01',initial='dmms',rs1=true,rs2=true) {
   calendar.workingHours.forEach((x,i)=>store.put(T.hours,{id:'H'+i,'day.of.week':x.dayOfWeek,'start.time':x.startTime,'end.time':x.endTime}));
   store.put(T.config,{id:'CFG','transaction.type':'Dự chi','product.type':'Tất cả','effective.from':time('01','00:00'),'effective.to':null,status:'Đang hoạt động'});
   const roles=['user.created.dmms','user.checker.kttc','user.checker.dmms','user.approver.dmms','user.approver.kttc','user.checker.final','user.approver.final'];
-  roles.forEach(role=>store.put(T.detail,{id:role,'sla.config.id':'CFG','role.code':role,'sla.hours':1,'is.active':true}));
+  roles.forEach(role=>store.put(T.detail,{id:role,'sla.config.id':'CFG','role.code':role,'sla.minutes':60,'is.active':true}));
   let payment={id,'transaction.type':'Dự chi','initial.role':initial,'current.phase':'start',status:initial+'_created','created.by':'maker','require.check.level1':rs1,'require.check.level2':rs2,'user.checker.kttc':'kttc','user.checker.dmms':'rs1','user.approver.dmms':'pd_dmms','user.approver.kttc':'pd_kttc','user.checker.final':'rs2','user.approver.final':'pd_final'};
   store.put(payment['transaction.type']==='Tạm ứng'?'esdHTKTprepayment':'esdHTKTpayment',payment);
   const service=engine.createService(store,cal,calc,rules,{});
@@ -166,10 +166,10 @@ test('Interrupted multi-table writes recover from PREPARED; later operations can
  f.service.applyEvent(f.events[0]);assert.equal(f.tracks().length,1);assert.equal(f.store.list(T.segment,{}).length,1);
  assert(f.store.list(T.event,{}).some(x=>x['processing.status']==='APPLIED'));
 });
-test('Decimal budgets are fixed on tracking creation',()=>{
- const f=fixture();f.store.put(T.detail,{...f.store.get(T.detail,'user.created.dmms'),'sla.hours':1.125});
+test('Minute budgets are fixed on tracking creation',()=>{
+ const f=fixture();f.store.put(T.detail,{...f.store.get(T.detail,'user.created.dmms'),'sla.minutes':67.5});
  f.send('RETURN',time('27','08:00'),{'current.phase':'initial_dmms',status:'request_edit'});assert.equal(f.tracks()[0]['sla.minutes'],67.5);
- f.store.put(T.detail,{...f.store.get(T.detail,'user.created.dmms'),'sla.hours':99});
+ f.store.put(T.detail,{...f.store.get(T.detail,'user.created.dmms'),'sla.minutes':99});
  f.service.refresh(f.payment.id,time('27','08:48'));
  assert.equal(f.tracks()[0]['sla.minutes'],67.5);
 });
@@ -228,7 +228,7 @@ test('Bootstrap publishes config last and rejects overlap; seeds approved holida
  const args={configId:'DC',effectiveFrom:time('01','00:00'),performedBy:'admin',holidays:['2026-10-28']};
  boot.installBaseline(st,cal,args);
  assert.equal(writes.at(-1),T.config);assert.equal(st.list(T.detail,{}).length,7);assert.equal(st.list(T.hours,{}).length,10);
- assert.equal(st.get(T.detail,'DC.user.checker.final')['sla.hours'],4.5);assert.equal(st.list(T.holiday,{}).length,1);
+ assert.equal(st.get(T.detail,'DC.user.checker.final')['sla.minutes'],270);assert.equal(st.list(T.holiday,{}).length,1);
  boot.installBaseline(st,cal,{...args,configId:'TA',transactionType:'Tạm ứng'});
  assert.equal(st.list(T.hours,{}).length,10);assert.equal(st.list(T.holiday,{}).length,1);
  assert.throws(()=>boot.installBaseline(st,cal,{...args,configId:'DC2'}),/EFFECTIVE_OVERLAP/);

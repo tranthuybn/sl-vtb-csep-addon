@@ -15,6 +15,7 @@ Mục này ghi lại các quyết định và công việc của cuộc chat hi�
 - Người dùng làm rõ chỉ bỏ đo khi status dmms_created/kttc_created, không bỏ toàn bộ phase initial_dmms/initial_kttc. Engine cũng coi initialized (thấy trong workflow Tạm ứng) là tạo mới, không đo. CREATE không mở Tracking/Segment. ĐMMS gửi sang KTTC bắt đầu đo KTTC; KTTC tạo gửi PD KTTC bắt đầu đo PD KTTC. RETURN về request_edit vẫn bắt đầu maker vòng mới.
 - Đã bỏ field source.table khỏi ENGINE, JOB, Tracking, EventLog và schema. Không thêm lại để chống trùng ID vì prefix đã phân biệt. Tracking/EventLog ID không ghép bảng nguồn. Engine vẫn có hàm/biến nội bộ xác định bảng; đó không phải field dữ liệu.
 - Đã bỏ sla.config.id khỏi Tracking, cả danh sách field đọc/ghi, câu tạo Tracking và Ref dbdict. Tracking chỉ giữ sla.config.detail.id; suy ra Config qua ConfigDetail.sla.config.id. ConfigDetail.sla.config.id vẫn giữ. SLA tính từ sla.minutes chốt trên Tracking, không cần đọc lại định mức Config mỗi lượt.
+- Đơn vị định mức đã thống nhất là phút: ConfigDetail dùng sla.minutes và Tracking chốt nguyên giá trị này khi bắt đầu đo. Không còn sla.hours hoặc phép nhân 60 trong engine.
 - Unique index Tracking hiện là (payment.id, attempt.no, role.code); payment.id giữ nguyên ID phiếu gồm prefix. Không tạo FK payment.id chỉ trỏ esdHTKTpayment vì phiếu TU nằm bảng khác.
 
 ### API workflow hiện tại và điều kiện phải xác nhận trên SM
@@ -289,7 +290,7 @@ Dùng schema DBML `../dbdict/SLA.sql` để tạo dbdict/index thực tế. Chư
 
 `buildBaseline(calendarLib, args)` tạo bộ dữ liệu để xem trước; `installBaseline(store, calendarLib, args)` thực sự ghi dữ liệu. Args cần `configId`, `transactionType`, `effectiveFrom`, `performedBy` và `holidays`; `effectiveTo` tùy chọn. Bootstrap luôn ghi `product.type = "Tất cả"`. Giờ làm việc và ngày nghỉ là cấu hình toàn hệ thống, được ghi đè theo ID; không có `calendarId` hoặc phiên bản lịch.
 
-Bộ giá trị Dự chi lấy từ `Thông tin SLA.xlsx`, sheet `Danh mục SLA`, dòng 19: CB đề nghị 2h; KTTC 3h; RS1 3h; PD ĐMMS 6h; PD KTTC 6h; RS2 4,5h; cấp thẩm quyền 9h. Cấu hình Dự chi có `product.type = "Tất cả"`. Hiệu lực theo khoảng `[effective.from, effective.to)`; không cho chồng lấn. Budget được chốt trên Tracking khi bắt đầu bước; Tracking đang mở dùng giờ làm việc/ngày nghỉ hiện hành khi tính lại.
+Bộ giá trị Dự chi lấy từ `Thông tin SLA.xlsx`, sheet `Danh mục SLA`, dòng 19 và lưu theo phút: CB đề nghị 120; KTTC 180; RS1 180; PD ĐMMS 360; PD KTTC 360; RS2 270; cấp thẩm quyền 540. Cấu hình Dự chi có `product.type = "Tất cả"`. Hiệu lực theo khoảng `[effective.from, effective.to)`; không cho chồng lấn. `Tracking.sla.minutes` chốt nguyên `ConfigDetail.sla.minutes` khi bắt đầu bước; Tracking đang mở dùng giờ làm việc/ngày nghỉ hiện hành khi tính lại.
 
 Timestamp dùng JS Date hoặc ISO có Z/offset; không parse chuỗi ngày theo locale. `start.time` và `end.time` là field Character dài 5, bắt buộc định dạng `HH:mm`; không dùng Date/time của SM. Ngày nghỉ dùng YYYY-MM-DD. Store chỉ cần adapter cho instant và ngày. Version hiện hỗ trợ Asia/Ho_Chi_Minh, không hỗ trợ vùng DST.
 

@@ -327,8 +327,8 @@ var SLA_FIELDS = {
     esdHTKTslaWorkingHour: "id,day.of.week,start.time,end.time",
     esdHTKTslaHoliday: "id,holiday.date,holiday.name,holiday.type,note,created.by,created.at",
     esdHTKTslaConfig: "id,transaction.type,product.type,effective.from,effective.to,status",
-    esdHTKTslaConfigDetail: "id,sla.config.id,role.code,role.name,sla.hours,is.active",
-    esdHTKTslaTracking: "id,payment.id,sla.config.detail.id,role.code,attempt.no,started.at,ended.at,due.at,sla.minutes,current.assignee,status,created.at,end.reason,result",
+    esdHTKTslaConfigDetail: "id,sla.config.id,role.code,role.name,sla.minutes,is.active",
+    esdHTKTslaTracking: "id,payment.id,sla.config.detail.id,role.code,attempt.no,started.at,ended.at,due.at,sla.minutes,current.assignee,status,end.reason,result",
     esdHTKTslaTimeSegment: "id,sla.tracking.id,segment.no,started.at,ended.at,working.minutes,start.event,end.event,assignee,created.at",
     esdHTKTslaEventLog: "id,sla.tracking.id,payment.id,event.type,event.at,from.status,to.status,from.phase,to.phase,role.code,performed.by,assignee,data,created.at,processing.status,event.key"
 };
@@ -585,15 +585,15 @@ function createService(store, calendarLib, calculator, policyRules, options) {
                 if (selected === null) continue;
                 if (!command.assignee) throw new Error("SLA_MISSING_ASSIGNEE: " + command.role);
                 var detail = selected.detail;
-                var hours = Number(detail["sla.hours"]);
-                if (!isFinite(hours) || hours <= 0) throw new Error("SLA_INVALID_HOURS");
+                var minutes = Number(detail["sla.minutes"]);
+                if (!isFinite(minutes) || minutes <= 0) throw new Error("SLA_INVALID_MINUTES");
                 var tid = key([paymentId, attempt, command.role]);
                 if (store.get(SLA_T.tracking, tid)) throw new Error("SLA_TRACKING_ALREADY_EXISTS: " + tid);
                 row = {id: tid, "payment.id": paymentId,
                     "sla.config.detail.id": detail.id,
                     "role.code": command.role, "attempt.no": attempt, "started.at": at, "ended.at": null,
-                    "sla.minutes": hours * 60, "current.assignee": command.assignee,
-                    "end.reason": null, result: null, "created.at": at};
+                    "sla.minutes": minutes, "current.assignee": command.assignee,
+                    "end.reason": null, result: null};
                 segments = [{id: key([tid, "SEG", 1]), "sla.tracking.id": tid, "segment.no": 1,
                     "started.at": at, "ended.at": null, "working.minutes": 0,
                     "start.event": event.kind === "RETURN" ? "RESET" : "START", "end.event": null,
@@ -802,11 +802,11 @@ function buildBaseline(calendarLib, args) {
         "effective.from":new Date(start).toISOString(),
         "effective.to":end === null ? null : new Date(end).toISOString(),status:"Đang hoạt động"}});
     // Source: Thông tin SLA.xlsx, Danh mục SLA, row 19. Order follows actual workflow.
-    var roles = [["user.created.dmms",2],["user.checker.kttc",3],["user.checker.dmms",3],["user.approver.dmms",6],
-        ["user.approver.kttc",6],["user.checker.final",4.5],["user.approver.final",9]];
+    var roles = [["user.created.dmms",120],["user.checker.kttc",180],["user.checker.dmms",180],["user.approver.dmms",360],
+        ["user.approver.kttc",360],["user.checker.final",270],["user.approver.final",540]];
     for (i = 0; i < roles.length; i++) writes.push({table:"esdHTKTslaConfigDetail",row:{
         id:args.configId+"."+roles[i][0],"sla.config.id":args.configId,"role.code":roles[i][0],
-        "role.name":roles[i][0],"sla.hours":roles[i][1],"is.active":true}});
+        "role.name":roles[i][0],"sla.minutes":roles[i][1],"is.active":true}});
     return writes;
 }
 function installBaseline(store, calendarLib, args) {

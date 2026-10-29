@@ -58,7 +58,7 @@ Table esdHTKTslaConfigDetail {
   "sla.config.id" varchar // Mã cấu hình SLA
   "role.code" varchar // Mã vai trò xử lý (user.created.dmms/user.checker.kttc/user.checker.dmms/user.approver.dmms/user.approver.kttc/user.checker.final/user.approver.final)
   "role.name" varchar // Tên vai trò hiển thị
-  "sla.hours" decimal // Số giờ làm việc cam kết của vai trò
+  "sla.minutes" decimal // Số phút làm việc cam kết của vai trò
   "is.active" bool // Có áp dụng SLA cho vai trò này hay không (mặc định là true)
 }
 
@@ -78,10 +78,9 @@ Table esdHTKTslaTracking {
   "due.at" datetime // Hạn xử lý dự kiến sau khi loại trừ ngoài giờ và ngày nghỉ/lễ
   "end.reason" varchar // COMPLETE/RETURN/CANCEL; null khi đang đo
   result varchar // MET/BREACHED/NOT_EVALUATED; null khi chưa kết thúc
-  "sla.minutes" decimal // Tổng số phút làm việc cam kết, quy đổi từ sla.hours
+  "sla.minutes" decimal // Tổng số phút làm việc cam kết, chốt từ cấu hình khi bắt đầu đo
   "current.assignee" varchar // Người đang được giao xử lý
   status varchar // Trạng thái SLA (Chưa tính/Trong thời gian/Vi phạm/Đã kết thúc)
-  "created.at" datetime // Thời điểm tạo bản ghi theo dõi
   sysmoduser varchar(60) // OpenText SM tự ghi người tạo hoặc cập nhật gần nhất
   sysmodtime datetime // OpenText SM tự cập nhật khi bản ghi được tạo hoặc sửa
 
