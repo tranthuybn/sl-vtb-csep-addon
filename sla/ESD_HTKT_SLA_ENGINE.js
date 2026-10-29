@@ -5,7 +5,7 @@
  * Version     : 2.0.0
  *
  * Chức năng   : Tính thời gian theo lịch làm việc và ghi toàn bộ vòng đời SLA:
- *               Tracking, Time Segment và EventLog.
+ *               Tracking và Time Segment.
  * Phạm vi     : Engine dùng chung cho các loại giao dịch và chứa trực tiếp quy tắc
  *               chuyển phase/role của luồng SLA.
  * Entry point : onWorkflowChanged(), snapshot(), createRuntime(), buildBaseline() và installBaseline().
@@ -164,9 +164,17 @@ function dateKey(day) {
     return d.getUTCFullYear() + "-" + pad2(d.getUTCMonth() + 1) + "-" + pad2(d.getUTCDate());
 }
 function clockMinutes(value) {
-    var m = /^(\d{2}):(\d{2})$/.exec(String(value));
-    if (!m || Number(m[1]) > 23 || Number(m[2]) > 59) throw new Error("SLA_INVALID_WORKING_TIME: " + value);
-    return Number(m[1]) * 60 + Number(m[2]);
+    var hour, minute, second, m;
+    if (value && typeof value.getHours === "function") {
+        hour = value.getHours(); minute = value.getMinutes(); second = value.getSeconds();
+    } else {
+        m = /(?:^|T|\s)(\d{2}):(\d{2})(?::(\d{2}))?(?:$|Z|[+\-]\d{2}:?\d{2}|\s)/.exec(String(value));
+        if (m) { hour = Number(m[1]); minute = Number(m[2]); second = Number(m[3] || 0); }
+    }
+    if (!isFinite(hour) || hour > 23 || !isFinite(minute) || minute > 59 || !isFinite(second) || second > 59) {
+        throw new Error("SLA_INVALID_WORKING_TIME: " + value);
+    }
+    return hour * 60 + minute + second / 60;
 }
 function compileCalendar(calendar) {
     if (!calendar || calendar.timezone !== "Asia/Ho_Chi_Minh") {
@@ -324,13 +332,12 @@ function calculateTransactionTracking(calendarLib, calendar, payment, tracking, 
 var SLA_FIELDS = {
     esdHTKTprepayment: "id,transaction.type,initial.role,current.phase,status,created.by,current.executor,require.check.level1,require.check.level2,user.checker.kttc,user.checker.dmms,user.approver.dmms,user.approver.kttc,user.checker.final,user.approver.final",
     esdHTKTpayment: "id,transaction.type,initial.role,current.phase,status,created.by,current.executor,require.check.level1,require.check.level2,user.checker.kttc,user.checker.dmms,user.approver.dmms,user.approver.kttc,user.checker.final,user.approver.final",
-    esdHTKTslaWorkingHour: "id,day.of.week,start.time,end.time",
-    esdHTKTslaHoliday: "id,holiday.date,holiday.name,holiday.type,note,created.by,created.at",
+    esdHTKTslaWorkingHour: "day.of.week,start.time,end.time",
+    esdHTKTslaHoliday: "holiday.date,holiday.name,holiday.type,sysmoduser,sysmodtime",
     esdHTKTslaConfig: "id,transaction.type,product.type,effective.from,effective.to,status",
     esdHTKTslaConfigDetail: "id,sla.config.id,role.code,role.name,sla.minutes,is.active",
     esdHTKTslaTracking: "id,payment.id,sla.config.detail.id,role.code,attempt.no,started.at,ended.at,due.at,sla.minutes,current.assignee,status,end.reason,result",
-    esdHTKTslaTimeSegment: "id,sla.tracking.id,segment.no,started.at,ended.at,working.minutes,start.event,end.event,assignee,created.at",
-    esdHTKTslaEventLog: "id,sla.tracking.id,payment.id,event.type,event.at,from.status,to.status,from.phase,to.phase,role.code,performed.by,assignee,data,created.at,processing.status,event.key"
+    esdHTKTslaTimeSegment: "id,sla.tracking.id,started.at,ended.at,working.minutes,start.event,end.event,assignee"
 };
 function quoteValue(value) {
     return '"' + String(value).replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"';
@@ -368,10 +375,19 @@ function createStore(options) {
         return rows.length ? rows[0] : null;
     }
     function put(table, row) {
-        var f = new SCFile(table), rc, exists, names = fields(table), i;
-        if (!row.id) throw new Error("SLA_MISSING_ROW_ID");
+        var f = new SCFile(table), rc, exists, names = fields(table), i, identity;
+        if (table === "esdHTKTslaWorkingHour") {
+            if (typeof row["day.of.week"] === "undefined" || !row["start.time"]) throw new Error("SLA_MISSING_WORKING_HOUR_KEY");
+            identity = "day.of.week=" + quoteValue(row["day.of.week"]) + " and start.time=" + quoteValue(row["start.time"]);
+        } else if (table === "esdHTKTslaHoliday") {
+            if (!row["holiday.date"]) throw new Error("SLA_MISSING_HOLIDAY_KEY");
+            identity = "holiday.date=" + quoteValue(row["holiday.date"]);
+        } else {
+            if (!row.id) throw new Error("SLA_MISSING_ROW_ID");
+            identity = "id=" + quoteValue(row.id);
+        }
         try {
-            rc = f.doSelect("id=" + quoteValue(row.id));
+            rc = f.doSelect(identity);
             if (rc !== RC_SUCCESS && rc !== RC_NO_MORE) throw new Error("SLA_WRITE_SELECT_FAILED: " + table + " rc=" + rc);
             exists = rc === RC_SUCCESS;
             for (i = 0; i < names.length; i++) {
@@ -386,7 +402,7 @@ function createStore(options) {
                 }
             }
             rc = exists ? f.doUpdate() : f.doInsert();
-            if (rc !== RC_SUCCESS) throw new Error("SLA_WRITE_FAILED: " + table + " id=" + row.id + " rc=" + rc);
+            if (rc !== RC_SUCCESS) throw new Error("SLA_WRITE_FAILED: " + table + " key=" + identity + " rc=" + rc);
         } finally { if (typeof f.close === "function") f.close(); }
     }
     return { get: get, list: list, put: put,
@@ -401,8 +417,7 @@ function createStore(options) {
  * ============================================================================= */
 var SLA_T = { config: "esdHTKTslaConfig", detail: "esdHTKTslaConfigDetail",
     hours: "esdHTKTslaWorkingHour", holiday: "esdHTKTslaHoliday",
-    tracking: "esdHTKTslaTracking", segment: "esdHTKTslaTimeSegment",
-    event: "esdHTKTslaEventLog" };
+    tracking: "esdHTKTslaTracking", segment: "esdHTKTslaTimeSegment" };
 function createService(store, calendarLib, calculator, policyRules, options) {
     options = options || {};
     function clone(x) { return JSON.parse(JSON.stringify(x)); }
@@ -421,7 +436,7 @@ function createService(store, calendarLib, calculator, policyRules, options) {
         var list = rows(SLA_T.hours, {}), i;
         for (i = 0; i < list.length; i++) result.workingHours.push({
             dayOfWeek: Number(list[i]["day.of.week"]),
-            startTime: String(list[i]["start.time"]), endTime: String(list[i]["end.time"])
+            startTime: list[i]["start.time"], endTime: list[i]["end.time"]
         });
         list = rows(SLA_T.holiday, {});
         for (i = 0; i < list.length; i++) result.holidays.push(store.decodeDate(list[i]["holiday.date"]));
@@ -461,7 +476,10 @@ function createService(store, calendarLib, calculator, policyRules, options) {
             list[i]["started.at"] = iso(instant(list[i]["started.at"]));
             list[i]["ended.at"] = blank(list[i]["ended.at"]) ? null : iso(instant(list[i]["ended.at"]));
         }
-        list.sort(function(a,b) { return Number(a["segment.no"]) - Number(b["segment.no"]); });
+        list.sort(function(a,b) {
+            var byStartedAt = instant(a["started.at"]) - instant(b["started.at"]);
+            return byStartedAt !== 0 ? byStartedAt : String(a.id).localeCompare(String(b.id));
+        });
         return list;
     }
     function calculate(row, segments, at) {
@@ -477,67 +495,29 @@ function createService(store, calendarLib, calculator, policyRules, options) {
         }
         return result;
     }
-    function journalId(paymentId, eventId, sourceTable) { return key(["EVENT", paymentId, eventId]); }
-    function assertNoPending(paymentId, except, sourceTable) {
-        var list = rows(SLA_T.event, {"payment.id": paymentId}), i;
-        for (i = 0; i < list.length; i++) {
-            if (list[i]["processing.status"] === "PREPARED" && list[i].id !== except) {
-                throw new Error("SLA_PENDING_EVENT_RETRY_FIRST: " + list[i].id);
-            }
-        }
-    }
     function addWrite(plan, table, row) { plan.push({table: table, row: clone(row)}); }
-    function commit(journal) {
-        var payload = JSON.parse(journal.data), i;
-        // Replaying these deterministic upserts repairs partially applied writes.
-        for (i = 0; i < payload.writes.length; i++) store.put(payload.writes[i].table, payload.writes[i].row);
-        journal["processing.status"] = "APPLIED"; store.put(SLA_T.event, journal);
-        return { success: true, eventId: journal["event.key"], writes: payload.writes.length };
+    function commit(plan, eventId) {
+        for (var i = 0; i < plan.length; i++) store.put(plan[i].table, plan[i].row);
+        return {success: true, eventId: eventId, writes: plan.length};
     }
     function applyEvent(event) {
         var commands = policyRules.buildCommands(event);
         var sourceTable = sourceTableFor(event.after);
         if (event.before && sourceTableFor(event.before) !== sourceTable) throw new Error("SLA_SOURCE_TABLE_CHANGED");
-        var paymentId = String(event.after.id), rootId = journalId(paymentId, event.id, sourceTable);
-        var existing = store.get(SLA_T.event, rootId);
-        // Stable JSON payload protects an operation ID from being reused for another business action.
-        var input = clone(event), fingerprint = JSON.stringify(input);
-        if (existing) {
-            if (JSON.parse(existing.data).fingerprint !== fingerprint) throw new Error("SLA_EVENT_ID_REUSED_WITH_DIFFERENT_INPUT");
-            if (existing["processing.status"] === "APPLIED") return {success: true, duplicate: true, eventId: event.id};
-            assertNoPending(paymentId, rootId, sourceTable); return commit(existing);
-        }
-        assertNoPending(paymentId, null, sourceTable);
-        var atMs = instant(event.eventAt), at = iso(atMs), journalAttempt = 1;
-        var journals = rows(SLA_T.event, {"payment.id": paymentId}), i, j;
-        for (i = 0; i < journals.length; i++) {
-            if (journals[i]["processing.status"] === "APPLIED") journalAttempt = Math.max(journalAttempt, Number(JSON.parse(journals[i].data).attempt || 1));
-            if (journals[i]["processing.status"] === "APPLIED" && instant(journals[i]["event.at"]) > atMs) {
-                throw new Error("SLA_OUT_OF_ORDER_EVENT");
-            }
-        }
-        var all = rows(SLA_T.tracking, {"payment.id": paymentId}), attempt = journalAttempt, active = {}, plan = [], command, row, segments;
+        var paymentId = String(event.after.id);
+        var atMs = instant(event.eventAt), at = iso(atMs), i, j;
+        var all = rows(SLA_T.tracking, {"payment.id": paymentId}), attempt = 1, active = {}, plan = [], command, row, segments;
         for (i = 0; i < all.length; i++) {
             attempt = Math.max(attempt, Number(all[i]["attempt.no"]));
             if (blank(all[i]["ended.at"])) {
                 if (active[all[i]["role.code"]]) throw new Error("SLA_MULTIPLE_ACTIVE_TRACKINGS_FOR_ROLE");
                 row = hydrateTracking(all[i]);
                 // A tick may have run after the business event's timestamp but before delivery.
-                // Recalculate open intervals at the authoritative event time. Business events
-                // themselves remain ordered by the APPLIED journal check above.
+                // Recalculate open intervals at the authoritative event time.
                 active[row["role.code"]] = {row: row, segments: loadSegments(row.id)};
             }
         }
-        if (event.kind === "CREATE" && (all.length || journals.length)) throw new Error("SLA_PAYMENT_ALREADY_INITIALIZED");
-        function log(type, role, trackingId, actor, data, suffix) {
-            addWrite(plan, SLA_T.event, {id: key([rootId, type, role || "ALL", suffix || ""]),
-                "sla.tracking.id": trackingId || null, "payment.id": paymentId,
-                "event.type": type, "event.at": at, "from.status": event.before ? event.before.status : null,
-                "to.status": event.after.status, "from.phase": event.before ? event.before["current.phase"] : null,
-                "to.phase": event.after["current.phase"], "role.code": role || null,
-                "performed.by": event.performedBy, assignee: actor || null, data: JSON.stringify(data || {}),
-                "created.at": at, "processing.status": null, "event.key": null });
-        }
+        if (event.kind === "CREATE" && all.length) throw new Error("SLA_PAYMENT_ALREADY_INITIALIZED");
         function persist(state) {
             var calculation = calculate(state.row, state.segments, at);
             for (var n = 0; n < state.segments.length; n++) addWrite(plan, SLA_T.segment, state.segments[n]);
@@ -554,7 +534,6 @@ function createService(store, calendarLib, calculator, policyRules, options) {
             calculation = persist(state);
             state.row.result = reason === "COMPLETE" ? (calculation.isBreached ? "BREACHED" : "MET") : "NOT_EVALUATED";
             addWrite(plan, SLA_T.tracking, state.row);
-            log(reason, role, state.row.id, state.row["current.assignee"]);
             delete active[role];
         }
         for (i = 0; i < commands.length; i++) {
@@ -565,7 +544,6 @@ function createService(store, calendarLib, calculator, policyRules, options) {
                 roleNames.sort();
                 for (j = 0; j < roleNames.length; j++) close(roleNames[j], command.type === "RETURN_ALL" ? "RETURN" : "CANCEL");
                 if (command.type === "RETURN_ALL") attempt++;
-                if (!roleNames.length) log(command.type === "RETURN_ALL" ? "RETURN" : "CANCEL", null, null, null);
             } else if (command.type === "COMPLETE") {
                 if (active[command.role]) close(command.role, "COMPLETE");
                 else {
@@ -594,12 +572,11 @@ function createService(store, calendarLib, calculator, policyRules, options) {
                     "role.code": command.role, "attempt.no": attempt, "started.at": at, "ended.at": null,
                     "sla.minutes": minutes, "current.assignee": command.assignee,
                     "end.reason": null, result: null};
-                segments = [{id: key([tid, "SEG", 1]), "sla.tracking.id": tid, "segment.no": 1,
+                segments = [{id: key([tid, "SEG", 1]), "sla.tracking.id": tid,
                     "started.at": at, "ended.at": null, "working.minutes": 0,
                     "start.event": event.kind === "RETURN" ? "RESET" : "START", "end.event": null,
-                    assignee: command.assignee, "created.at": at}];
+                    assignee: command.assignee}];
                 active[command.role] = {row: row, segments: segments}; persist(active[command.role]);
-                log(event.kind === "RETURN" ? "RESET" : "START", command.role, tid, command.assignee);
             } else if (command.type === "REASSIGN") {
                 var state = active[command.role];
                 if (!command.assignee) throw new Error("SLA_MISSING_NEW_ASSIGNEE");
@@ -610,32 +587,24 @@ function createService(store, calendarLib, calculator, policyRules, options) {
                             throw new Error("SLA_CANNOT_REASSIGN_COMPLETED_STEP");
                         }
                     }
-                    log("REASSIGN", command.role, null, command.assignee, {from: command.oldAssignee, to: command.assignee});
                     continue;
                 }
                 if (state.row["current.assignee"] !== command.oldAssignee) throw new Error("SLA_STALE_ASSIGNEE");
-                var found = 0, seq = 0;
+                var found = 0;
                 for (j = 0; j < state.segments.length; j++) {
-                    seq = Math.max(seq, Number(state.segments[j]["segment.no"]));
                     if (blank(state.segments[j]["ended.at"])) {
                         state.segments[j]["ended.at"] = at; state.segments[j]["end.event"] = "REASSIGN"; found++;
                     }
                 }
                 if (found !== 1) throw new Error("SLA_EXPECT_ONE_OPEN_SEGMENT");
-                seq++;
-                state.segments.push({id: key([state.row.id, "SEG", seq]), "sla.tracking.id": state.row.id,
-                    "segment.no": seq, "started.at": at, "ended.at": null, "working.minutes": 0,
-                    "start.event": "REASSIGN", "end.event": null, assignee: command.assignee, "created.at": at});
+                var nextSegmentId = key([state.row.id, "SEG", state.segments.length + 1]);
+                state.segments.push({id: nextSegmentId, "sla.tracking.id": state.row.id,
+                    "started.at": at, "ended.at": null, "working.minutes": 0,
+                    "start.event": "REASSIGN", "end.event": null, assignee: command.assignee});
                 state.row["current.assignee"] = command.assignee; persist(state);
-                log("REASSIGN", command.role, state.row.id, command.assignee, {from: command.oldAssignee, to: command.assignee});
             }
         }
-        var journal = {id: rootId, "payment.id": paymentId, "event.type": "WORKFLOW",
-            "event.at": at, "event.key": String(event.id), "performed.by": event.performedBy,
-            "from.status": event.before ? event.before.status : null, "to.status": event.after.status,
-            "from.phase": event.before ? event.before["current.phase"] : null, "to.phase": event.after["current.phase"],
-            "created.at": at, "processing.status": "PREPARED", data: JSON.stringify({fingerprint: fingerprint, attempt: attempt, writes: plan})};
-        store.put(SLA_T.event, journal); return commit(journal);
+        return commit(plan, String(event.id));
     }
     function refresh(paymentId, asOf, sourceTable) {
         sourceTable = sourceTable || sourceTableForId(paymentId);
@@ -643,7 +612,6 @@ function createService(store, calendarLib, calculator, policyRules, options) {
         var payment = store.get(sourceTable, paymentId);
         if (payment) sourceTableFor(payment);
         if (!payment) throw new Error("SLA_PAYMENT_NOT_FOUND");
-        assertNoPending(paymentId, null, sourceTable);
         if (payment.status === "cancelled" || payment.status === "approved" || payment.status === "accounted") {
             var dangling = rows(SLA_T.tracking, {"payment.id": paymentId}), d;
             for (d = 0; d < dangling.length; d++) if (blank(dangling[d]["ended.at"])) throw new Error("SLA_MISSING_TERMINAL_WORKFLOW_EVENT");
@@ -666,11 +634,6 @@ function createService(store, calendarLib, calculator, policyRules, options) {
         }
         return {success: true, paymentId: paymentId, calculated: count};
     }
-    function retryPrepared(paymentId, sourceTable) {
-        var list = rows(SLA_T.event, {"payment.id": paymentId, "processing.status": "PREPARED"});
-        if (list.length > 1) throw new Error("SLA_MULTIPLE_PENDING_EVENTS_REQUIRE_RECONCILIATION");
-        return list.length ? commit(list[0]) : {success: true, writes: 0};
-    }
     return {
         applyEvent: function(event) {
             if (!event || !event.after || !event.after.id) throw new Error("SLA_MISSING_PAYMENT");
@@ -678,9 +641,6 @@ function createService(store, calendarLib, calculator, policyRules, options) {
         },
         refresh: function(paymentId, asOf, sourceTable) {
             return refresh(paymentId, asOf, sourceTable);
-        },
-        retryPrepared: function(paymentId, sourceTable) {
-            return retryPrepared(paymentId, sourceTable);
         }
     };
 }
@@ -780,10 +740,10 @@ function buildBaseline(calendarLib, args) {
     if (end !== null && end <= start) throw new Error("SLA_INVALID_EFFECTIVE_RANGE");
     var c = {timezone: "Asia/Ho_Chi_Minh", workingHours: [], holidays: args.holidays}, writes = [], d, i;
     for (d = 1; d <= 5; d++) {
-        var slots = [["08:00", "12:00"], ["13:00", "17:00"]];
+        var slots = [["08:00:00", "12:00:00"], ["13:00:00", "17:00:00"]];
         for (i = 0; i < slots.length; i++) {
             c.workingHours.push({dayOfWeek:d,startTime:slots[i][0],endTime:slots[i][1]});
-            writes.push({table:"esdHTKTslaWorkingHour",row:{id:"WH."+d+"."+i,
+            writes.push({table:"esdHTKTslaWorkingHour",row:{
                 "day.of.week":d,"start.time":slots[i][0],"end.time":slots[i][1]}});
         }
     }
@@ -792,9 +752,9 @@ function buildBaseline(calendarLib, args) {
     for (i = 0; i < args.holidays.length; i++) {
         if (seen[args.holidays[i]]) throw new Error("SLA_DUPLICATE_HOLIDAY");
         seen[args.holidays[i]] = true;
-        writes.push({table:"esdHTKTslaHoliday",row:{id:"OFF."+args.holidays[i],
+        writes.push({table:"esdHTKTslaHoliday",row:{
             "holiday.date":args.holidays[i],"holiday.name":"Ngày nghỉ được phê duyệt",
-            "holiday.type":"OTHER","created.by":args.performedBy,"created.at":new Date().toISOString()}});
+            "holiday.type":"OTHER"}});
     }
     var transactionType = String(args.transactionType || "Dự chi");
     var productType = "Tất cả";

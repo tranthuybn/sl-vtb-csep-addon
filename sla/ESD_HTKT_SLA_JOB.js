@@ -4,8 +4,8 @@
  * Module      : HTKT - Job tính lại trạng thái SLA
  * Version     : 2.1.0
  *
- * Chức năng   : Quét Tracking đang mở, phục hồi EventLog PREPARED và tính lại
- *               due.at/status. Không lưu elapsed/remaining và không gửi email.
+ * Chức năng   : Quét Tracking đang mở và tính lại due.at/status.
+ *               Không lưu elapsed/remaining và không gửi email.
  * Điểm gọi    : SM Scheduler gọi runBatch() định kỳ nếu cần cập nhật trạng thái
  *               vi phạm của Tracking đang mở.
  * Môi trường  : OpenText Service Manager (JavaScript ES5 Engine).
@@ -25,8 +25,6 @@ function runBatch(runtime, asOf, batch) {
         ids[String(row["payment.id"])] = {id:String(row["payment.id"]),table:table};
     }
     for (i = 0; i < list.length; i++) if (!list[i]["ended.at"]) collect(list[i]);
-    list = store.list("esdHTKTslaEventLog", {"processing.status": "PREPARED"});
-    for (i = 0; i < list.length; i++) collect(list[i]);
     var keys = [], payment, results = [], errors = [], processed = 0, cursor = batch.afterPaymentId || "";
     for (id in ids) if (Object.prototype.hasOwnProperty.call(ids, id) && id > cursor) keys.push(id);
     keys.sort();
@@ -36,7 +34,6 @@ function runBatch(runtime, asOf, batch) {
             var target = ids[id];
             payment = store.get(target.table, target.id);
             if (!payment || !isSupportedTransactionType(String(payment["transaction.type"] || ""))) continue;
-            runtime.service.retryPrepared(target.id, target.table);
             results.push(runtime.service.refresh(target.id, asOf, target.table));
         } catch (error) {
             errors.push({paymentId: id, error: String(error.message || error)});

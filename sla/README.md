@@ -13,7 +13,7 @@ Mục này ghi lại các quyết định và công việc của cuộc chat hi�
 - Bỏ các alias/hàm mang tên Expense trong SLA ENGINE và JOB. Hai hàm cầu nối tên Expense ở expense/ESD_HTKT_EXPENSE_WF.js vẫn là cầu nối workflow cũ, không phải engine riêng cho Dự chi. Hàm gọi mới trực tiếp không cần qua cầu nối này.
 - role.code thống nhất theo dbdict: user.created.dmms, user.checker.kttc, user.checker.dmms, user.approver.dmms, user.approver.kttc, user.checker.final, user.approver.final. user.created.dmms là mã vai trò, người tạo thực tế vẫn lấy field created.by. Không dùng các mã CB_DE_NGHI/CB_KTTC/RA_SOAT_1/PHE_DUYET_DM/PHE_DUYET_KTTC/RA_SOAT_2/PHE_DUYET_TQ cho dữ liệu mới.
 - Người dùng làm rõ chỉ bỏ đo khi status dmms_created/kttc_created, không bỏ toàn bộ phase initial_dmms/initial_kttc. Engine cũng coi initialized (thấy trong workflow Tạm ứng) là tạo mới, không đo. CREATE không mở Tracking/Segment. ĐMMS gửi sang KTTC bắt đầu đo KTTC; KTTC tạo gửi PD KTTC bắt đầu đo PD KTTC. RETURN về request_edit vẫn bắt đầu maker vòng mới.
-- Đã bỏ field source.table khỏi ENGINE, JOB, Tracking, EventLog và schema. Không thêm lại để chống trùng ID vì prefix đã phân biệt. Tracking/EventLog ID không ghép bảng nguồn. Engine vẫn có hàm/biến nội bộ xác định bảng; đó không phải field dữ liệu.
+- Đã bỏ field source.table khỏi ENGINE, JOB, Tracking và schema. ID phiếu có prefix phân biệt bảng nguồn.
 - Đã bỏ sla.config.id khỏi Tracking, cả danh sách field đọc/ghi, câu tạo Tracking và Ref dbdict. Tracking chỉ giữ sla.config.detail.id; suy ra Config qua ConfigDetail.sla.config.id. ConfigDetail.sla.config.id vẫn giữ. SLA tính từ sla.minutes chốt trên Tracking, không cần đọc lại định mức Config mỗi lượt.
 - Đơn vị định mức đã thống nhất là phút: ConfigDetail dùng sla.minutes và Tracking chốt nguyên giá trị này khi bắt đầu đo. Không còn sla.hours hoặc phép nhân 60 trong engine.
 - Unique index Tracking hiện là (payment.id, attempt.no, role.code); payment.id giữ nguyên ID phiếu gồm prefix. Không tạo FK payment.id chỉ trỏ esdHTKTpayment vì phiếu TU nằm bảng khác.
@@ -56,14 +56,12 @@ Nguồn đã đối chiếu:
 - https://docs.microfocus.com/doc/Service_Manager/9.80/AddPhase (After successful enter và After successful update).
 - https://docs.microfocus.com/doc/425/9.71/runactiononrelatedrecords (record/oldRecord; chưa chứng minh lifecycle chính xác trong Rule Set đang dùng).
 
-### Job và PREPARED — đã giải thích cho người dùng
+### Job SLA
 
-- JOB.runBatch(runtime,asOf,batch) hiện đọc TOÀN BỘ Tracking bằng store.list(...,{}), rồi lọc ended.at rỗng trong JavaScript. EventLog truy vấn processing.status=PREPARED. Gộp payment.id, loại trùng, sort tăng dần, xử lý tối đa limit (mặc định 100); afterPaymentId/nextCursor là ID phiếu. limit chưa giảm số Tracking đọc từ DB.
-- Mỗi phiếu đọc bảng theo TU/DC/TT, bỏ qua không tìm thấy/transaction.type không hỗ trợ; retryPrepared trước rồi refresh. Prefix lạ hiện có thể làm lỗi ngay lúc thu danh sách trước vòng try/catch từng phiếu; chưa tối ưu phần này.
+- JOB.runBatch(runtime,asOf,batch) đọc Tracking, lọc các dòng `ended.at` rỗng, loại trùng payment.id, sắp xếp tăng dần và xử lý tối đa limit (mặc định 100).
+- Mỗi phiếu đọc bảng theo TU/DC/TT, bỏ qua không tìm thấy hoặc transaction.type không hỗ trợ rồi gọi refresh.
 - Refresh chỉ xử lý Tracking mở: tính lại Tracking.due.at, Tracking.status và TimeSegment.working.minutes (segment mở tính đến asOf). Code ghi lại toàn bộ row đã đọc nhưng chỉ ba field nghiệp vụ này tính lại; có thể được SM tự cập nhật sysmodtime/sysmoduser. Không đổi status/phase phiếu, không gửi mail, không tự kết thúc Tracking.
 - Phiếu approved/accounted/cancelled còn Tracking mở thì báo SLA_MISSING_TERMINAL_WORKFLOW_EVENT, không tự đóng thay workflow.
-- EventLog WORKFLOW PREPARED = đã lưu kế hoạch ghi JSON nhưng chưa xác nhận áp dụng xong tất cả Tracking/Segment/log. Ghi xong chuyển APPLIED. Nếu lỗi giữa chừng, retry/job áp dụng lại kế hoạch để hoàn tất, không sinh thao tác mới. Log chi tiết không dùng processing.status.
-- PREPARED là trạng thái kỹ thuật; tồn tại ngắn trong ghi bình thường, kéo dài có thể do gián đoạn. Không phải trạng thái SLA hay trạng thái phiếu. Job phục hồi có thể ghi nhiều field/bản ghi theo kế hoạch cũ, không chỉ ba field refresh nêu trên.
 
 ### File đã sửa và bằng chứng kiểm tra
 
@@ -77,7 +75,7 @@ Chưa import SL, chưa sửa dbdict thật, chưa gắn Rule Set/scheduler, chư
 2. Xác nhận SM datetime/date adapter và transaction.type của Tạm ứng; đối chiếu status/phase thực tế vì workflow có thể gán status ở bước khác với tên phase.
 3. Đối chiếu dbdict đang có với SLA.sql (DBML): không source.table, không Tracking.sla.config.id, đúng role.code và unique index, đủ kích thước ID/JSON/decimal.
 4. Import bản SL đúng và gắn lời gọi hai record tại điểm thành công, một nguồn duy nhất; kiểm tra không ghi SLA khi ký/chuyển bước thất bại.
-5. Chạy hai nhánh, TU/DC/TT, RS bật/tắt, trả sửa, xóa, đổi người, retry PREPARED, lịch nghỉ, quá hạn; scheduler/job chỉ sau khi workflow đã ghi đúng.
+5. Chạy hai nhánh, TU/DC/TT, RS bật/tắt, trả sửa, xóa, đổi người, lịch nghỉ, quá hạn; scheduler/job chỉ sau khi workflow đã ghi đúng.
 
 Câu mở chat để tiếp tục:
 
@@ -101,7 +99,7 @@ Các mốc do người dùng đính chính có ưu tiên hơn nội dung sai/mâ
 - **RS2 trong nhánh KTTC tạo:** người dùng trả lời câu hỏi riêng, chọn bắt đầu khi PD KTTC chuyển sang RS2.
 - Thêm lịch/ngày nghỉ; bổ sung CANCEL và lý do kết thúc Segment do REASSIGN đã được người dùng yêu cầu.
 
-Các lựa chọn kỹ thuật hiện tại cần phân biệt với yêu cầu xác nhận trực tiếp: ưu tiên gọi từ workflow sau thành công là đánh giá của agent; nhật ký PREPARED/APPLIED và adapter mail là thiết kế triển khai. Không đo khi status là `dmms_created`/`kttc_created`; maker vòng trả sửa chạy từ lúc trả sửa thành công; chạm hạn `remaining <= 0` là vi phạm theo sheet quy tắc hiển thị. Các lựa chọn này đã ghi trong mã/tài liệu nhưng chưa được kiểm chứng trên SM thật.
+Các lựa chọn kỹ thuật hiện tại cần phân biệt với yêu cầu xác nhận trực tiếp: ưu tiên gọi từ workflow sau thành công là đánh giá của agent. Không đo khi status là `dmms_created`/`kttc_created`; maker vòng trả sửa chạy từ lúc trả sửa thành công; chạm hạn `remaining <= 0` là vi phạm theo sheet quy tắc hiển thị.
 
 ### Trạng thái mã nguồn lúc bàn giao
 
@@ -153,7 +151,7 @@ Nếu tiếp tục phần frontend, mang theo repo `C:/workspace/vtb-csep-addon`
 | check_final | RS2 / user.checker.final |
 | approval_final | Cấp có thẩm quyền / user.approver.final |
 
-`start` và `end` còn xuất hiện ở mã tạo phiếu/workflow; chúng là phase kỹ thuật ngoài mảng 7 phase người dùng liệt kê. Ghi đúng status/phase thực tế trước và sau trong EventLog, không suy đoán từ nhãn "Chờ phê duyệt".
+`start` và `end` còn xuất hiện ở mã tạo phiếu/workflow; chúng là phase kỹ thuật ngoài mảng 7 phase người dùng liệt kê.
 
 ### Công việc tiếp theo trên máy mới
 
@@ -198,11 +196,11 @@ Gắn tại After successful enter để bắt chuyển bước; REASSIGN cần 
 
 ## Bảng phiếu và API dùng chung
 
-ID có prefix duy nhất: DC = Dự chi, TT = Thanh toán, TU = Tạm ứng. Không lưu trường bảng nguồn trong Tracking, EventLog hoặc snapshot. payment.id là ID đầy đủ gồm prefix. Unique index Tracking: (payment.id, attempt.no, role.code). Không có FK chỉ trỏ bảng payment vì phiếu TU nằm ở bảng khác.
+ID có prefix duy nhất: DC = Dự chi, TT = Thanh toán, TU = Tạm ứng. Không lưu trường bảng nguồn trong Tracking hoặc snapshot. payment.id là ID đầy đủ gồm prefix. Unique index Tracking: (payment.id, attempt.no, role.code). Không có FK chỉ trỏ bảng payment vì phiếu TU nằm ở bảng khác.
 
 Job và service.refresh(id, asOf) nhận diện TU để đọc esdHTKTprepayment, DC/TT để đọc esdHTKTpayment. Prefix không nhận diện được sẽ báo lỗi. nextCursor là ID phiếu, truyền nguyên lại qua afterPaymentId. Engine vẫn dùng transaction.type trên record để chọn cấu hình SLA; phiếu Tạm ứng phải có transaction.type = "Tạm ứng" trong dữ liệu truyền vào.
 
-Đã bỏ alias Expense khỏi ENGINE/JOB. Dùng calculateTransactionTracking, service.applyEvent, service.refresh, service.retryPrepared, buildBaseline/installBaseline và JOB.runBatch. Tuần tự hóa thao tác/job theo payment.id. ID Tracking/EventLog không cần thành phần bảng nguồn. Nếu đã có dữ liệu từ bản trung gian sử dụng ID chứa bảng nguồn, cần đối chiếu/chuyển đổi ID và tham chiếu trước khi chạy bản mới; chưa thay đổi dữ liệu SM.
+Đã bỏ alias Expense khỏi ENGINE/JOB. Dùng calculateTransactionTracking, service.applyEvent, service.refresh, buildBaseline/installBaseline và JOB.runBatch. Phải tuần tự hóa thao tác/job theo payment.id.
 
 ## Luồng nghiệp vụ
 
@@ -214,7 +212,7 @@ Job và service.refresh(id, asOf) nhận diện TU để đọc esdHTKTprepaymen
 - RS2 của luồng ĐMMS tạo bắt đầu ngay khi PD ĐMMS chuyển thành công, kết thúc khi RS2 chuyển sang cấp có thẩm quyền. Đây là ngoại lệ mốc đo do người dùng chốt; có thể chạy đồng thời với PD KTTC dù thứ tự xử lý vẫn tuần tự.
 - RS2 của luồng KTTC tạo bắt đầu khi PD KTTC chuyển sang RS2, theo xác nhận của người dùng.
 - Trả sửa: kết thúc mọi Tracking đang mở của vòng cũ, giữ lịch sử, tăng vòng đo và bắt đầu ngay maker của vòng mới. Không đợi người sửa mở màn hình.
-- Tái phân công bước đang đo: đóng/mở Segment liên tiếp tại cùng thời điểm, không đổi Tracking/hạn/budget. Bước chưa tới lượt chỉ ghi EventLog.
+- Tái phân công bước đang đo: đóng/mở Segment liên tiếp tại cùng thời điểm, không đổi Tracking/hạn/budget. Bước chưa tới lượt không tạo dữ liệu SLA.
 - Xóa: đóng mọi Tracking/Segment đang mở; không xóa lịch sử. Chỉ phát sinh sau khi nghiệp vụ xóa thành công.
 - Đã phê duyệt kết thúc đồng hồ cuối. Không đo thêm thời gian tích hợp/hạch toán.
 
@@ -224,8 +222,8 @@ Các role.code dùng trong cấu hình: `user.created.dmms`, `user.checker.kttc`
 
 | File | Trách nhiệm |
 |---|---|
-| ESD_HTKT_SLA_ENGINE.js | Policy phase/role/command, lịch, tính toán, SCFile, Tracking, Segment, EventLog, runtime workflow và bootstrap cấu hình |
-| ESD_HTKT_SLA_JOB.js | Entry point scheduler: tính lại due/status của Tracking mở và phục hồi PREPARED |
+| ESD_HTKT_SLA_ENGINE.js | Policy phase/role/command, lịch, tính toán, SCFile, Tracking, Segment, runtime workflow và bootstrap cấu hình |
+| ESD_HTKT_SLA_JOB.js | Entry point scheduler: tính lại due/status của Tracking mở |
 
 Tạm thời engine chọn cấu hình bằng `transaction.type` và bắt buộc dòng cấu hình có `product.type = "Tất cả"`. Engine không yêu cầu `product.type` trên phiếu. Khi nghiệp vụ chốt nguồn/trường lưu sản phẩm, chỉ cần sửa `resolveProductType()` và bổ sung cấu hình chi tiết; policy luồng không thay đổi.
 
@@ -270,29 +268,28 @@ lib.ESD_HTKT_EXPENSE_WF.recordCommittedExpenseSlaEvent(
 
 Ba biến context ở ví dụ là dữ liệu phải lấy từ action/ruleset thực tế, không phải tên biến có sẵn của SM. `operationId` phải tạo một lần cho thao tác và giữ nguyên khi retry; không tạo UUID hoặc lấy `new Date()` mới mỗi lần gọi lại. Snapshot phải là bản trước/sau của chính thao tác đó, không đọc lại bản hiện tại để thay snapshot khi retry. Không dùng `from.status` đơn lẻ để suy ra phase.
 
-Tạo mới dùng `kind=CREATE`, `before=null`; có thể dùng operationId `CREATE:<payment.id>` và thời điểm `created.at`. Các thao tác khác cần ID thao tác riêng. Trong trường hợp lỗi sau khi lưu phiếu nhưng trước khi ghi nhật ký SLA, nguồn gọi phải lưu/giữ context để retry. Nhật ký PREPARED chỉ phục hồi được sau khi INSERT nhật ký thành công; không có transaction chung giữa lưu phiếu và các bảng SLA.
+Tạo mới dùng `kind=CREATE`, `before=null`. Không có transaction chung giữa lưu phiếu và các bảng SLA; caller phải tránh gọi trùng và có phương án đối soát khi ghi SLA thất bại.
 
 Lỗi SLA sau khi phiếu đã lưu phải được báo rõ là lỗi ghi SLA để retry, không thông báo phiếu chưa được tạo khiến người dùng tạo trùng. Không bắt lỗi rồi bỏ qua vô điều kiện.
 
 ## Các bảng được ghi
 
 - Bootstrap tạo Calendar, WorkingHour, Holiday, Config và ConfigDetail. Config xuất bản sau cùng để tránh thấy bộ cấu hình chưa đủ vai trò.
-- Bắt đầu: Tracking + TimeSegment + EventLog START/RESET.
-- Hoàn thành: chốt Segment/Tracking, ghi COMPLETE. Kết quả `MET`, `BREACHED` hoặc `NOT_EVALUATED` tách khỏi trạng thái đã kết thúc.
-- REASSIGN/RETURN/CANCEL: ghi đủ nguyên nhân và snapshot status/phase; giữ dữ liệu cũ.
+- Bắt đầu: tạo Tracking + TimeSegment.
+- Hoàn thành: chốt Segment/Tracking. Kết quả `MET`, `BREACHED` hoặc `NOT_EVALUATED` tách khỏi trạng thái đã kết thúc.
+- REASSIGN/RETURN/CANCEL: cập nhật Tracking/TimeSegment và giữ dữ liệu các lần đo cũ.
 - Job: tính lại Segment cùng `due.at`/`status` của Tracking đang mở; không lưu elapsed/remaining và không tạo cảnh báo.
-- EventLog WORKFLOW là nhật ký áp dụng thao tác: PREPARED lưu kế hoạch ghi đầy đủ trước khi cập nhật, APPLIED sau khi ghi xong. Các log chi tiết có processing.status null.
-- Không sử dụng bảng khóa SLA. Workflow, scheduler và dispatcher phải được cấu hình để không xử lý đồng thời cùng một `payment.id`. Nhật ký PREPARED/APPLIED và các unique index vẫn hỗ trợ retry/chống trùng, nhưng không thay thế việc tuần tự hóa ở tầng vận hành.
+- Không sử dụng bảng EventLog hoặc bảng khóa SLA. Workflow, scheduler và dispatcher phải tránh gọi trùng và không xử lý đồng thời cùng một `payment.id`.
 
 ## Cấu hình và lịch ban đầu
 
-Dùng schema DBML `../dbdict/SLA.sql` để tạo dbdict/index thực tế. Chưa phải migration SQL có thể chạy trực tiếp. Các trường số phút dùng decimal; `EventLog.data` phải đủ lớn cho JSON kế hoạch ghi và `id` phải đủ dài cho ID ghép đã encode.
+Dùng schema DBML `../dbdict/SLA.sql` để tạo dbdict/index thực tế. Chưa phải migration SQL có thể chạy trực tiếp. Các trường số phút dùng decimal và `id` phải đủ dài cho ID ghép đã encode.
 
 `buildBaseline(calendarLib, args)` tạo bộ dữ liệu để xem trước; `installBaseline(store, calendarLib, args)` thực sự ghi dữ liệu. Args cần `configId`, `transactionType`, `effectiveFrom`, `performedBy` và `holidays`; `effectiveTo` tùy chọn. Bootstrap luôn ghi `product.type = "Tất cả"`. Giờ làm việc và ngày nghỉ là cấu hình toàn hệ thống, được ghi đè theo ID; không có `calendarId` hoặc phiên bản lịch.
 
 Bộ giá trị Dự chi lấy từ `Thông tin SLA.xlsx`, sheet `Danh mục SLA`, dòng 19 và lưu theo phút: CB đề nghị 120; KTTC 180; RS1 180; PD ĐMMS 360; PD KTTC 360; RS2 270; cấp thẩm quyền 540. Cấu hình Dự chi có `product.type = "Tất cả"`. Hiệu lực theo khoảng `[effective.from, effective.to)`; không cho chồng lấn. `Tracking.sla.minutes` chốt nguyên `ConfigDetail.sla.minutes` khi bắt đầu bước; Tracking đang mở dùng giờ làm việc/ngày nghỉ hiện hành khi tính lại.
 
-Timestamp dùng JS Date hoặc ISO có Z/offset; không parse chuỗi ngày theo locale. `start.time` và `end.time` là field Character dài 5, bắt buộc định dạng `HH:mm`; không dùng Date/time của SM. Ngày nghỉ dùng YYYY-MM-DD. Store chỉ cần adapter cho instant và ngày. Version hiện hỗ trợ Asia/Ho_Chi_Minh, không hỗ trợ vùng DST.
+Timestamp dùng JS Date hoặc ISO có Z/offset; không parse chuỗi ngày theo locale. `start.time` và `end.time` là field Date/time của SM; engine chỉ lấy phần giờ, phút, giây và bỏ qua phần ngày. Chuỗi `HH:mm`/`HH:mm:ss` vẫn được hỗ trợ để tương thích adapter và dữ liệu thử nghiệm. Ngày nghỉ dùng YYYY-MM-DD. Version hiện hỗ trợ Asia/Ho_Chi_Minh, không hỗ trợ vùng DST.
 
 Phút giữ phần lẻ, chỉ làm tròn khi hiển thị. Theo quy tắc hiển thị đã cung cấp, chạm hạn (`remaining <= 0`) là vi phạm; mail BREACH dùng cùng quy ước. Ngoài giờ và ngày nghỉ không tách Segment. Tạm dừng có khoảng hở sẽ được loại thời gian; khi chưa tiếp tục thì chưa xác định được hạn tương lai. Chưa thêm action tạm dừng vào luồng Dự chi vì chưa có nghiệp vụ tương ứng.
 

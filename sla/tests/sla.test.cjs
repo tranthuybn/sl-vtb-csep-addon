@@ -22,10 +22,15 @@ function test(name,fn) {fn(); tests++; console.log('PASS',name);}
 const clone = x => JSON.parse(JSON.stringify(x));
 function memoryStore() {
   const db = {}; let writes=0, failAt=null;
+  function rowKey(t,row){
+    if(t===T.hours)return `${row['day.of.week']}|${row['start.time']}`;
+    if(t===T.holiday)return String(row['holiday.date']);
+    return row.id;
+  }
   return {db,
     get(t,id){return clone(db[t]?.[id] || null);},
     list(t,filter){return Object.values(db[t]||{}).filter(x=>Object.entries(filter).every(([k,v])=>String(x[k])===String(v))).map(clone);},
-    put(t,row){writes++;if(writes===failAt)throw Error('INJECTED_WRITE_FAILURE');(db[t] ||= {})[row.id] = clone(row);},
+    put(t,row){writes++;if(writes===failAt)throw Error('INJECTED_WRITE_FAILURE');(db[t] ||= {})[rowKey(t,row)] = clone(row);},
     decodeInstant:x=>x,decodeDate:x=>x,
     failAfter(n){failAt=writes+n;}, clearFailure(){failAt=null;}
   };
@@ -33,7 +38,7 @@ function memoryStore() {
 function fixture(id='DC01',initial='dmms',rs1=true,rs2=true) {
   if (!/^(DC|TT|TU)/.test(id)) id='DC'+id;
   const store=memoryStore();
-  calendar.workingHours.forEach((x,i)=>store.put(T.hours,{id:'H'+i,'day.of.week':x.dayOfWeek,'start.time':x.startTime,'end.time':x.endTime}));
+  calendar.workingHours.forEach(x=>store.put(T.hours,{'day.of.week':x.dayOfWeek,'start.time':x.startTime,'end.time':x.endTime}));
   store.put(T.config,{id:'CFG','transaction.type':'Dự chi','product.type':'Tất cả','effective.from':time('01','00:00'),'effective.to':null,status:'Đang hoạt động'});
   const roles=['user.created.dmms','user.checker.kttc','user.checker.dmms','user.approver.dmms','user.approver.kttc','user.checker.final','user.approver.final'];
   roles.forEach(role=>store.put(T.detail,{id:role,'sla.config.id':'CFG','role.code':role,'sla.minutes':60,'is.active':true}));
@@ -64,7 +69,8 @@ test('Invalid calendars, overlapping shifts and ambiguous datetimes fail',()=>{
  assert.throws(()=>cal.compileCalendar({...calendar,timezone:'UTC'}),/TIMEZONE/);
  assert.throws(()=>cal.compileCalendar({...calendar,holidays:['2026-02-30']}),/HOLIDAY/);
  assert.throws(()=>cal.toMillis('27/10/2026 08:00:00'),/INVALID_INSTANT/);
- assert.throws(()=>cal.compileCalendar({...calendar,workingHours:[{dayOfWeek:1,startTime:'08:00:00',endTime:'12:00'}]}),/WORKING_TIME/);
+ assert.doesNotThrow(()=>cal.compileCalendar({...calendar,workingHours:[{dayOfWeek:1,startTime:'08:00:00',endTime:'12:00:00'}]}));
+ assert.throws(()=>cal.compileCalendar({...calendar,workingHours:[{dayOfWeek:1,startTime:'08:00:60',endTime:'12:00:00'}]}),/WORKING_TIME/);
 });
 test('Fractional minutes are preserved; exact deadline is breach; closed breach remains visible',()=>{
  const start=time('27','08:00'),end='2026-10-27T08:00:30+07:00';
@@ -96,7 +102,7 @@ test('Full DMMS flow persists all roles; RS2 starts early and keeps original tra
  assert.equal(f.tracks().length,6);assert(f.tracks().every(x=>x['ended.at']&&x['end.reason']==='COMPLETE'));
  rs=f.tracks().find(x=>x['role.code']==='user.checker.final');
  assert.equal(f.store.list(T.segment,{'sla.tracking.id':rs.id})[0]['working.minutes'],20);
- assert.equal(f.store.list(T.segment,{}).length,6);assert(f.store.list(T.event,{}).some(x=>x['processing.status']==='APPLIED'));
+ assert.equal(f.store.list(T.segment,{}).length,6);
 });
 test('KTTC-created bypasses RS1/PD DMMS and starts RS2 at entry to RS2',()=>{
  const f=fixture('DC02','kttc');f.send('CREATE',time('27','08:00'));
@@ -113,9 +119,9 @@ test('Optional reviews skipped; unexpected transition rejected without SLA write
  const f=fixture('DC03','dmms',false,false);f.send('CREATE',time('27','08:00'));
  f.send('TRANSITION',time('27','08:01'),{'current.phase':'initial_dmms'});
  f.send('TRANSITION',time('27','08:10'),{'current.phase':'initial_kttc',status:'dmms_initiated'});
- const count=f.store.list(T.event,{}).length;
+ const trackCount=f.tracks().length, segmentCount=f.store.list(T.segment,{}).length;
  assert.throws(()=>f.service.applyEvent({id:'BAD',kind:'TRANSITION',eventAt:time('27','08:20'),performedBy:'actor',before:f.payment,after:{...f.payment,'current.phase':'check_dmms'}}),/UNEXPECTED_NEXT/);
- assert.equal(f.store.list(T.event,{}).length,count);
+ assert.equal(f.tracks().length,trackCount);assert.equal(f.store.list(T.segment,{}).length,segmentCount);
  f.send('TRANSITION',time('27','08:20'),{'current.phase':'approval_dmms',status:'kttc_checked'});
  f.send('TRANSITION',time('27','08:30'),{'current.phase':'approval_kttc',status:'dmms_approved'});
  f.send('TRANSITION',time('27','08:40'),{'current.phase':'approval_final',status:'kttc_approved'});
@@ -147,24 +153,13 @@ test('Return closes all concurrent clocks and creates attempt 2 including maker;
  assert(f.tracks().every(x=>x['ended.at']));assert.equal(f.tracks().find(x=>x['attempt.no']===2)['end.reason'],'CANCEL');
  f.service.refresh(f.payment.id,time('27','10:00'));
 });
-test('Retry same event is idempotent; changed payload, stale events, missing config rejected',()=>{
- const f=fixture();const e=f.send('CREATE',time('27','08:00'));const n=f.store.list(T.segment,{}).length;
- assert.equal(f.service.applyEvent(e).duplicate,true);assert.equal(f.store.list(T.segment,{}).length,n);
- assert.throws(()=>f.service.applyEvent({...e,performedBy:'different'}),/ID_REUSED/);
+test('Delayed transition recalculates from event time; missing config is rejected',()=>{
+ const f=fixture();f.send('CREATE',time('27','08:00'));
  f.service.refresh(f.payment.id,time('27','08:10'));
  f.service.applyEvent({id:'DELAYED',kind:'TRANSITION',eventAt:time('27','08:05'),performedBy:'actor',before:{...f.payment,'current.phase':'initial_dmms'},after:{...f.payment,'current.phase':'initial_kttc',status:'dmms_initiated'}});
  assert(!f.tracks().some(x=>x['role.code']==='user.created.dmms'));
  assert.equal(f.tracks()[0]['started.at'],iso(time('27','08:05')));
- assert.throws(()=>f.service.applyEvent({id:'STALE',kind:'TRANSITION',eventAt:time('27','08:04'),performedBy:'actor',before:{...f.payment,'current.phase':'initial_kttc'},after:{...f.payment,'current.phase':'check_dmms',status:'kttc_checked'}}),/OUT_OF_ORDER/);
  const bad=fixture('NO-CFG');bad.store.db[T.config]={};assert.throws(()=>bad.send('TRANSITION',time('27','08:00'),{'current.phase':'initial_kttc',status:'dmms_initiated'},{before:{...bad.payment,'current.phase':'initial_dmms'}}),/EXPECT_ONE_EFFECTIVE_CONFIG/);
-});
-test('Interrupted multi-table writes recover from PREPARED; later operations cannot bypass it',()=>{
- const f=fixture();f.store.failAfter(3);
- assert.throws(()=>f.send('RETURN',time('27','08:00'),{'current.phase':'initial_dmms',status:'request_edit'}),/INJECTED/);
- f.store.clearFailure();assert(f.store.list(T.event,{}).some(x=>x['processing.status']==='PREPARED'));
- assert.throws(()=>f.service.refresh(f.payment.id,time('27','08:10')),/PENDING_EVENT/);
- f.service.applyEvent(f.events[0]);assert.equal(f.tracks().length,1);assert.equal(f.store.list(T.segment,{}).length,1);
- assert(f.store.list(T.event,{}).some(x=>x['processing.status']==='APPLIED'));
 });
 test('Minute budgets are fixed on tracking creation',()=>{
  const f=fixture();f.store.put(T.detail,{...f.store.get(T.detail,'user.created.dmms'),'sla.minutes':67.5});
@@ -183,16 +178,6 @@ test('Batch continues after one corrupt payment and pagination reaches later IDs
  const rt={store:f.store,service:f.service};
  const a=worker.runBatch(rt,time('27','08:45'),{limit:1});assert.equal(a.nextCursor,'DCA');assert.equal(a.results.length,1);
  const b=worker.runBatch(rt,time('27','08:45'),{limit:10,afterPaymentId:a.nextCursor});assert.equal(b.errors.length,1);assert.equal(b.errors[0].paymentId,'DCB');assert.equal(b.nextCursor,null);
-});
-test('Every interrupted write in first measured event can recover without duplicate rows',()=>{
- for(let fail=2;fail<=5;fail++) {
-  const f=fixture('REC'+fail);f.store.failAfter(fail);
-  assert.throws(()=>f.send('RETURN',time('27','08:00'),{'current.phase':'initial_dmms',status:'request_edit'}),/INJECTED/);f.store.clearFailure();
-  if(f.store.list(T.event,{'processing.status':'PREPARED'}).length) f.service.retryPrepared(f.payment.id);
-  else f.service.applyEvent(f.events[0]); // source retries if journal INSERT itself failed
-  assert.equal(f.tracks().length,1);assert.equal(f.store.list(T.segment,{}).length,1);
-  assert.equal(f.service.applyEvent(f.events[0]).duplicate,true);
- }
 });
 test('Unsupported transaction type and duplicate config fail without SLA mutation',()=>{
  const f=fixture();const c=f.store.get(T.config,'CFG');f.store.put(T.config,{...c,id:'CFG2'});
@@ -252,8 +237,8 @@ test('SCFile adapter converts timestamp writes',()=>{
   close(){}
  }
  const adapter=load('ESD_HTKT_SLA_ENGINE',{SCFile:FakeSCFile,SCFILE_READONLY:1,RC_SUCCESS:OK,RC_NO_MORE:NONE});
- const st=adapter.createStore();st.put(T.event,{id:'D','created.at':time('27','08:00')});
- assert(db[T.event].D['created.at'] instanceof Date);assert.equal(st.get(T.event,'MISSING'),null);
+ const st=adapter.createStore();st.put(T.tracking,{id:'D','started.at':time('27','08:00')});
+ assert(db[T.tracking].D['started.at'] instanceof Date);assert.equal(st.get(T.tracking,'MISSING'),null);
 });
 test('Working-time addition agrees with independently counted minutes across multiple days',()=>{
  const c={...calendar,holidays:['2026-10-28']};
@@ -296,19 +281,17 @@ test('Document prefixes select the right table without a source field',()=>{
  f.store.put('esdHTKTprepayment',after);
  const rt=engine.createRuntime({store:f.store});rt.onWorkflowChanged(before,{...after,sysmodcount:1,sysmodtime:time('27','08:10'),sysmoduser:'actor'});
  assert.equal(worker.runBatch(rt,time('27','08:40'),{}).results.length,1);
- for(const t of [T.tracking,T.event])for(const row of f.store.list(t,{}))assert(!Object.hasOwn(row,'source.table'));
+ for(const row of f.store.list(T.tracking,{}))assert(!Object.hasOwn(row,'source.table'));
 });
 
 
-test('Two-record workflow API detects events, retries stably and skips unrelated changes',()=>{
+test('Two-record workflow API detects events and skips unrelated changes',()=>{
  const f=fixture('TWO');const rt=engine.createRuntime({store:f.store});
  let rec={...f.payment,sysmodcount:1,sysmodtime:time('27','08:00'),sysmoduser:'actor'};
  rt.onWorkflowChanged(null,rec);assert.equal(f.tracks().length,0);
- assert.equal(rt.onWorkflowChanged(null,rec).duplicate,true);
  let old=rec;rec={...rec,'current.phase':'initial_dmms',sysmodcount:2,sysmodtime:time('27','08:01')};rt.onWorkflowChanged(old,rec);
  old=rec;rec={...rec,'current.phase':'initial_kttc',status:'dmms_initiated',sysmodcount:3,sysmodtime:time('27','08:10')};
  rt.onWorkflowChanged(old,rec);assert.equal(f.tracks()[0]['started.at'],iso(time('27','08:10')));
- assert.equal(rt.onWorkflowChanged(old,rec).duplicate,true);
  assert.equal(rt.onWorkflowChanged(rec,{...rec,description:'edit'}).skipped,true);
  old=rec;rec={...rec,'user.checker.kttc':'new',sysmodcount:4,sysmodtime:time('27','08:20')};rt.onWorkflowChanged(old,rec);
  assert.equal(f.store.list(T.segment,{}).length,2);
@@ -328,13 +311,11 @@ test('Two-record API rejects absent old record or unstable committed metadata',(
  }
  assert.equal(f.tracks().length,0);
 });
-test('Two-record API recovers prepared writes and distinguishes prepayment',()=>{
+test('Two-record API distinguishes prepayment',()=>{
  const f=fixture('PRE-TWO'),rt=engine.createRuntime({store:f.store});
  const c=f.store.get(T.config,'CFG');f.store.put(T.config,{...c,'transaction.type':'Tạm ứng'});
  const old={...f.payment,'transaction.type':'Tạm ứng','current.phase':'initial_dmms',status:'initialized'};
  const after={...old,'current.phase':'initial_kttc',status:'dmms_initiated',sysmodcount:2,sysmodtime:time('27','08:10'),sysmoduser:'actor'};
- f.store.failAfter(2);assert.throws(()=>rt.onWorkflowChanged(old,after),/INJECTED/);f.store.clearFailure();
  rt.onWorkflowChanged(old,after);assert.equal(f.tracks().length,1);assert.equal(f.tracks()[0]['payment.id'],f.payment.id);
- assert.equal(rt.onWorkflowChanged(old,after).duplicate,true);
 });
 console.log('Completed',tests,'tests');
