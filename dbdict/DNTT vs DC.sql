@@ -39,26 +39,7 @@ Table esdHTKTpayment {
   "total.contract" number // Tổng số hợp đồng/KMS; 
   "total.vendor" number // Tổng số NCC trên toàn phiếu;
   "total.transaction" number // Tổng số món (DC: tổng số món dự chi)
-  "unit.lv1.name" varchar // Tên đơn vị Khối/CN/DVSN
-  "unit.lv2.name" varchar // Tên đơn vị PB thuộc Khối/CN/ĐVSN
 }
-
-// ================================================================
-// HỢP ĐỒNG THUỘC PHIẾU DỰ CHI
-// Chỉ dùng khi esdHTKTpayment.transaction.type = "Dự chi".
-// Một phiếu Dự chi có nhiều hợp đồng/KMS.
-// ================================================================
-
-
-Table esdHTKTpaymentContract {
-  "payment.id" varchar // Mã phiếu dùng chung trên esdHTKTpayment (prefix DC)
-  "contract.id" varchar // Mã HĐ/KMS nghiệp vụ
-  "contract.name" varchar // Tên HĐ/KMS tại thời điểm đưa vào Dự chi
-  "currency" varchar // Loại tiền của hợp đồng
-  "amount" decimal // Tổng số tiền dự chi của hợp đồng
-  "total.vendor" number // Tổng số NCC thuộc hợp đồng trong phiếu
-}
-
 
 
 // Table commom (dùng chung với bên tạm ứng)
@@ -111,7 +92,6 @@ Table esdHTKTpaymentAttachment {
 
 
 // Bảng hóa đơn - thanh toán / TT + lấy từ nhà CC <-> Hóa đơn
-Ref: esdHTKTpaymentInvoice."payment.vendor.id" > esdHTKTpaymentVendor.id
 Table esdHTKTpaymentInvoice {
   "payment.id" varchar  // Mã đề nghị thanh toán
   "contract.id" varchar // Mã HĐ/KMS để tra cứu/đối soát
