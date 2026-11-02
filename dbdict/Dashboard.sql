@@ -82,7 +82,3 @@ Table esdHTKTdashboardTransactionDaily {
 // Với ngoại tệ phải quy đổi theo tỷ giá gắn với giao dịch. Thiếu tỷ giá thì ghi lỗi
 // đồng bộ, không tự lấy một trường tiền khác để thay thế.
 //
-// Khuyến nghị vận hành:
-// - Có job đối soát/tái dựng hai bảng tổng hợp từ bảng nguồn để sửa sai lệch.
-// - Logic insert/update/delete phải idempotent để retry không làm tăng số liệu hai lần.
-// - Cập nhật phần 1 và phần 2/3 trong cùng luồng đồng bộ khi đề nghị thay đổi.

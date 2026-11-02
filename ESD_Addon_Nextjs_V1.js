@@ -15,43 +15,47 @@ function renderPageNextJS(endpoint, input, extraData) {
      * Các tài khoản còn lại sử dụng máy chủ triển khai. 
      */
     const iframeUrl =
-        //    userLogin === 'vtb.htkt.115' ||
-        //    userLogin === 'vtb.htkt.113' ||
-        userLogin === 'vtb.htkt.112' ||
-        //    userLogin === 'vtb.htkt.100' ||
-        userLogin === 'vtb.htkt.178' ||
-        //    userLogin === 'vtb.htkt.147'  ||
-        userLogin === 'vtb.htkt.146' ||
+            userLogin === 'vtb.htkt.116' ||
+//            userLogin === 'vtb.htkt.114' ||
+//        userLogin === 'vtb.htkt.112' ||
+//            userLogin === 'vtb.htkt.110' ||
+//        userLogin === 'vtb.htkt.178' ||
+//            userLogin === 'vtb.htkt.147'  ||
+//        userLogin === 'vtb.htkt.146' ||
 //        userLogin === 'vtb.htkt.145' ||
-        //    userLogin === 'vtb.htkt.19'  ||
-        //    userLogin === 'vtb.htkt.16'  ||
-//            userLogin === 'vtb.htkt.117'  ||
-        //    userLogin === 'vtb.htkt.116'  ||
-//        userLogin === 'vtb.htkt.16' ||
-        //     userLogin === 'vtb.htkt.16'  ||
-//        userLogin === 'vtb.htkt.132' ||
+//            userLogin === 'vtb.htkt.19'  ||
+//            userLogin === 'vtb.htkt.16'  ||
+            userLogin === 'vtb.htkt.117'  ||
+//            userLogin === 'vtb.htkt.116'  ||
+//        userLogin === 'vtb.htkt.17' ||
+             userLogin === 'vtb.htkt.178'  ||
+//             userLogin === 'vtb.htkt.189'  ||
+//              userLogin === 'vtb.htkt.197'  ||
+//        userLogin === 'vtb.htkt.110' ||
+//        userLogin === 'vtb.htkt.123' ||
         // userLogin === 'vtb.htkt.122'  ||
-//        userLogin === 'vtb.htkt.121' ||
-//            userLogin === 'vtb.htkt.126'  ||
+        userLogin === 'vtb.htkt.127' ||
+         userLogin === 'vtb.htkt.126' ||
 //        userLogin === 'vtb.htkt.129' ||
 //        userLogin === 'vtb.htkt.124' ||
+//        userLogin === 'vtb.htkt.130' ||
 //        userLogin === 'vtb.htkt.123' ||
 //            userLogin === 'vtb.htkt.127'  ||
-//            userLogin === 'vtb.htkt.123'  ||
-//        userLogin === 'vtb.htkt.130' ||
-        //    userLogin === 'vtb.htkt.124'  ||
+//            userLogin === 'vtb.htkt.132'  ||  
+//        userLogin === 'vtb.htkt.133' ||
+//            userLogin === 'vtb.htkt.124'  ||
         //        userLogin === 'vtb.htkt.17'  ||
         //                userLogin === 'vtb.htkt.120'  ||
-//            userLogin === 'vtb.htkt.126'  ||
-        userLogin === 'vtb.htkt.146' ||
-        userLogin === 'vtb.htkt.148' ||
+//            userLogin === 'vtb.htkt.148'  ||
+//        userLogin === 'vtb.htkt.50' ||
+//        userLogin === 'vtb.htkt.148' ||
         //    userLogin === 'vtb.htkt.123'  ||
         //        userLogin === 'vtb.htkt.199'  ||
         //    userLogin === 'vtb.htkt.42'  ||
         //    userLogin === 'vtb.htkt.47'  ||
         //    userLogin === 'vtb.htkt.48'  ||
-        userLogin === 'vtb.htkt.111' ||
-        userLogin === 'vtb.htkt.118' ||
+//        userLogin === 'vtb.htkt.111' ||
+//        userLogin === 'vtb.htkt.118' ||
         userLogin === 'vtb.htkt.11' ?
         'http://localhost:3001' :
         'http://10.2.18.9:5010';
