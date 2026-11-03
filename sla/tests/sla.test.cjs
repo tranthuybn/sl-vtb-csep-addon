@@ -16,6 +16,8 @@ const T = engine.SLA_T;
 const calendar = {timezone:'Asia/Ho_Chi_Minh',workingHours:[],holidays:[]};
 for (let d=1;d<=5;d++) for (const [a,b] of [['08:00','12:00'],['13:00','17:00']]) calendar.workingHours.push({dayOfWeek:d,startTime:a,endTime:b});
 const time = (d,h) => `2026-10-${d}T${h}:00+07:00`;
+const holiday = (id,start,end,makeupStartAt=null,makeupEndAt=null) =>
+ ({id,holidayName:id,holidayStartAt:start,holidayEndAt:end,makeupStartAt,makeupEndAt});
 const iso = t => new Date(t).toISOString();
 let tests=0;
 function test(name,fn) {fn(); tests++; console.log('PASS',name);}
@@ -24,7 +26,7 @@ function memoryStore() {
   const db = {}; let writes=0, failAt=null, sequence=0;
   function rowKey(t,row){
     if(t===T.hours)return `${row['day.of.week']}|${row['start.time']}`;
-    if(t===T.holiday)return String(row['holiday.date']);
+    if(t===T.holiday)return String(row.id);
     return row.id;
   }
   return {db,
@@ -32,7 +34,7 @@ function memoryStore() {
     list(t,filter){return Object.values(db[t]||{}).filter(x=>Object.entries(filter).every(([k,v])=>String(x[k])===String(v))).map(clone);},
     put(t,row){writes++;if(writes===failAt)throw Error('INJECTED_WRITE_FAILURE');(db[t] ||= {})[rowKey(t,row)] = clone(row);},
     nextNumber(numberClass){assert.equal(numberClass,'esdHTKTslaTimeSegment');return String(++sequence);},
-    decodeInstant:x=>x,decodeDate:x=>x,
+    decodeInstant:x=>x,
     failAfter(n){failAt=writes+n;}, clearFailure(){failAt=null;}
   };
 }
@@ -60,15 +62,25 @@ test('Lunch break, weekend, holiday, UTC+07 independent of host timezone',()=>{
  assert.equal(cal.getWorkingMinutes(calendar,time('27','11:30'),time('27','14:30')),120);
  assert.equal(iso(cal.addWorkingMinutes(calendar,time('27','11:30'),120)),iso(time('27','14:30')));
  assert.equal(iso(cal.addWorkingMinutes(calendar,time('30','16:30'),60)),'2026-11-02T01:30:00.000Z');
- const c={...calendar,holidays:['2026-10-28']};
+ const c={...calendar,holidays:[holiday('H1',time('28','00:00'),time('29','00:00'))]};
  assert.equal(iso(cal.addWorkingMinutes(c,time('27','16:30'),60)),iso(time('29','08:30')));
+ const partial={...calendar,holidays:[holiday('H2',time('27','09:00'),time('27','14:00'))]};
+ assert.equal(cal.getWorkingMinutes(partial,time('27','08:00'),time('27','17:00')),240);
+ const makeup={...calendar,holidays:[holiday('H3',time('28','00:00'),time('29','00:00'),
+   '2026-10-31T08:00:00+07:00','2026-10-31T12:00:00+07:00')]};
+ assert.equal(cal.getWorkingMinutes(makeup,'2026-10-31T08:00:00+07:00','2026-10-31T12:00:00+07:00'),240);
  assert.equal(cal.getWorkingMinutes(calendar,time('27','12:00'),time('27','13:00')),0);
  assert.equal(iso(cal.addWorkingMinutes(calendar,time('27','17:00'),60)),iso(time('28','09:00')));
 });
 test('Invalid calendars, overlapping shifts and ambiguous datetimes fail',()=>{
  assert.throws(()=>cal.compileCalendar({...calendar,workingHours:[{dayOfWeek:1,startTime:'08:00',endTime:'12:00'},{dayOfWeek:1,startTime:'11:00',endTime:'13:00'}]}),/OVERLAPPING/);
  assert.throws(()=>cal.compileCalendar({...calendar,timezone:'UTC'}),/TIMEZONE/);
- assert.throws(()=>cal.compileCalendar({...calendar,holidays:['2026-02-30']}),/HOLIDAY/);
+ assert.throws(()=>cal.compileCalendar({...calendar,holidays:[holiday('BAD',time('28','10:00'),time('28','09:00'))]}),/HOLIDAY/);
+ assert.throws(()=>cal.compileCalendar({...calendar,holidays:[holiday('BAD2',time('28','00:00'),time('29','00:00'),time('30','08:00'),null)]}),/INCOMPLETE_MAKEUP/);
+ assert.throws(()=>cal.compileCalendar({...calendar,holidays:[
+   holiday('A',time('28','00:00'),time('29','00:00')),
+   holiday('B',time('28','12:00'),time('30','00:00'))
+ ]}),/OVERLAPPING_HOLIDAYS/);
  assert.throws(()=>cal.toMillis('27/10/2026 08:00:00'),/INVALID_INSTANT/);
  assert.doesNotThrow(()=>cal.compileCalendar({...calendar,workingHours:[{dayOfWeek:1,startTime:'08:00:00',endTime:'12:00:00'}]}));
  assert.throws(()=>cal.compileCalendar({...calendar,workingHours:[{dayOfWeek:1,startTime:'08:00:60',endTime:'12:00:00'}]}),/WORKING_TIME/);
@@ -211,7 +223,8 @@ test('Late completion recalculates segments at actual business time',()=>{
 test('Bootstrap publishes config last and rejects overlap; seeds approved holiday rows',()=>{
  const boot=engine;const st=memoryStore();const writes=[];
  const put=st.put.bind(st);st.put=(t,row)=>{writes.push(t);put(t,row);};
- const args={configId:'DC',effectiveFrom:time('01','00:00'),performedBy:'admin',holidays:['2026-10-28']};
+ const args={configId:'DC',effectiveFrom:time('01','00:00'),performedBy:'admin',
+  holidays:[holiday('H1',time('28','00:00'),time('29','00:00'))]};
  boot.installBaseline(st,cal,args);
  assert.equal(writes.at(-1),T.config);assert.equal(st.list(T.detail,{}).length,7);assert.equal(st.list(T.hours,{}).length,10);
  assert.equal(st.get(T.detail,'DC.user.checker.final')['sla.minutes'],270);assert.equal(st.list(T.holiday,{}).length,1);
@@ -240,9 +253,11 @@ test('SCFile adapter converts timestamp writes',()=>{
  const adapter=load('ESD_HTKT_SLA_ENGINE',{SCFile:FakeSCFile,SCFILE_READONLY:1,RC_SUCCESS:OK,RC_NO_MORE:NONE});
  const st=adapter.createStore();st.put(T.tracking,{id:'D','started.at':time('27','08:00')});
  assert(db[T.tracking].D['started.at'] instanceof Date);assert.equal(st.get(T.tracking,'MISSING'),null);
+ st.put(T.holiday,{id:'H','holiday.name':'Nghỉ','holiday.start.at':time('28','00:00'),'holiday.end.at':time('29','00:00'),'makeup.start.at':null,'makeup.end.at':null});
+ assert(db[T.holiday].H['holiday.start.at'] instanceof Date);assert(db[T.holiday].H['holiday.end.at'] instanceof Date);
 });
 test('Working-time addition agrees with independently counted minutes across multiple days',()=>{
- const c={...calendar,holidays:['2026-10-28']};
+ const c={...calendar,holidays:[holiday('H1',time('28','00:00'),time('29','00:00'))]};
  function independent(start,end){let total=0;for(let n=start;n<end;n+=60000){const d=new Date(n+7*3600000),wd=d.getUTCDay(),m=d.getUTCHours()*60+d.getUTCMinutes(),day=d.toISOString().slice(0,10);if(wd>=1&&wd<=5&&day!=='2026-10-28'&&((m>=480&&m<720)||(m>=780&&m<1020)))total++;}return total;}
  for(let i=0;i<12;i++) {const start=Date.parse(time('27','07:00'))+i*97*60000,budget=37+i*61,end=cal.addWorkingMinutes(c,start,budget).getTime();assert.equal(independent(start,end),budget);}
 });

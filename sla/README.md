@@ -16,6 +16,7 @@ Mục này ghi lại các quyết định và công việc của cuộc chat hi�
 - Đã bỏ field source.table khỏi ENGINE, JOB, Tracking và schema. ID phiếu có prefix phân biệt bảng nguồn.
 - Đã bỏ sla.config.id khỏi Tracking, cả danh sách field đọc/ghi, câu tạo Tracking và Ref dbdict. Tracking chỉ giữ sla.config.detail.id; suy ra Config qua ConfigDetail.sla.config.id. ConfigDetail.sla.config.id vẫn giữ. SLA tính từ sla.minutes chốt trên Tracking, không cần đọc lại định mức Config mỗi lượt.
 - Đơn vị định mức đã thống nhất là phút: ConfigDetail dùng sla.minutes và Tracking chốt nguyên giá trị này khi bắt đầu đo. Không còn sla.hours hoặc phép nhân 60 trong engine.
+- esdHTKTslaHoliday lưu một khoảng nghỉ bằng holiday.start.at/holiday.end.at và một khoảng làm bù tùy chọn bằng makeup.start.at/makeup.end.at. Engine trừ phần nghỉ khỏi ca chuẩn, sau đó cộng và gộp giờ làm bù; hỗ trợ nghỉ một phần ngày, nhiều ngày và làm bù cuối tuần.
 - Unique index Tracking hiện là (payment.id, attempt.no, role.code); payment.id giữ nguyên ID phiếu gồm prefix. Không tạo FK payment.id chỉ trỏ esdHTKTpayment vì phiếu TU nằm bảng khác.
 
 ### API workflow hiện tại và điều kiện phải xác nhận trên SM
@@ -284,11 +285,11 @@ Lỗi SLA sau khi phiếu đã lưu phải được báo rõ là lỗi ghi SLA �
 
 Dùng schema DBML `../dbdict/SLA.sql` để tạo dbdict/index thực tế. Chưa phải migration SQL có thể chạy trực tiếp. Các trường số phút dùng decimal và `id` phải đủ dài cho ID ghép đã encode.
 
-`buildBaseline(calendarLib, args)` tạo bộ dữ liệu để xem trước; `installBaseline(store, calendarLib, args)` thực sự ghi dữ liệu. Args cần `configId`, `transactionType`, `effectiveFrom`, `performedBy` và `holidays`; `effectiveTo` tùy chọn. Bootstrap luôn ghi `product.type = "Tất cả"`. Giờ làm việc và ngày nghỉ là cấu hình toàn hệ thống, được ghi đè theo ID; không có `calendarId` hoặc phiên bản lịch.
+`buildBaseline(calendarLib, args)` tạo bộ dữ liệu để xem trước; `installBaseline(store, calendarLib, args)` thực sự ghi dữ liệu. Args cần `configId`, `transactionType`, `effectiveFrom`, `performedBy` và `holidays`; `effectiveTo` tùy chọn. Mỗi phần tử `holidays` gồm `id`, `holidayName`, `holidayStartAt`, `holidayEndAt`; `makeupStartAt` và `makeupEndAt` cùng có hoặc cùng null. Các timestamp dùng Date hoặc ISO có timezone và các khoảng áp dụng theo quy ước `[start, end)`. Bootstrap luôn ghi `product.type = "Tất cả"`. Giờ làm việc và ngày nghỉ là cấu hình toàn hệ thống, được ghi đè theo ID; không có `calendarId` hoặc phiên bản lịch.
 
 Bộ giá trị Dự chi lấy từ `Thông tin SLA.xlsx`, sheet `Danh mục SLA`, dòng 19 và lưu theo phút: CB đề nghị 120; KTTC 180; RS1 180; PD ĐMMS 360; PD KTTC 360; RS2 270; cấp thẩm quyền 540. Cấu hình Dự chi có `product.type = "Tất cả"`. Hiệu lực theo khoảng `[effective.from, effective.to)`; không cho chồng lấn. `Tracking.sla.minutes` chốt nguyên `ConfigDetail.sla.minutes` khi bắt đầu bước; Tracking đang mở dùng giờ làm việc/ngày nghỉ hiện hành khi tính lại.
 
-Timestamp nghiệp vụ dùng JS Date hoặc ISO có Z/offset; không parse chuỗi ngày theo locale. Riêng `start.time` và `end.time` của `esdHTKTslaWorkingHour` là chuỗi `varchar(8)` theo định dạng `HH:mm:ss` để không phụ thuộc ngày nền và múi giờ của SM. Engine cũng chấp nhận `HH:mm` để tương thích dữ liệu thử nghiệm. Ngày nghỉ dùng YYYY-MM-DD. Version hiện hỗ trợ Asia/Ho_Chi_Minh, không hỗ trợ vùng DST.
+Timestamp nghiệp vụ dùng JS Date hoặc ISO có Z/offset; không parse chuỗi ngày theo locale. Riêng `start.time` và `end.time` của `esdHTKTslaWorkingHour` là chuỗi `varchar(8)` theo định dạng `HH:mm:ss` để không phụ thuộc ngày nền và múi giờ của SM. Engine cũng chấp nhận `HH:mm` để tương thích dữ liệu thử nghiệm. Khoảng nghỉ và làm bù dùng datetime đầy đủ, vì có thể bắt đầu/kết thúc giữa ngày. Version hiện hỗ trợ Asia/Ho_Chi_Minh, không hỗ trợ vùng DST.
 
 ID của `esdHTKTslaTimeSegment` được cấp bằng SM Sequential Numbers với number class `esdHTKTslaTimeSegment` qua `rtecall("getnumber", ...)`. Number class này phải tồn tại trước khi chạy SLA; cấu hình Increment = 1, không Decrement. Có thể dùng Prefix/Suffix theo chuẩn triển khai vì trường `id` là varchar, nhưng giá trị trả về phải duy nhất và không rỗng.
 

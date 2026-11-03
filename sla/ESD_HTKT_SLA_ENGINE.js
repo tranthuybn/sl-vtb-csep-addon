@@ -167,11 +167,6 @@ function toMillis(value) {
     return n;
 }
 
-function pad2(n) { return n < 10 ? "0" + n : String(n); }
-function dateKey(day) {
-    var d = new Date(day * SLA_DAY_MS);
-    return d.getUTCFullYear() + "-" + pad2(d.getUTCMonth() + 1) + "-" + pad2(d.getUTCDate());
-}
 function clockMinutes(value) {
     var hour, minute, second, m;
     if (value && typeof value.JSDate === "function") value = value.JSDate();
@@ -190,8 +185,8 @@ function compileCalendar(calendar) {
     if (!calendar || calendar.timezone !== "Asia/Ho_Chi_Minh") {
         throw new Error("SLA_UNSUPPORTED_TIMEZONE: expected Asia/Ho_Chi_Minh");
     }
-    var compiled = { days: {}, holidays: {} }, rows = calendar.workingHours || [];
-    var i, row, day, start, end, slots, j, key, parsed;
+    var compiled = { days: {}, holidays: [], makeups: [] }, rows = calendar.workingHours || [];
+    var i, row, day, start, end, slots, j, hasMakeupStart, hasMakeupEnd;
     if (!rows.length) throw new Error("SLA_EMPTY_WORKING_HOURS");
     for (i = 0; i < rows.length; i++) {
         row = rows[i]; day = Number(row.dayOfWeek);
@@ -212,32 +207,76 @@ function compileCalendar(calendar) {
     }
     rows = calendar.holidays || [];
     for (i = 0; i < rows.length; i++) {
-        key = String(rows[i]);
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) throw new Error("SLA_INVALID_HOLIDAY: " + key);
-        parsed = Date.parse(key + "T00:00:00Z");
-        if (!isFinite(parsed) || dateKey(Math.floor(parsed / SLA_DAY_MS)) !== key) {
-            throw new Error("SLA_INVALID_HOLIDAY: " + key);
+        row = rows[i] || {};
+        start = toMillis(row.holidayStartAt); end = toMillis(row.holidayEndAt);
+        if (end <= start) throw new Error("SLA_INVALID_HOLIDAY_INTERVAL");
+        compiled.holidays.push([start, end]);
+        hasMakeupStart = row.makeupStartAt !== null && typeof row.makeupStartAt !== "undefined" && row.makeupStartAt !== "";
+        hasMakeupEnd = row.makeupEndAt !== null && typeof row.makeupEndAt !== "undefined" && row.makeupEndAt !== "";
+        if (hasMakeupStart !== hasMakeupEnd) throw new Error("SLA_INCOMPLETE_MAKEUP_INTERVAL");
+        if (hasMakeupStart) {
+            start = toMillis(row.makeupStartAt); end = toMillis(row.makeupEndAt);
+            if (end <= start) throw new Error("SLA_INVALID_MAKEUP_INTERVAL");
+            compiled.makeups.push([start, end]);
         }
-        compiled.holidays[key] = true;
+    }
+    function validateNoOverlap(items, code) {
+        items.sort(function(a, b) { return a[0] - b[0]; });
+        for (var k = 1; k < items.length; k++) if (items[k][0] < items[k - 1][1]) throw new Error(code);
+    }
+    validateNoOverlap(compiled.holidays, "SLA_OVERLAPPING_HOLIDAYS");
+    validateNoOverlap(compiled.makeups, "SLA_OVERLAPPING_MAKEUPS");
+    for (i = 0; i < compiled.makeups.length; i++) for (j = 0; j < compiled.holidays.length; j++) {
+        if (compiled.makeups[i][0] < compiled.holidays[j][1] && compiled.makeups[i][1] > compiled.holidays[j][0]) {
+            throw new Error("SLA_MAKEUP_OVERLAPS_HOLIDAY");
+        }
     }
     return compiled;
 }
 function daySlots(compiled, day) {
-    if (compiled.holidays[dateKey(day)]) return [];
     var weekday = new Date(day * SLA_DAY_MS).getUTCDay();
-    return compiled.days[weekday === 0 ? 7 : weekday] || [];
+    var base = day * SLA_DAY_MS - SLA_OFFSET_MS, dayEnd = base + SLA_DAY_MS;
+    var recurring = compiled.days[weekday === 0 ? 7 : weekday] || [];
+    var slots = [], i, j, next, cut, additions = [];
+    for (i = 0; i < recurring.length; i++) slots.push([
+        base + recurring[i][0] * SLA_MINUTE_MS, base + recurring[i][1] * SLA_MINUTE_MS
+    ]);
+    for (i = 0; i < compiled.holidays.length; i++) {
+        cut = compiled.holidays[i];
+        if (cut[1] <= base || cut[0] >= dayEnd) continue;
+        next = [];
+        for (j = 0; j < slots.length; j++) {
+            if (cut[0] > slots[j][0]) next.push([slots[j][0], Math.min(cut[0], slots[j][1])]);
+            if (cut[1] < slots[j][1]) next.push([Math.max(cut[1], slots[j][0]), slots[j][1]]);
+        }
+        slots = next;
+    }
+    for (i = 0; i < compiled.makeups.length; i++) {
+        if (compiled.makeups[i][1] > base && compiled.makeups[i][0] < dayEnd) additions.push([
+            Math.max(base, compiled.makeups[i][0]), Math.min(dayEnd, compiled.makeups[i][1])
+        ]);
+    }
+    slots = slots.concat(additions);
+    slots.sort(function(a, b) { return a[0] - b[0]; });
+    next = [];
+    for (i = 0; i < slots.length; i++) {
+        if (slots[i][1] <= slots[i][0]) continue;
+        if (!next.length || slots[i][0] > next[next.length - 1][1]) next.push(slots[i]);
+        else if (slots[i][1] > next[next.length - 1][1]) next[next.length - 1][1] = slots[i][1];
+    }
+    return next;
 }
 function workingMillis(compiled, start, end) {
     if (end < start) throw new Error("SLA_END_BEFORE_START");
     var first = Math.floor((start + SLA_OFFSET_MS) / SLA_DAY_MS);
     var last = Math.floor((end + SLA_OFFSET_MS) / SLA_DAY_MS);
     if (last - first > 36600) throw new Error("SLA_RANGE_TOO_LARGE");
-    var day, slots, i, base, a, b, total = 0;
+    var day, slots, i, a, b, total = 0;
     for (day = first; day <= last; day++) {
-        slots = daySlots(compiled, day); base = day * SLA_DAY_MS - SLA_OFFSET_MS;
+        slots = daySlots(compiled, day);
         for (i = 0; i < slots.length; i++) {
-            a = Math.max(start, base + slots[i][0] * SLA_MINUTE_MS);
-            b = Math.min(end, base + slots[i][1] * SLA_MINUTE_MS);
+            a = Math.max(start, slots[i][0]);
+            b = Math.min(end, slots[i][1]);
             if (b > a) total += b - a;
         }
     }
@@ -247,12 +286,12 @@ function addMillis(compiled, start, duration) {
     if (!isFinite(duration) || duration < 0) throw new Error("SLA_INVALID_DURATION");
     if (duration === 0) return start;
     var first = Math.floor((start + SLA_OFFSET_MS) / SLA_DAY_MS);
-    var day, slots, i, base, a, b;
+    var day, slots, i, a, b;
     for (day = first; day <= first + 36600; day++) {
-        slots = daySlots(compiled, day); base = day * SLA_DAY_MS - SLA_OFFSET_MS;
+        slots = daySlots(compiled, day);
         for (i = 0; i < slots.length; i++) {
-            a = Math.max(start, base + slots[i][0] * SLA_MINUTE_MS);
-            b = base + slots[i][1] * SLA_MINUTE_MS;
+            a = Math.max(start, slots[i][0]);
+            b = slots[i][1];
             if (b <= a) continue;
             if (duration <= b - a) return a + duration;
             duration -= b - a;
@@ -345,7 +384,7 @@ var SLA_FIELDS = {
     esdHTKTprepayment: "id,transaction.type,initial.role,current.phase,status,created.by,current.executor,require.check.level1,require.check.level2,user.checker.kttc,user.checker.dmms,user.approver.dmms,user.approver.kttc,user.checker.final,user.approver.final",
     esdHTKTpayment: "id,transaction.type,initial.role,current.phase,status,created.by,current.executor,require.check.level1,require.check.level2,user.checker.kttc,user.checker.dmms,user.approver.dmms,user.approver.kttc,user.checker.final,user.approver.final",
     esdHTKTslaWorkingHour: "day.of.week,start.time,end.time",
-    esdHTKTslaHoliday: "holiday.date,holiday.name,holiday.type,sysmoduser,sysmodtime",
+    esdHTKTslaHoliday: "id,holiday.name,holiday.start.at,holiday.end.at,makeup.start.at,makeup.end.at,sysmoduser,sysmodtime",
     esdHTKTslaConfig: "id,transaction.type,product.type,effective.from,effective.to,status",
     esdHTKTslaConfigDetail: "id,sla.config.id,role.code,role.name,sla.minutes,is.active",
     esdHTKTslaTracking: "id,payment.id,sla.config.detail.id,role.code,attempt.no,started.at,ended.at,due.at,sla.minutes,current.assignee,status,end.reason,result",
@@ -402,9 +441,6 @@ function createStore(options) {
         if (table === "esdHTKTslaWorkingHour") {
             if (typeof row["day.of.week"] === "undefined" || !row["start.time"]) throw new Error("SLA_MISSING_WORKING_HOUR_KEY");
             identity = "day.of.week=" + quoteValue(row["day.of.week"]) + " and start.time=" + quoteValue(row["start.time"]);
-        } else if (table === "esdHTKTslaHoliday") {
-            if (!row["holiday.date"]) throw new Error("SLA_MISSING_HOLIDAY_KEY");
-            identity = "holiday.date=" + quoteValue(row["holiday.date"]);
         } else {
             if (!row.id) throw new Error("SLA_MISSING_ROW_ID");
             identity = "id=" + quoteValue(row.id);
@@ -420,7 +456,6 @@ function createStore(options) {
                         value = options.encodeInstant ? options.encodeInstant(value) : new Date(value);
                         if (!options.encodeInstant && !isFinite(value.getTime())) throw new Error("SLA_INVALID_WRITE_TIMESTAMP");
                     }
-                    if (value !== null && names[i] === "holiday.date" && options.encodeDate) value = options.encodeDate(value);
                     f[names[i]] = value;
                 }
             }
@@ -429,8 +464,7 @@ function createStore(options) {
         } finally { if (typeof f.close === "function") f.close(); }
     }
     return { get: get, list: list, put: put, nextNumber: nextNumber,
-        decodeInstant: options.decodeInstant || function(value) { return value; },
-        decodeDate: options.decodeDate || function(value) { return String(value); }
+        decodeInstant: options.decodeInstant || function(value) { return value; }
     };
 }
 
@@ -469,7 +503,13 @@ function createService(store, calendarLib, calculator, policyRules, options) {
             startTime: list[i]["start.time"], endTime: list[i]["end.time"]
         });
         list = rows(SLA_T.holiday, {});
-        for (i = 0; i < list.length; i++) result.holidays.push(store.decodeDate(list[i]["holiday.date"]));
+        for (i = 0; i < list.length; i++) result.holidays.push({
+            id: list[i].id, holidayName: list[i]["holiday.name"],
+            holidayStartAt: store.decodeInstant(list[i]["holiday.start.at"]),
+            holidayEndAt: store.decodeInstant(list[i]["holiday.end.at"]),
+            makeupStartAt: blank(list[i]["makeup.start.at"]) ? null : store.decodeInstant(list[i]["makeup.start.at"]),
+            makeupEndAt: blank(list[i]["makeup.end.at"]) ? null : store.decodeInstant(list[i]["makeup.end.at"])
+        });
         calendarLib.compileCalendar(result); return result;
     }
     function resolveProductType(payment) {
@@ -818,13 +858,18 @@ function buildBaseline(calendarLib, args) {
         }
     }
     calendarLib.compileCalendar(c);
-    var seen = {};
+    var seen = {}, holiday;
     for (i = 0; i < args.holidays.length; i++) {
-        if (seen[args.holidays[i]]) throw new Error("SLA_DUPLICATE_HOLIDAY");
-        seen[args.holidays[i]] = true;
+        holiday = args.holidays[i] || {};
+        if (!holiday.id || !holiday.holidayName) throw new Error("SLA_MISSING_HOLIDAY_ID_OR_NAME");
+        if (seen[holiday.id]) throw new Error("SLA_DUPLICATE_HOLIDAY");
+        seen[holiday.id] = true;
         writes.push({table:"esdHTKTslaHoliday",row:{
-            "holiday.date":args.holidays[i],"holiday.name":"Ngày nghỉ được phê duyệt",
-            "holiday.type":"OTHER"}});
+            id:holiday.id,"holiday.name":holiday.holidayName,
+            "holiday.start.at":new Date(calendarLib.toMillis(holiday.holidayStartAt)).toISOString(),
+            "holiday.end.at":new Date(calendarLib.toMillis(holiday.holidayEndAt)).toISOString(),
+            "makeup.start.at":holiday.makeupStartAt ? new Date(calendarLib.toMillis(holiday.makeupStartAt)).toISOString() : null,
+            "makeup.end.at":holiday.makeupEndAt ? new Date(calendarLib.toMillis(holiday.makeupEndAt)).toISOString() : null}});
     }
     var transactionType = String(args.transactionType || "Dự chi");
     var productType = "Tất cả";

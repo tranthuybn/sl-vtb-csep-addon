@@ -16,15 +16,21 @@ Table esdHTKTslaWorkingHour {
   }
 }
 
-// Mỗi dòng là một ngày không tính SLA (lễ, Tết, nghỉ bù hoặc ngày nghỉ đặc biệt).
-// Kỳ nghỉ nhiều ngày tạo từng dòng theo ngày thực tế; không tự suy diễn nghỉ bù.
+// Mỗi dòng là một kỳ nghỉ, có thể kéo dài nhiều ngày hoặc chỉ một phần ngày.
+// Khoảng làm bù là tùy chọn và được cộng vào lịch làm việc kể cả khi rơi vào cuối tuần.
 Table esdHTKTslaHoliday {
-  "holiday.date" date [pk] // Ngày nghỉ
-  "holiday.name" varchar // Tên ngày nghỉ
-  "holiday.type" varchar // PUBLIC_HOLIDAY/TET/COMPENSATORY_LEAVE/OTHER
+  id varchar [pk] // Mã cấu hình ngày nghỉ
+  "holiday.name" varchar [not null] // Tên kỳ nghỉ
+  "holiday.start.at" datetime [not null] // Bắt đầu nghỉ
+  "holiday.end.at" datetime [not null] // Kết thúc nghỉ; phải lớn hơn holiday.start.at
+  "makeup.start.at" datetime // Bắt đầu làm bù; null nếu không làm bù
+  "makeup.end.at" datetime // Kết thúc làm bù; phải cùng có với makeup.start.at và lớn hơn nó
   sysmoduser varchar(60) // OpenText SM tự ghi người tạo hoặc cập nhật gần nhất
   sysmodtime datetime // OpenText SM tự cập nhật khi bản ghi được tạo hoặc sửa
 
+  indexes {
+    ("holiday.start.at", "holiday.end.at")
+  }
 }
 
 // Bảng cấu hình SLA
