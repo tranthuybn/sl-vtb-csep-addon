@@ -25,7 +25,7 @@ const clone = x => JSON.parse(JSON.stringify(x));
 function memoryStore() {
   const db = {}; let writes=0, failAt=null, sequence=0;
   function rowKey(t,row){
-    if(t===T.hours)return `${row['day.of.week']}|${row['start.time']}`;
+    if(t===T.hours)return [row['working.hour.id'],row['day.of.week'],row['start.time']].join('|');
     if(t===T.holiday)return String(row.id);
     return row.id;
   }
@@ -41,8 +41,10 @@ function memoryStore() {
 function fixture(id='DC01',initial='dmms',rs1=true,rs2=true) {
   if (!/^(DC|TT|TU)/.test(id)) id='DC'+id;
   const store=memoryStore();
-  calendar.workingHours.forEach(x=>store.put(T.hours,{'day.of.week':x.dayOfWeek,'start.time':x.startTime,'end.time':x.endTime}));
-  store.put(T.config,{id:'CFG','transaction.type':'Dự chi','product.type':'Tất cả','effective.from':time('01','00:00'),'effective.to':null,status:'Đang hoạt động'});
+  store.put(T.workingHour,{id:'STANDARD','category.name':'Giờ làm việc tiêu chuẩn','apply.to.holiday':false});
+  calendar.workingHours.forEach(x=>store.put(T.hours,{'working.hour.id':'STANDARD',
+    'day.of.week':x.dayOfWeek,'start.time':x.startTime,'end.time':x.endTime}));
+  store.put(T.config,{id:'CFG','transaction.type':'Dự chi','product.type':'Tất cả','effective.from':time('01','00:00'),'effective.to':null,status:'Đang hoạt động','working.hour.id':'STANDARD'});
   const roles=['user.created.dmms','user.checker.kttc','user.checker.dmms','user.approver.dmms','user.approver.kttc','user.checker.final','user.approver.final'];
   roles.forEach(role=>store.put(T.detail,{id:role,'sla.config.id':'CFG','role.code':role,'sla.minutes':60,'is.active':true}));
   let payment={id,'transaction.type':'Dự chi','initial.role':initial,'current.phase':'start',status:initial+'_created','created.by':'maker','require.check.level1':rs1,'require.check.level2':rs2,'user.checker.kttc':'kttc','user.checker.dmms':'rs1','user.approver.dmms':'pd_dmms','user.approver.kttc':'pd_kttc','user.checker.final':'rs2','user.approver.final':'pd_final'};
@@ -69,6 +71,8 @@ test('Lunch break, weekend, holiday, UTC+07 independent of host timezone',()=>{
  const makeup={...calendar,holidays:[holiday('H3',time('28','00:00'),time('29','00:00'),
    '2026-10-31T08:00:00+07:00','2026-10-31T12:00:00+07:00')]};
  assert.equal(cal.getWorkingMinutes(makeup,'2026-10-31T08:00:00+07:00','2026-10-31T12:00:00+07:00'),240);
+ const holidayAware={...c,applyToHoliday:true};
+ assert.equal(cal.getWorkingMinutes(holidayAware,time('28','08:00'),time('28','17:00')),480);
  assert.equal(cal.getWorkingMinutes(calendar,time('27','12:00'),time('27','13:00')),0);
  assert.equal(iso(cal.addWorkingMinutes(calendar,time('27','17:00'),60)),iso(time('28','09:00')));
 });
@@ -212,6 +216,14 @@ test('Engine temporarily uses Tất cả config without requiring payment produc
   assert.equal(f.tracks().length,1);assert.equal(f.store.get(T.detail,f.tracks()[0]['sla.config.detail.id'])['sla.config.id'],'CFG');assert(!Object.hasOwn(f.tracks()[0],'sla.config.id'));
  }
 });
+test('SLA config selects its own working-hour header and details',()=>{
+ const f=fixture('CALENDAR');
+ f.store.put(T.workingHour,{id:'24X7','category.name':'24x7','apply.to.holiday':true});
+ for(let d=1;d<=7;d++) f.store.put(T.hours,{'working.hour.id':'24X7','day.of.week':d,'start.time':'00:00:00','end.time':'23:59:59'});
+ f.store.put(T.config,{...f.store.get(T.config,'CFG'),'working.hour.id':'24X7'});
+ f.send('RETURN','2026-10-31T08:00:00+07:00',{'current.phase':'initial_dmms',status:'request_edit'});
+ assert.equal(iso(f.tracks()[0]['due.at']),'2026-10-31T02:00:00.000Z');
+});
 test('Late completion recalculates segments at actual business time',()=>{
  const f=fixture('LATE','kttc');f.send('RETURN',time('27','08:00'),{'current.phase':'initial_kttc',status:'request_edit'});
  f.service.refresh(f.payment.id,time('27','09:10'));
@@ -227,6 +239,7 @@ test('Bootstrap publishes config last and rejects overlap; seeds approved holida
   holidays:[holiday('H1',time('28','00:00'),time('29','00:00'))]};
  boot.installBaseline(st,cal,args);
  assert.equal(writes.at(-1),T.config);assert.equal(st.list(T.detail,{}).length,7);assert.equal(st.list(T.hours,{}).length,10);
+ assert.equal(st.get(T.workingHour,'STANDARD')['category.name'],'Giờ làm việc tiêu chuẩn');
  assert.equal(st.get(T.detail,'DC.user.checker.final')['sla.minutes'],270);assert.equal(st.list(T.holiday,{}).length,1);
  boot.installBaseline(st,cal,{...args,configId:'TA',transactionType:'Tạm ứng'});
  assert.equal(st.list(T.hours,{}).length,10);assert.equal(st.list(T.holiday,{}).length,1);

@@ -4,17 +4,29 @@
 
 
 // LỊCH TÍNH SLA DÙNG CHUNG TOÀN HỆ THỐNG
-// Mỗi dòng là một ca làm việc lặp lại theo tuần;
-// Lịch chuẩn có 10 dòng: 2 ca/ngày x 5 ngày; không có dòng cho thứ Bảy/Chủ nhật.
+// Thông tin chung của một bộ lịch làm việc.
 Table esdHTKTslaWorkingHour {
+  id varchar [pk] // Mã bộ lịch
+  "category.name" varchar [not null] // Tên hiển thị của bộ lịch
+  "apply.to.holiday" boolean [not null] // Có tiếp tục tính SLA trong ngày nghỉ hay không
+  sysmoduser varchar(60)
+  sysmodtime datetime
+}
+
+// Các ca làm việc lặp lại theo tuần của từng bộ lịch.
+// Lịch STANDARD có 10 dòng: 2 ca/ngày x 5 ngày.
+Table esdHTKTslaWorkingHourDetail {
+  "working.hour.id" varchar [not null] // Tham chiếu bộ lịch
   "day.of.week" number [not null] // ISO: 1=thứ Hai ... 7=Chủ nhật
   "start.time" varchar(8) [not null] // Giờ thuần túy theo định dạng HH:mm:ss, ví dụ 08:00:00
   "end.time" varchar(8) [not null] // Giờ thuần túy HH:mm:ss; phải lớn hơn start.time
 
   indexes {
-    ("day.of.week", "start.time") [pk]
+    ("working.hour.id", "day.of.week", "start.time") [pk]
   }
 }
+
+Ref: esdHTKTslaWorkingHourDetail."working.hour.id" > esdHTKTslaWorkingHour.id
 
 // Mỗi dòng là một kỳ nghỉ, có thể kéo dài nhiều ngày hoặc chỉ một phần ngày.
 // Khoảng làm bù là tùy chọn và được cộng vào lịch làm việc kể cả khi rơi vào cuối tuần.
@@ -46,9 +58,10 @@ Table esdHTKTslaConfig {
   "created.at" datetime // Thời điểm tạo cấu hình
   sysmoduser varchar(60) // OpenText SM tự ghi người tạo hoặc cập nhật gần nhất
   sysmodtime datetime // OpenText SM tự cập nhật khi bản ghi được tạo hoặc sửa
+  "working.hour.id" varchar // Bộ lịch làm việc
 }
 
-
+Ref: esdHTKTslaConfig."working.hour.id" > esdHTKTslaWorkingHour.id
 Ref: esdHTKTslaConfigDetail."sla.config.id" > esdHTKTslaConfig.id
 
 // Bảng chi tiết SLA theo vai trò xử lý
