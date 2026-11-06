@@ -398,7 +398,7 @@ function makePrepared(requestId, type, subType, vendorId, amount, payload, entry
 
 function buildAccountingInformationRow(payment, item, createdTime) {
     return {
-        'request.id': item.requestId, 'prepayment.id': payment.id,
+        'request.id': item.requestId, 'prepayment.id': payment.id, 'internal.ref.id': payment.id,
         'vendor.id': item.vendorId, type: item.type, 'sub.type': item.subType,
         data: JSON.stringify(item.payload), status: STATUS_CREATED, message: '', response: '',
         'transaction.id': '', 'ref.id': '', 'ap.code': '', 'batch.name': '',
