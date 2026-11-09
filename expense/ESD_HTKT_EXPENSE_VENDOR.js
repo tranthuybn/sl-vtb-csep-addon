@@ -121,53 +121,85 @@ function createListInvoinVendor(input) {
             var invoiceId = normalizeExpenseVendorValue(invoice.id || invoice.invoiceId);
             if (!invoiceId) continue;
 
-            var relationFile = new SCFile("esdHTKTpaymentInvoice");
+            var checkStatus = "DangKiemTra";
+            var warningMsg = "";
+            var apiSuccess = false;
+            var invoiceFile = new SCFile("esdHTKTinvoice");
             try {
-                relationFile["payment.id"] = paymentId;
-                relationFile["invoice.id"] = invoiceId;
-                relationFile["vendor.id"] = normalizeExpenseVendorValue(invoice.vendorId) || vendorId;
-                relationFile["contract.id"] = normalizeExpenseVendorValue(invoice.contractId);
-                relationFile["ref.id"] = paymentVendorId;
-
-                var totalTax = Number(invoice.totalTax || 0);
-                relationFile["deduction.type"] = totalTax > 0 ? "KHAUTRU_001" : "KHAUTRU_003";
-
-                var insertRc = relationFile.doInsert();
-                if (insertRc !== true && insertRc !== RC_SUCCESS) continue;
-
-                successInvoiceIds.push(invoiceId);
-
-                var checkStatus = "DangKiemTra";
-                var warningMsg = "";
-                var invoiceFile = new SCFile("esdHTKTinvoice");
-                try {
-                    if (invoiceFile.doSelect('id="' + escapeExpenseVendorQueryValue(invoiceId) + '"') === RC_SUCCESS) {
-                        invoiceFile["request.id"] = paymentId;
-                        invoiceFile.doUpdate();
-
-                        try {
-                            var apiResponse = lib.ESD_HTKT_SCHEDULE_OGL.callCheckInvoiceAPI(invoiceFile);
-                            if (apiResponse !== null && apiResponse.success === true) {
-                                invoiceFile["last.check.date"] = new Date();
-                                invoiceFile.doUpdate();
-                            }
-                        } catch (apiError) {}
-
-                        checkStatus = String(invoiceFile["check.status.detail"] || checkStatus);
+                if (invoiceFile.doSelect('id="' + escapeExpenseVendorQueryValue(invoiceId) + '"') !== RC_SUCCESS) {
+                    warningMsg = "Không tìm thấy hóa đơn trong hệ thống.";
+                } else {
+                    // Giữ payload API như luồng cũ nhưng chưa lưu request.id trước khi kiểm tra thành công.
+                    invoiceFile["request.id"] = paymentId;
+                    try {
+                        var apiResponse = lib.ESD_HTKT_SCHEDULE_OGL.callCheckInvoiceAPI(invoiceFile);
+                        apiSuccess = apiResponse !== null && apiResponse.success === true;
+                        if (!apiSuccess) {
+                            warningMsg = apiResponse && apiResponse.message
+                                    ? String(apiResponse.message)
+                                    : "Kiểm tra hóa đơn thất bại.";
+                        }
+                    } catch (apiError) {
+                        warningMsg = "Kiểm tra hóa đơn thất bại: " + apiError.toString();
                     }
-                } finally {
-                    closeExpenseVendorFile(invoiceFile);
-                }
 
-                checkStatusList.push({
-                    invoiceId: invoiceId,
-                    invoiceNumber: invoice.invoiceNumber || "",
-                    status: checkStatus,
-                    warningMsg: warningMsg
-                });
+                    if (!apiSuccess) {
+                        checkStatus = String(invoiceFile["check.status.detail"] || checkStatus);
+                        return {
+                            success: false,
+                            message: warningMsg,
+                            checkStatus: [{
+                                invoiceId: invoiceId,
+                                invoiceNumber: invoice.invoiceNumber || "",
+                                status: checkStatus,
+                                warningMsg: warningMsg
+                            }]
+                        };
+                    }
+
+                    if (apiSuccess) {
+                        invoiceFile["last.check.date"] = new Date();
+                        var invoiceUpdateRc = invoiceFile.doUpdate();
+                        if (invoiceUpdateRc !== RC_SUCCESS) {
+                            apiSuccess = false;
+                            warningMsg = "Kiểm tra hóa đơn thành công nhưng không cập nhật được hóa đơn. Code: " + invoiceUpdateRc;
+                        }
+                    }
+                    checkStatus = String(invoiceFile["check.status.detail"] || checkStatus);
+
+                    if (apiSuccess) {
+                        var relationFile = new SCFile("esdHTKTpaymentInvoice");
+                        try {
+                            relationFile["payment.id"] = paymentId;
+                            relationFile["invoice.id"] = invoiceId;
+                            relationFile["vendor.id"] = normalizeExpenseVendorValue(invoice.vendorId) || vendorId;
+                            relationFile["contract.id"] = normalizeExpenseVendorValue(invoice.contractId);
+                            relationFile["ref.id"] = paymentVendorId;
+
+                            var totalTax = Number(invoice.totalTax || 0);
+                            relationFile["deduction.type"] = totalTax > 0 ? "KHAUTRU_001" : "KHAUTRU_003";
+
+                            var insertRc = relationFile.doInsert();
+                            if (insertRc === true || insertRc === RC_SUCCESS) {
+                                successInvoiceIds.push(invoiceId);
+                            } else {
+                                warningMsg = "Không thể lưu liên kết hóa đơn. Code: " + insertRc;
+                            }
+                        } finally {
+                            closeExpenseVendorFile(relationFile);
+                        }
+                    }
+                }
             } finally {
-                closeExpenseVendorFile(relationFile);
+                closeExpenseVendorFile(invoiceFile);
             }
+
+            checkStatusList.push({
+                invoiceId: invoiceId,
+                invoiceNumber: invoice.invoiceNumber || "",
+                status: checkStatus,
+                warningMsg: warningMsg
+            });
         }
 
         if (successInvoiceIds.length > 0) {
