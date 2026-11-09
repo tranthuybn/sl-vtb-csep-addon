@@ -163,7 +163,7 @@ function getListPrepaymentVendor(input) {
 }
 
 
-function getPrepaymentRemainingAmount(prepaymentId) {
+function getPrepaymentRemainingAmount(prepaymentId,vendorId) {
     var resultList = [];
 
     if (!prepaymentId) {
@@ -174,8 +174,8 @@ function getPrepaymentRemainingAmount(prepaymentId) {
         ['hdVendor.supplier.id', 'supplier_id', 'S'],
         ['hdVendor.supplier.name', 'supplier_name', 'S'],
         ['hpv.payment.method', 'payment_method', 'S'],
-        ['hpv.amount', 'amount', 'N'],
-        ['hdVendor.unpaid.amount', 'remaining_amount', 'N'],
+        ['hpv.amount', 'amount', 'S'],
+        ['hdVendor.unpaid.amount', 'remaining_amount', 'S'],
 //        ['hdVendor.remaining.amount', 'remaining_amount', 'N'],
         ['hv.vendor.number', 'tax_code', 'S'],
         ['hv.ogl.sync.status', 'ogl_sync_status', 'S'],
@@ -199,7 +199,7 @@ function getPrepaymentRemainingAmount(prepaymentId) {
         ' LEFT JOIN esdHTKTvendorSite hvs ON (hvs.id = hpv.vendor.site.id)' +
         ' LEFT JOIN esdHDcontractSupplier hdVendor ON (hp.contract.id = hdVendor.contract.id AND hv.supplier.id = hdVendor.supplier.id)';
 
-    var sqlWhere = ' WHERE hp.id = "' + prepaymentId + '"';
+    var sqlWhere = ' WHERE hp.id = "' + prepaymentId + '" AND hpv.vendor.id = "' + vendorId + '"';
 
     var itemQuery = sqlSelect + sqlFrom + sqlWhere;
 
@@ -541,18 +541,16 @@ function createListInvoinVendor(input) {
         }
 
         // Bước 2.5: Kiểm tra vượt quá số tiền còn lại của khoản tạm ứng
-        var remainingData = getPrepaymentRemainingAmount(prepaymentId);
+        var remainingData = getPrepaymentRemainingAmount(prepaymentId,vendorId);
         var totalRemainingAmount = "0";
 
-        if (Array.isArray(remainingData)) {
+        if (Array.isArray(remainingData) && remainingData.length > 0) {
             for (var m = 0; m < remainingData.length; m++) {
                 var rAmt = String(remainingData[m].remaining_amount || "0");
                 totalRemainingAmount = lib.ESD_HTKT_Utils.addStringsManual(totalRemainingAmount, rAmt);
             }
-        } else if (typeof remainingData === "object" && remainingData !== null) {
+        } else if (typeof remainingData === "object" && remainingData !== null && !Array.isArray(remainingData)) {
             totalRemainingAmount = String(remainingData.remaining_amount || remainingData.remainingAmount || "0");
-        } else {
-            totalRemainingAmount = String(remainingData || "0");
         }
 
         if (lib.ESD_HTKT_Utils.compareMoneyStrings(totalAccumulatedGrandTotal, totalRemainingAmount) > 0) {
@@ -1188,31 +1186,48 @@ function syncVendorOglFromPrepayment(record) {
                     itemPrepaymentVendor['ogl.sync.status'] = true;
 
                     // =========================================================================
-                    // BỔ SUNG: Kiểm tra số lượng Site của Nhà cung cấp sau khi đồng bộ
+                    // BỔ SUNG: AUTO-FILL SITE NCC NGAY SAU KHI ĐỒNG BỘ THÀNH CÔNG (CÁCH 2)
                     // =========================================================================
                     var vendorId = itemPrepaymentVendor['vendor.id'];
 
-                    if (vendorId) {
+                    if (vendorId && (!itemPrepaymentVendor['vendor.site.id'] || itemPrepaymentVendor['vendor.site.id'] == "")) {
                         var siteFile = new SCFile("esdHTKTvendorSite", SCFILE_READONLY);
+                        var siteQuery = 'vendor.id="' + vendorId + '"'; // Lấy tất cả site của NCC này
+                        
+                        var siteList = [];
+                        var rcSite = siteFile.doSelect(siteQuery);
+                        
+                        while (rcSite == RC_SUCCESS) {
+                            siteList.push({
+                                id: siteFile['id'],
+                                siteCode: siteFile['ogl.site.code']
+                            });
+                            rcSite = siteFile.getNext();
+                        }
+                        try { siteFile.doClose(); } catch (e) {}
 
-                        // Tuỳ logic hệ thống, nếu site phân theo entity thì bạn bổ sung thêm: 
-                        // and ogl.org.code="' + entityCode + '"
-                        var siteQuery = 'vendor.id="' + vendorId + '"';
-
-                        // Đếm số lượng site của NCC này
-                        var siteCount = siteFile.doCount(siteQuery);
-
-                        // Nếu chỉ có ĐÚNG 1 SITE -> Tự động điền luôn vào DB
-                        if (siteCount === 1) {
-                            if (siteFile.doSelect(siteQuery) === RC_SUCCESS) {
-                                itemPrepaymentVendor['vendor.site.id'] = siteFile['id'];
+                        // Áp dụng Cách 2: Tìm site mặc định, nếu không có lấy site đầu tiên
+                        if (siteList.length > 0) {
+                            var matchedSiteId = null;
+                            
+                            // 1. Thử tìm xem có site nào khớp với cấu hình Default không
+                            if (defaultVendorSiteInfo && defaultVendorSiteInfo.siteCode) {
+                                for (var i = 0; i < siteList.length; i++) {
+                                    if (siteList[i].siteCode == defaultVendorSiteInfo.siteCode) {
+                                        matchedSiteId = siteList[i].id;
+                                        break;
+                                    }
+                                }
+                            }
+                            
+                            // 2. Nếu khớp thì gán site đó, nếu KHÔNG khớp thì lấy site ĐẦU TIÊN
+                            if (matchedSiteId) {
+                                itemPrepaymentVendor['vendor.site.id'] = matchedSiteId;
+                            } else {
+                                itemPrepaymentVendor['vendor.site.id'] = siteList[0].id;
                             }
                         }
-                        // Nếu có > 1 site hoặc 0 site -> Bỏ qua, giữ nguyên như bình thường
-
-                        try { siteFile.doClose(); } catch (e) {}
                     }
-                    // =========================================================================
 
                     itemPrepaymentVendor.doUpdate();
                 }
@@ -1349,7 +1364,7 @@ function syncVendorOglFromPrepayment(record) {
  * Đồng bộ từng NCC (Logic MỚI: Query QLTS -> Sync OGL -> Create OGL)
  * @param prepaymentVendor 
  * @param branchCode 
- * @param entityCode 
+ * @param entityCode  
  * @param username
  */
 function syncVendorToOgl(prepaymentVendor, branchCode, entityCode, username) {
@@ -1726,7 +1741,7 @@ function loadPrepaymentVendorInfo(record) {
         var prepaymentId = record["prepayment.id"] || record["id"] || "";
         var vendorId = record["vendor.id"] || "";
 
-        if (!prepaymentId || !vendorId) {
+        if (!prepaymentId) {
             return;
         }
 

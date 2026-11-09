@@ -1458,12 +1458,14 @@ function validateVendorAndPaymentDetails(record) {
         var vLookup = new SCFile("esdHTKTvendor", SCFILE_READONLY);
         try {
             vLookup.setFields(["id"]);
-            var vSql = "";
+            var conditions = [];
             if (vars.$taxCode) {
-                vSql = 'vendor.number="' + escapeExpenseVendorQueryValue(vars.$taxCode) + '"';
-            } else if (vars.$supplierId) {
-                vSql = 'supplier.id="' + escapeExpenseVendorQueryValue(vars.$supplierId) + '"';
+                conditions.push('vendor.number="' + escapeExpenseVendorQueryValue(vars.$taxCode) + '"');
             }
+            if (vars.$supplierId) {
+                conditions.push('supplier.id="' + escapeExpenseVendorQueryValue(vars.$supplierId) + '"');
+            }
+            var vSql = conditions.join(" or ");
             if (vSql && vLookup.doSelect(vSql) === RC_SUCCESS) {
                 selectedVendorId = normalizeExpenseVendorValue(vLookup["id"]);
             }
@@ -1483,18 +1485,76 @@ function validateVendorAndPaymentDetails(record) {
         }
     }
 
-    var rawAmount = (vars.$amount !== undefined && vars.$amount !== null && String(vars.$amount).trim() !== "")
-        ? vars.$amount
-        : (record ? record["amount"] : undefined);
+    // Lấy số tiền hoàn ứng lần này từ record hoặc vars (ưu tiên nguồn có giá trị > 0)
+    var rawRefundAmount = undefined;
+    var refundSources = [
+        record ? record["refund.amount"] : undefined,
+        record ? record["refund_amount"] : undefined,
+        record ? record.refundAmount : undefined,
+        typeof vars !== "undefined" && vars && vars.$L_file ? vars.$L_file["refund.amount"] : undefined,
+        typeof vars !== "undefined" && vars && vars.$L_file ? vars.$L_file["refund_amount"] : undefined,
+        typeof vars !== "undefined" && vars ? vars.$refundAmount : undefined,
+        typeof vars !== "undefined" && vars ? vars["$refund.amount"] : undefined,
+        typeof vars !== "undefined" && vars ? vars.$refund_amount : undefined,
+        typeof vars !== "undefined" && vars ? vars.$isRefundAmount : undefined
+    ];
+
+    for (var rIdx = 0; rIdx < refundSources.length; rIdx++) {
+        var valR = refundSources[rIdx];
+        if (valR !== undefined && valR !== null && String(valR).trim() !== "") {
+            var numR = parseAmount(valR);
+            if (!isNaN(numR) && numR > 0) {
+                rawRefundAmount = valR;
+                break;
+            }
+            if (rawRefundAmount === undefined) {
+                rawRefundAmount = valR;
+            }
+        }
+    }
+
+    var refundAmount = parseAmount(rawRefundAmount);
+
+    // Lấy số tiền dự chi từ record hoặc vars
+    var rawAmount = undefined;
+    var amountSources = [
+        record ? record["amount"] : undefined,
+        record ? record.amount : undefined,
+        typeof vars !== "undefined" && vars && vars.$L_file ? vars.$L_file["amount"] : undefined,
+        typeof vars !== "undefined" && vars ? vars.$amount : undefined
+    ];
+
+    for (var aIdx = 0; aIdx < amountSources.length; aIdx++) {
+        var valA = amountSources[aIdx];
+        if (valA !== undefined && valA !== null && String(valA).trim() !== "") {
+            var numA = parseAmount(valA);
+            if (!isNaN(numA) && numA > 0) {
+                rawAmount = valA;
+                break;
+            }
+            if (rawAmount === undefined) {
+                rawAmount = valA;
+            }
+        }
+    }
+
     var amountField = parseAmount(rawAmount);
 
-    var rawRefundAmount = (vars.$refundAmount !== undefined && vars.$refundAmount !== null && String(vars.$refundAmount).trim() !== "")
-        ? vars.$refundAmount
-        : (record ? record["refund.amount"] : undefined);
-    var parsedRefundAmount = parseAmount(rawRefundAmount);
-    var refundAmount = (isNaN(parsedRefundAmount) || parsedRefundAmount === null) ? 0 : parsedRefundAmount;
+    // Đồng bộ lại giá trị vào record và vars nếu là số hợp lệ
+    if (record && !isNaN(refundAmount)) {
+        record["refund.amount"] = refundAmount;
+    }
+    if (typeof vars !== "undefined" && vars && !isNaN(refundAmount)) {
+        vars.$refundAmount = refundAmount;
+    }
 
-    if (refundAmount < 0) {
+    if (isNaN(amountField)) {
+        errorMss.push("Số tiền dự chi là bắt buộc.");
+    }
+
+    if (isNaN(refundAmount)) {
+        errorMss.push("Số tiền hoàn ứng lần này là bắt buộc.");
+    } else if (refundAmount < 0) {
         errorMss.push("Số tiền hoàn ứng lần này không được là số âm.");
     } else if (refundAmount > 0) {
         // 1. Nếu refund.amount > 0 => validate xem có khoản tạm ứng không?
@@ -1528,16 +1588,12 @@ function validateVendorAndPaymentDetails(record) {
         }
 
         // Nếu có khoản tạm ứng => cho phép thằng amount >= 0
-        if (isNaN(amountField)) {
-            errorMss.push("Số tiền dự chi là bắt buộc.");
-        } else if (amountField < 0) {
+        if (!isNaN(amountField) && amountField < 0) {
             errorMss.push("Số tiền dự chi phải lớn hơn hoặc bằng 0.");
         }
     } else {
         // 2. Nếu refund.amount = 0 => amount phải > 0
-        if (isNaN(amountField)) {
-            errorMss.push("Số tiền dự chi là bắt buộc.");
-        } else if (amountField <= 0) {
+        if (!isNaN(amountField) && amountField <= 0) {
             errorMss.push("Số tiền dự chi phải lớn hơn 0.");
         }
     }
