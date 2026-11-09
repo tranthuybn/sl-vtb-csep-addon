@@ -72,6 +72,23 @@ function run() {
  * Luồng Dự chi chỉ cập nhật amount của esdHTKTpaymentVendor, không cập nhật
  * trường tổng tiền hóa đơn đã duyệt của luồng Thanh toán.
  */
+function shouldCheckExpenseInvoice(lastCheckDate) {
+    if (!lastCheckDate) return true;
+
+    try {
+        var checkDate = lastCheckDate instanceof Date
+                ? lastCheckDate
+                : new Date(lastCheckDate);
+        var checkTime = checkDate.getTime();
+        if (isNaN(checkTime)) return true;
+
+        var twoDaysInMilliseconds = 2 * 24 * 60 * 60 * 1000;
+        return new Date().getTime() - checkTime > twoDaysInMilliseconds;
+    } catch (e) {
+        return true;
+    }
+}
+
 function createListInvoinVendor(input) {
     var params = getExpenseVendorInputDetails(input);
     var rows = params.updatedSelectedRows instanceof Array
@@ -131,16 +148,23 @@ function createListInvoinVendor(input) {
                 } else {
                     // Giữ payload API như luồng cũ nhưng chưa lưu request.id trước khi kiểm tra thành công.
                     invoiceFile["request.id"] = paymentId;
-                    try {
-                        var apiResponse = lib.ESD_HTKT_SCHEDULE_OGL.callCheckInvoiceAPI(invoiceFile);
-                        apiSuccess = apiResponse !== null && apiResponse.success === true;
-                        if (!apiSuccess) {
-                            warningMsg = apiResponse && apiResponse.message
-                                    ? String(apiResponse.message)
-                                    : "Kiểm tra hóa đơn thất bại.";
+                    var needCheckInvoice = shouldCheckExpenseInvoice(invoiceFile["last.check.date"]);
+
+                    if (needCheckInvoice) {
+                        try {
+                            var apiResponse = lib.ESD_HTKT_SCHEDULE_OGL.callCheckInvoiceAPI(invoiceFile);
+                            apiSuccess = apiResponse !== null && apiResponse.success === true;
+                            if (!apiSuccess) {
+                                warningMsg = apiResponse && apiResponse.message
+                                        ? String(apiResponse.message)
+                                        : "Kiểm tra hóa đơn thất bại.";
+                            }
+                        } catch (apiError) {
+                            warningMsg = "Kiểm tra hóa đơn thất bại: " + apiError.toString();
                         }
-                    } catch (apiError) {
-                        warningMsg = "Kiểm tra hóa đơn thất bại: " + apiError.toString();
+                    } else {
+                        // Kết quả kiểm tra trong vòng 2 ngày vẫn còn hiệu lực.
+                        apiSuccess = true;
                     }
 
                     if (!apiSuccess) {
@@ -157,7 +181,7 @@ function createListInvoinVendor(input) {
                         };
                     }
 
-                    if (apiSuccess) {
+                    if (apiSuccess && needCheckInvoice) {
                         invoiceFile["last.check.date"] = new Date();
                         var invoiceUpdateRc = invoiceFile.doUpdate();
                         if (invoiceUpdateRc !== RC_SUCCESS) {
