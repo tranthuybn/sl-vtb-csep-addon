@@ -88,7 +88,7 @@ function shouldCheckExpenseInvoice(lastCheckDate) {
         return true;
     }
 }
-
+createListInvoinVendor()
 function createListInvoinVendor(input) {
     var params = getExpenseVendorInputDetails(input);
     var rows = params.updatedSelectedRows instanceof Array
@@ -149,7 +149,7 @@ function createListInvoinVendor(input) {
                     // Giữ payload API như luồng cũ nhưng chưa lưu request.id trước khi kiểm tra thành công.
                     invoiceFile["request.id"] = paymentId;
                     var needCheckInvoice = shouldCheckExpenseInvoice(invoiceFile["last.check.date"]);
-
+print("needCheckInvoice" + needCheckInvoice)
                     if (needCheckInvoice) {
                         try {
                             var apiResponse = lib.ESD_HTKT_SCHEDULE_OGL.callCheckInvoiceAPI(invoiceFile);
@@ -1459,23 +1459,23 @@ function validateVendorAndPaymentDetails(record) {
     }
 
     var paymentId = normalizeExpenseVendorValue(
-        (record && (record["payment.id"] || record.payment_id)) ||
-        vars.$G_payment_id ||
-        (vars.$L_file && (vars.$L_file["payment.id"] || vars.$L_file.payment_id))
+            (record && (record["payment.id"] || record.payment_id)) ||
+            vars.$G_payment_id ||
+            (vars.$L_file && (vars.$L_file["payment.id"] || vars.$L_file.payment_id))
     );
     var contractId = normalizeExpenseVendorValue(
-        (record && (record["contract.id"] || record.contract_id)) ||
-        vars.$G_contract_id ||
-        (vars.$L_file && (vars.$L_file["contract.id"] || vars.$L_file.contract_id))
+            (record && (record["contract.id"] || record.contract_id)) ||
+            vars.$G_contract_id ||
+            (vars.$L_file && (vars.$L_file["contract.id"] || vars.$L_file.contract_id))
     );
     var currentItemId = normalizeExpenseVendorValue(
-        (record && (record["id"] || record.id)) ||
-        vars.$G_payment_vendor_id ||
-        (vars.$L_file && (vars.$L_file["id"] || vars.$L_file.id))
+            (record && (record["id"] || record.id)) ||
+            vars.$G_payment_vendor_id ||
+            (vars.$L_file && (vars.$L_file["id"] || vars.$L_file.id))
     );
     var selectedVendorId = normalizeExpenseVendorValue(
-        (record && record["vendor.id"]) ||
-        (vars.$L_file && vars.$L_file["vendor.id"])
+            (record && record["vendor.id"]) ||
+            (vars.$L_file && vars.$L_file["vendor.id"])
     );
 
     if (!selectedVendorId && (vars.$taxCode || vars.$supplierId)) {
@@ -1509,67 +1509,44 @@ function validateVendorAndPaymentDetails(record) {
         }
     }
 
-    // Lấy số tiền hoàn ứng lần này từ record hoặc vars (ưu tiên nguồn có giá trị > 0)
+    // Lấy số tiền hoàn ứng lần này (ưu tiên trực tiếp từ record đang chỉnh sửa trên form)
     var rawRefundAmount = undefined;
-    var refundSources = [
-        record ? record["refund.amount"] : undefined,
-        record ? record["refund_amount"] : undefined,
-        record ? record.refundAmount : undefined,
-        typeof vars !== "undefined" && vars && vars.$L_file ? vars.$L_file["refund.amount"] : undefined,
-        typeof vars !== "undefined" && vars && vars.$L_file ? vars.$L_file["refund_amount"] : undefined,
-        typeof vars !== "undefined" && vars ? vars.$refundAmount : undefined,
-        typeof vars !== "undefined" && vars ? vars["$refund.amount"] : undefined,
-        typeof vars !== "undefined" && vars ? vars.$refund_amount : undefined,
-        typeof vars !== "undefined" && vars ? vars.$isRefundAmount : undefined
-    ];
-
-    for (var rIdx = 0; rIdx < refundSources.length; rIdx++) {
-        var valR = refundSources[rIdx];
-        if (valR !== undefined && valR !== null && String(valR).trim() !== "") {
-            var numR = parseAmount(valR);
-            if (!isNaN(numR) && numR > 0) {
-                rawRefundAmount = valR;
-                break;
-            }
-            if (rawRefundAmount === undefined) {
-                rawRefundAmount = valR;
-            }
-        }
+    if (record && record["refund.amount"] !== undefined) {
+        rawRefundAmount = record["refund.amount"];
+    } else if (record && record["refund_amount"] !== undefined) {
+        rawRefundAmount = record["refund_amount"];
+    } else if (record && record.refundAmount !== undefined) {
+        rawRefundAmount = record.refundAmount;
+    } else if (typeof vars !== "undefined" && vars && vars.$L_file && vars.$L_file["refund.amount"] !== undefined) {
+        rawRefundAmount = vars.$L_file["refund.amount"];
+    } else if (typeof vars !== "undefined" && vars && vars.$refundAmount !== undefined) {
+        rawRefundAmount = vars.$refundAmount;
     }
 
     var refundAmount = parseAmount(rawRefundAmount);
 
-    // Lấy số tiền dự chi từ record hoặc vars
+    // Lấy số tiền dự chi (ưu tiên trực tiếp từ record đang chỉnh sửa trên form)
     var rawAmount = undefined;
-    var amountSources = [
-        record ? record["amount"] : undefined,
-        record ? record.amount : undefined,
-        typeof vars !== "undefined" && vars && vars.$L_file ? vars.$L_file["amount"] : undefined,
-        typeof vars !== "undefined" && vars ? vars.$amount : undefined
-    ];
-
-    for (var aIdx = 0; aIdx < amountSources.length; aIdx++) {
-        var valA = amountSources[aIdx];
-        if (valA !== undefined && valA !== null && String(valA).trim() !== "") {
-            var numA = parseAmount(valA);
-            if (!isNaN(numA) && numA > 0) {
-                rawAmount = valA;
-                break;
-            }
-            if (rawAmount === undefined) {
-                rawAmount = valA;
-            }
-        }
+    if (record && record["amount"] !== undefined) {
+        rawAmount = record["amount"];
+    } else if (record && record.amount !== undefined) {
+        rawAmount = record.amount;
+    } else if (typeof vars !== "undefined" && vars && vars.$L_file && vars.$L_file["amount"] !== undefined) {
+        rawAmount = vars.$L_file["amount"];
+    } else if (typeof vars !== "undefined" && vars && vars.$amount !== undefined) {
+        rawAmount = vars.$amount;
     }
 
     var amountField = parseAmount(rawAmount);
 
-    // Đồng bộ lại giá trị vào record và vars nếu là số hợp lệ
-    if (record && !isNaN(refundAmount)) {
-        record["refund.amount"] = refundAmount;
+    // Đồng bộ lại giá trị chuẩn vào record và vars
+    if (record) {
+        if (!isNaN(refundAmount)) record["refund.amount"] = refundAmount;
+        if (!isNaN(amountField)) record["amount"] = amountField;
     }
-    if (typeof vars !== "undefined" && vars && !isNaN(refundAmount)) {
-        vars.$refundAmount = refundAmount;
+    if (typeof vars !== "undefined" && vars) {
+        if (!isNaN(refundAmount)) vars.$refundAmount = refundAmount;
+        if (!isNaN(amountField)) vars.$amount = amountField;
     }
 
     if (isNaN(amountField)) {
