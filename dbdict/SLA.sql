@@ -3,6 +3,16 @@
 // ================================================================
 
 
+// DANH MỤC QUY TRÌNH MUA SẮM HÀNG HÓA, DỊCH VỤ
+Table esdDMmsProcess {
+  "code" varchar [pk] // Mã quy trình
+  "name" varchar [not null] // Tên quy trình
+  "type" varchar [not null] // Nghiệp vụ/Sản phẩm
+  sysmoduser varchar(60)
+  sysmodtime datetime
+}
+
+
 // LỊCH TÍNH SLA DÙNG CHUNG TOÀN HỆ THỐNG
 // Thông tin chung của một bộ lịch làm việc.
 Table esdHTKTslaWorkingHour {

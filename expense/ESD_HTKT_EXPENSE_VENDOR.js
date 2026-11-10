@@ -88,7 +88,9 @@ function shouldCheckExpenseInvoice(lastCheckDate) {
         return true;
     }
 }
-createListInvoinVendor()
+
+
+
 function createListInvoinVendor(input) {
     var params = getExpenseVendorInputDetails(input);
     var rows = params.updatedSelectedRows instanceof Array
@@ -149,7 +151,7 @@ function createListInvoinVendor(input) {
                     // Giữ payload API như luồng cũ nhưng chưa lưu request.id trước khi kiểm tra thành công.
                     invoiceFile["request.id"] = paymentId;
                     var needCheckInvoice = shouldCheckExpenseInvoice(invoiceFile["last.check.date"]);
-print("needCheckInvoice" + needCheckInvoice)
+
                     if (needCheckInvoice) {
                         try {
                             var apiResponse = lib.ESD_HTKT_SCHEDULE_OGL.callCheckInvoiceAPI(invoiceFile);
@@ -181,12 +183,17 @@ print("needCheckInvoice" + needCheckInvoice)
                         };
                     }
 
-                    if (apiSuccess && needCheckInvoice) {
-                        invoiceFile["last.check.date"] = new Date();
+                    if (apiSuccess) {
+                        // request.id luôn phải được lưu khi gắn hóa đơn, kể cả khi
+                        // kết quả kiểm tra cũ vẫn còn hiệu lực và không gọi lại API.
+                        invoiceFile["request.id"] = paymentId;
+                        if (needCheckInvoice) {
+                            invoiceFile["last.check.date"] = new Date();
+                        }
                         var invoiceUpdateRc = invoiceFile.doUpdate();
                         if (invoiceUpdateRc !== RC_SUCCESS) {
                             apiSuccess = false;
-                            warningMsg = "Kiểm tra hóa đơn thành công nhưng không cập nhật được hóa đơn. Code: " + invoiceUpdateRc;
+                            warningMsg = "Không cập nhật được request.id của hóa đơn. Code: " + invoiceUpdateRc;
                         }
                     }
                     checkStatus = String(invoiceFile["check.status.detail"] || checkStatus);
