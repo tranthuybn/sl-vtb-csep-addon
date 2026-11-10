@@ -400,6 +400,7 @@ function buildAccountingInformationRecord(
     return {
         'request.id': requestId,
         'prepayment.id': prepayment.id,
+        'internal.ref.id': prepayment.id,
         'vendor.id': payloadResult.vendorId,
         type: accountingType,
         data: JSON.stringify(payload),
