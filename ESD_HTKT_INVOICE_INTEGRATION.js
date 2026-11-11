@@ -974,7 +974,6 @@ function base64(fileInput) {
                 var singleStartTime = new Date().getTime(); // [LOG TIME] Bắt đầu gọi API
                 
                 var responseBody = lib.ESD_HTKT_INVOICE_VATIN_INTEGRATION.uploadInvoice(uploadPayload);
-                print("responseBody " + JSON.stringify(responseBody))
                 var singleEndTime = new Date().getTime(); // [LOG TIME] Kết thúc gọi API
                 var singleDuration = singleEndTime - singleStartTime; // Thời gian xử lý (ms)
 
