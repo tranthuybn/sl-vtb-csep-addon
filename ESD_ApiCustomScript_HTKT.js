@@ -20,6 +20,12 @@ function run() {
     var result = null;
     try {
         switch (name) {
+            case "getAccountingDashboardSummary":
+                result = lib.ESD_HTKT_DASHBOARD.getAccountingDashboardSummary(details);
+                break;
+            case "getPaymentApprovalData":
+                result = lib.ESD_HTKT_PAYMENT_LOAD_APRROVAL_COMBOBOX.getPaymentApprovalData(details);
+                break;
             case "getPaymentApprovalOptions":
                 result = lib.ESD_HTKT_PAYMENT_LOAD_APRROVAL_COMBOBOX.getPaymentApprovalOptions(details);
                 break;
@@ -188,15 +194,29 @@ function run() {
                 result = { success: true, data: lib.ESD_HTKT_ACCOUNTING_ERROR_HANDLING.retryAccountingErrorsResult(input) };
                 break;
             case "saveAccountingErrorsResult": // Lưu khai báo kết quả hạch toán
-                result = { success: true, data: lib.ESD_HTKT_ACCOUNTING_ERROR_HANDLING.saveAccountingErrorsResult(input) };
+                result = lib.ESD_HTKT_ACCOUNTING_ERROR_HANDLING.saveAccountingErrorsResult(input);
                 break;
 
+            // TT: nguồn tài liệu theo category thật; DC giữ các action riêng hiện có.
+            case "listPaymentSourceDocuments":
+                result = lib.ESD_HTKT_PAYMENT_FILE_ATTACHMENT.listPaymentSourceDocuments(input);
+                break;
+            case "addPaymentSourceDocuments":
+                result = lib.ESD_HTKT_PAYMENT_FILE_ATTACHMENT.addPaymentSourceDocuments(input);
+                break;
+            case "deletePaymentSourceDocument":
+                result = lib.ESD_HTKT_PAYMENT_FILE_ATTACHMENT.deletePaymentSourceDocument(input);
+                break;
+                
             case 'listFileAttachment':
                 lib.ESD_HTKT_PAYMENT_CREATE_REQUEST.listFileAttachment(input);
                 break;
             case "getAccountingErrorApproverKttcOptions": // Danh sách cán bộ phê duyệt KTTC cho khai báo kết quả
                 result = lib.ESD_HTKT_ACCOUNTING_ERROR_HANDLING.getAccountingErrorApproverKttcOptions(input);
                 break;
+            case "getAccountingErrorStatusCounts":
+                result = lib.ESD_HTKT_ACCOUNTING_ERROR_HANDLING.getAccountingErrorStatusCounts(input);
+                break;    
             case "approveAccountingErrorsResult": // Phê duyệt kết quả khai báo hạch toán
                 result = { success: true, data: lib.ESD_HTKT_ACCOUNTING_ERROR_HANDLING.approveAccountingErrorsResult(input) };
                 break;
@@ -206,15 +226,37 @@ function run() {
             case "getAccountingErrorExecutorOptions":
                 result = lib.ESD_HTKT_ACCOUNTING_ERROR_HANDLING.getAccountingErrorExecutorOptions(input);
                 break;
-            //Du chi
-            case "getExpenceList":
-                result = lib.ESD_HTKT_EXPENSE_CREATE_REQUEST.getList(input);
+            case "listPaymentXdcbContracts": // Chỉ đọc HĐ S4 cho popup Thanh toán, áp quyền/phạm vi Thanh toán.
+                result = lib.ESD_HTKT_EXPENSE_CONTRACT.listPaymentXdcbContracts(input);
                 break;
+            //Du chi
+            case "listExpenseSourceDocuments": // Dự chi: S4 lấy tài liệu theo SHTL, HHDV giữ reader S2.
+                result = lib.ESD_HTKT_EXPENSE_FILE_ATTACHMENT.listExpenseSourceDocuments(input);
+                break;
+            case "listExpenseContracts": // Dự chi: quyền/phase trên phiếu cha -> HHDV lấy từ S2; XDCB lấy từ S4 qua SHTL -> HĐ
+                result = lib.ESD_HTKT_EXPENSE_CONTRACT.listExpenseContracts(input);
+                break;
+            case "listExpenseXdcbContracts":  // Đọc Dự chi HD - XDCB qua hai loại SHTL; lọc HĐ/phạm vi rồi phân trang trên SM
+                result = lib.ESD_HTKT_EXPENSE_CONTRACT.listExpenseXdcbContracts(input);
+                break;
+            case "getExpenseXdcbContract": // Đọc lại nguồn SHTL và chi tiết theo HĐ.id; TH2 phải phân giải hồ sơ.ctr.id
+                result = lib.ESD_HTKT_EXPENSE_CONTRACT.getExpenseXdcbContract(input);
+                break;
+//            case "getExpenceList":
+//                result = lib.ESD_HTKT_EXPENSE_CREATE_REQUEST.getList(input);
+//                break;
             case "createExpenseRequest":
                 result = lib.ESD_HTKT_EXPENSE_CREATE_REQUEST.createExpenseRequest(input);
                 break;
             case "createPaymentVendor":
                 result = lib.ESD_HTKT_EXPENSE_VENDOR.createPaymentVendor(input);
+                break;
+            case "importExpenseVendors":  // Nhập danh sách món Dự chi từ file Excel.
+                return safeReturn(lib.ESD_HTKT_EXPENSE_VENDOR.importExpenseVendors(input));
+            case "syncExpenseVendorsToOgl": // Đồng bộ OGL từng món dự chi
+                return safeReturn(lib.ESD_HTKT_EXPENSE_VENDOR.syncExpenseVendorsToOgl(input));
+            case "deleteExpenseVendor":
+                result = lib.ESD_HTKT_EXPENSE_VENDOR.deleteExpenseVendor(input);
                 break;
             case "getListExpenseVendor":
                 result = {
