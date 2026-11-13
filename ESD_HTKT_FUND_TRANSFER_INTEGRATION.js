@@ -66,43 +66,41 @@ function checkNameAccountNapas(acctId, napasCode) {
     var config = lib.ESD_HTKT_BASE_API_INTEGRATION.getConfigSystem();
     if (!token || !config) return null;
 
-    var url = config.coreBaseUrl + "/gateway-info-inq/v1/gwinfoinq";
+    // 1. URL & Headers theo đúng thông tin bạn cung cấp
+    var url = config.coreBaseUrl + "/payment-hub/pmh-rtgs-out/v1/acctinq";
     var headers = [
-        new Header("Content-Type", "application/json"),
+        new Header("content-type", "application/json"),
+        new Header("accept", "application/json"),
         new Header("Authorization", "Bearer " + token),
-        new Header("requestId", "ac1b7dc8-bd99-425a-a775-56bd512ab33b"),
-        new Header("username", config['coreUsername']),
-        new Header("password", config['corePassword']),
-        new Header("ClientID", config['coreClientId']),
+        new Header("RequestId", requestId),
         new Header("RequestTime", lib.ESD_HTKT_Utils.formatDateToISOWithOffset()),
+        new Header("ClientId", config['coreClientId']),
+        new Header("userAD", config['coreClientId']) // userAD là ClientID trước đó
     ];
 
+    // 2. Request body đúng theo ảnh
     var checkData = {
-        "spname": "com.fnf.xes.SML",
-        "reftype": config['coreClientId'],
-        "refid": config['coreClientId'],
-        "data": {
-            "gwLogicalName": "G003_SML",
-            "gwActionCode": "S03_SML_ACCOUNT_INQ",
-            "acctIdFrom": "100868368326",
-            "acctIdTo": acctId,
-            "bankIdTo": napasCode,
-            "postingDt": lib.ESD_HTKT_Utils.formatDateToISO(),
-            "processingCode": "432020",
-            "amt": 0,
-            "curCode": "VND",
-            "comment": "RTGS Transaction",
-            "acquiredId": "970415",
-            "merchantType": "7399"
-        }
+        "channelName": config['coreClientId'],
+        "rcvrType": "ACC",
+        "receiveCode": napasCode,
+        "accountNo": acctId
     };
-//    print('checkNameAccount::request: ' + rteJSONStringify(checkData));
+
+    // print('checkNameAccount::request: ' + rteJSONStringify(checkData));
     var response = lib.ESD_HTKT_BASE_API_INTEGRATION.postJson(url, rteJSONStringify(checkData), headers);
-//    print('checkNameAccountNapas::httpStatus: ' + (response ? response.statusCode : null));
-    print('checkNameAccount::response: ' + (response ? response.body : null));
-    if (response && response.body) {
+    print('checkNameAccount::response: ' + (response ? rteJSONStringify(response) : null));
+
+    // 3. Xử lý Response theo cấu trúc trả về trong ảnh
+    if (response) {
         try {
-            var responseObj = rteJSONParse(response.body);
+            // response.body có thể là string JSON hoặc đã parse thành Object
+            var responseObj = null;
+            if (response.body) {
+                responseObj = (typeof response.body === 'string') ? rteJSONParse(response.body) : response.body;
+            } else if (response.rawBody) {
+                responseObj = rteJSONParse(response.rawBody);
+            }
+
             if (responseObj) {
                 return responseObj;
             }
@@ -111,7 +109,7 @@ function checkNameAccountNapas(acctId, napasCode) {
             return {
                 status: {
                     code: "400",
-                    detail: "Fail: " + response.body
+                    detail: "Fail: " + (response.body || response.rawBody || e)
                 }
             };
         }
