@@ -14,7 +14,7 @@ function checkNameAccount(acctId) {
     //    })
     if (!token || !config) return null;
 
-    var url = config.coreBaseUrl + "/prf-dep-inq/v1/acct-inq";
+    var url = config.coreBaseUrl + "/msa/prf-dep-inq/v1/acct-inq";
     var headers = [
         new Header("Content-Type", "application/json"),
         new Header("Authorization", "Bearer " + token),
@@ -133,7 +133,7 @@ function fundTranfer(transferData) {
     var config = lib.ESD_HTKT_BASE_API_INTEGRATION.getConfigSystem();
     if (!token || !config) return null;
 
-    var url = config.coreBaseUrl + "/api/transfer-in/fundstransferadd";
+    var url = config.coreBaseUrl + "/msa/api/transfer-in/fundstransferadd";
     var headers = [
         new Header("Content-Type", "application/json"),
         new Header("Authorization", "Bearer " + token),
@@ -189,7 +189,7 @@ function fundTranferOut(transferData) {
     var config = lib.ESD_HTKT_BASE_API_INTEGRATION.getConfigSystem();
     if (!token || !config) return null;
 
-    var url = config.coreBaseUrl + "/api/transfer-out/pmtadd";
+    var url = config.coreBaseUrl + "/msa/api/transfer-out/pmtadd";
     var headers = [
         new Header("Content-Type", "application/json"),
         new Header("Authorization", "Bearer " + token),
@@ -289,7 +289,7 @@ function inquireTransactionStatus(input) {
 
 
     var requestTime = lib.ESD_HTKT_Utils.formatDateToISOWithOffset2();
-    var url = config.coreBaseUrl + "/prf-account-trans/v1/payment-inq";
+    var url = config.coreBaseUrl + "/msa/prf-account-trans/v1/payment-inq";
     result.endpoint = url;
     var headers = [
         new Header("Content-Type", "application/json"),
