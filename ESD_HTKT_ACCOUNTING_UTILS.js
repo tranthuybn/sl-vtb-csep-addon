@@ -343,7 +343,6 @@ function callApiGl(esdHTKTacountingInfo) {
 //checkCompleteAccounting('DC.100.26.0000069')
 function callApiCore(esdHTKTacountingInfo) {
     // Đặt false để tắt giả lập và gọi lại CORE thật.
-    var USE_FAKE_CORE_RESPONSE = false;
     var success = false;
     if (!esdHTKTacountingInfo || !esdHTKTacountingInfo['request.id'] || !esdHTKTacountingInfo.data) {
         // logger.info('ESD_HTKT_ACCOUNTING_UTILS::callApiCore: invalid payload');
@@ -362,25 +361,7 @@ function callApiCore(esdHTKTacountingInfo) {
         var httpStatus = null;
         var status = "UNKNOWN";
         var statusDetail = null;
-        if (USE_FAKE_CORE_RESPONSE &&
-            (esdHTKTacountingInfo['sub.type'] == ACCOUNTING_SUB_TYPE.INHOUSE ||
-                esdHTKTacountingInfo['sub.type'] == ACCOUNTING_SUB_TYPE.CITAD)) {
-            var fakeStatuses = [
-                { code: "1", detail: "Thất bại" },
-                { code: "1001", detail: "Lỗi server" },
-                { code: "98", detail: "Time out call sang XES" },
-                { code: "202", detail: "Lỗi kết nối database" },
-                { code: "100", detail: "Lỗi dữ liệu. Mã lỗi hệ thống chung" }
-            ];
-            var fakeStatus = fakeStatuses[Math.floor(Math.random() * fakeStatuses.length)];
-            response = {
-                status: {
-                    code: fakeStatus.code,
-                    detail: fakeStatus.detail + " (Giả lập)"
-                },
-            };
-            rawResponseBody = rteJSONStringify(response);
-        } else if (esdHTKTacountingInfo['sub.type'] == ACCOUNTING_SUB_TYPE.INHOUSE) {
+        if (esdHTKTacountingInfo['sub.type'] == ACCOUNTING_SUB_TYPE.INHOUSE) {
             apiResult = lib.ESD_HTKT_FUND_TRANSFER_INTEGRATION.fundTranfer(payload);
         } else if (esdHTKTacountingInfo['sub.type'] == ACCOUNTING_SUB_TYPE.CITAD) {
             apiResult = lib.ESD_HTKT_FUND_TRANSFER_INTEGRATION.fundTranferOut(payload);
