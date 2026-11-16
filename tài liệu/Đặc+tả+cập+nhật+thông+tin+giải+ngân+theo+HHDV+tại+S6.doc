@@ -1,0 +1,2225 @@
+Date: Mon, 16 Nov 2026 03:04:22 +0000 (UTC)
+Message-ID: <1837001480.33.1794798262288@b51528b28075>
+Subject: Exported From Confluence
+MIME-Version: 1.0
+Content-Type: multipart/related; 
+	boundary="----=_Part_32_977409732.1794798262288"
+
+------=_Part_32_977409732.1794798262288
+Content-Type: text/html; charset=UTF-8
+Content-Transfer-Encoding: quoted-printable
+Content-Location: file:///C:/exported.html
+
+<html xmlns:o=3D'urn:schemas-microsoft-com:office:office'
+      xmlns:w=3D'urn:schemas-microsoft-com:office:word'
+      xmlns:v=3D'urn:schemas-microsoft-com:vml'
+      xmlns=3D'urn:w3-org-ns:HTML'>
+<head>
+    <meta http-equiv=3D"Content-Type" content=3D"text/html; charset=3Dutf-8=
+">
+    <title>=C4=90=E1=BA=B7c t=E1=BA=A3 c=E1=BA=ADp nh=E1=BA=ADt th=C3=B4ng =
+tin gi=E1=BA=A3i ng=C3=A2n theo HHDV t=E1=BA=A1i S6</title>
+    <!--[if gte mso 9]>
+    <xml>
+        <o:OfficeDocumentSettings>
+            <o:TargetScreenSize>1024x640</o:TargetScreenSize>
+            <o:PixelsPerInch>72</o:PixelsPerInch>
+            <o:AllowPNG/>
+        </o:OfficeDocumentSettings>
+        <w:WordDocument>
+            <w:View>Print</w:View>
+            <w:Zoom>90</w:Zoom>
+            <w:DoNotOptimizeForBrowser/>
+        </w:WordDocument>
+    </xml>
+    <![endif]-->
+    <style>
+                <!--
+        @page Section1 {
+            size: 8.5in 11.0in;
+            margin: 1.0in;
+            mso-header-margin: .5in;
+            mso-footer-margin: .5in;
+            mso-paper-source: 0;
+        }
+
+        table {
+            border: solid 1px;
+            border-collapse: collapse;
+        }
+
+        table td, table th {
+            border: solid 1px;
+            padding: 5px;
+        }
+
+        td {
+            page-break-inside: avoid;
+        }
+
+        tr {
+            page-break-after: avoid;
+        }
+
+        div.Section1 {
+            page: Section1;
+        }
+
+        /* Confluence print stylesheet. Common to all themes for print medi=
+a */
+/* Full of !important until we improve batching for print CSS */
+
+@media print {
+    #main {
+        padding-bottom: 1em !important; /* The default padding of 6em is to=
+o much for printouts */
+    }
+
+    body {
+        font: var(--ds-font-body-small, Arial, Helvetica, FreeSans, sans-se=
+rif);
+    }
+
+    body, #full-height-container, #main, #page, #content, .has-personal-sid=
+ebar #content {
+        background: var(--ds-surface, #fff) !important;
+        color: var(--ds-text, #000) !important;
+        border: 0 !important;
+        width: 100% !important;
+        height: auto !important;
+        min-height: auto !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        display: block !important;
+    }
+
+    a, a:link, a:visited, a:focus, a:hover, a:active {
+        color: var(--ds-text, #000);
+    }
+
+    #content h1,
+    #content h2,
+    #content h3,
+    #content h4,
+    #content h5,
+    #content h6 {
+        page-break-after: avoid;
+    }
+
+    pre {
+        font: var(--ds-font-code, Monaco, "Courier New", monospace);
+    }
+
+    #header,
+    .aui-header-inner,
+    #navigation,
+    #sidebar,
+    .sidebar,
+    #personal-info-sidebar,
+    .ia-fixed-sidebar,
+    .page-actions,
+    .navmenu,
+    .ajs-menu-bar,
+    .noprint,
+    .inline-control-link,
+    .inline-control-link a,
+    a.show-labels-editor,
+    .global-comment-actions,
+    .comment-actions,
+    .quick-comment-container,
+    #addcomment {
+        display: none !important;
+    }
+
+    /* CONF-28544 cannot print multiple pages in IE */
+    #splitter-content {
+        position: relative !important;
+    }
+
+    .comment .date::before {
+        content: none !important; /* remove middot for print view */
+    }
+
+    h1.pagetitle img {
+        height: auto;
+        width: auto;
+    }
+
+    .print-only {
+        display: block;
+    }
+
+    #footer {
+        position: relative !important; /* CONF-17506 Place the footer at en=
+d of the content */
+        margin: 0;
+        padding: 0;
+        background: none;
+        clear: both;
+    }
+
+    #poweredby {
+        border-top: none;
+        background: none;
+    }
+
+    #poweredby li.print-only {
+        display: list-item;
+        font-style: italic;
+    }
+
+    #poweredby li.noprint {
+        display: none;
+    }
+
+    /* no width controls in print */
+    .wiki-content .table-wrap,
+    .wiki-content p,
+    .panel .codeContent,
+    .panel .codeContent pre,
+    .image-wrap {
+        overflow: visible !important;
+    }
+
+    /* TODO - should this work? */
+    #children-section,
+    #comments-section .comment,
+    #comments-section .comment .comment-body,
+    #comments-section .comment .comment-content,
+    #comments-section .comment p {
+        page-break-inside: avoid;
+    }
+
+    #page-children a {
+        text-decoration: none;
+    }
+
+    /**
+     hide twixies
+
+     the specificity here is a hack because print styles
+     are getting loaded before the base styles. */
+    #comments-section.pageSection .section-header,
+    #comments-section.pageSection .section-title,
+    #children-section.pageSection .section-header,
+    #children-section.pageSection .section-title,
+    .children-show-hide {
+        padding-left: 0;
+        margin-left: 0;
+    }
+
+    .children-show-hide.icon {
+        display: none;
+    }
+
+    /* personal sidebar */
+    .has-personal-sidebar #content {
+        margin-right: 0px;
+    }
+
+    .has-personal-sidebar #content .pageSection {
+        margin-right: 0px;
+    }
+
+    .no-print, .no-print * {
+        display: none !important;
+    }
+}
+-->
+    </style>
+</head>
+<body>
+    <h1>=C4=90=E1=BA=B7c t=E1=BA=A3 c=E1=BA=ADp nh=E1=BA=ADt th=C3=B4ng tin=
+ gi=E1=BA=A3i ng=C3=A2n theo HHDV t=E1=BA=A1i S6</h1>
+    <div class=3D"Section1">
+        <h2 local-id=3D"5e850b737227" id=3D"id-=C4=90=E1=BA=B7ct=E1=BA=A3c=
+=E1=BA=ADpnh=E1=BA=ADtth=C3=B4ngtingi=E1=BA=A3ing=C3=A2ntheoHHDVt=E1=BA=A1i=
+S6-1.Giaodi=E1=BB=87n">1. Giao di=E1=BB=87n</h2>
+<p local-id=3D"70104b33b72a"><a class=3D"external-link" href=3D"https://www=
+.figma.com/design/NuUwsRnd9psAVIp7ZKtfCJ/HPT---CSEP---Ph%C3%A2n-h%E1%BB%87-=
+QLH%C4%90---T%C3%A0i-ch%C3%ADnh?node-id=3D22642-29083&amp;t=3DTIvTMhCAlXPvi=
+zw3-4" rel=3D"nofollow">Link Figma</a></p>
+<span class=3D"confluence-embedded-file-wrapper image-center-wrapper conflu=
+ence-embedded-manual-size"><img class=3D"confluence-embedded-image image-ce=
+nter" alt=3D"Tab HHDV - =C4=90=E1=BB=81 ngh=E1=BB=8B theo NCC.png" width=3D=
+"468" loading=3D"lazy" src=3D"cf8db26af1c11b9fa47cc86a48be943523fe2fdc60832=
+12460df3d8eb047f50b" data-image-src=3D"https://vietinbank.atlassian.net/wik=
+i/download/attachments/435191823/Tab%20HHDV%20-%20%C4%90%E1%BB%81%20ngh%E1%=
+BB%8B%20theo%20NCC.png?version=3D2&amp;modificationDate=3D1794454857042&amp=
+;cacheVersion=3D1&amp;api=3Dv2" data-height=3D"1124" data-width=3D"1327" da=
+ta-unresolved-comment-count=3D"0" data-linked-resource-id=3D"435224589" dat=
+a-linked-resource-version=3D"2" data-linked-resource-type=3D"attachment" da=
+ta-linked-resource-default-alias=3D"Tab HHDV - =C4=90=E1=BB=81 ngh=E1=BB=8B=
+ theo NCC.png" data-base-url=3D"https://vietinbank.atlassian.net/wiki" data=
+-linked-resource-content-type=3D"image/png" data-linked-resource-container-=
+id=3D"435191823" data-linked-resource-container-version=3D"9" data-media-id=
+=3D"c2e056d9-b693-499c-b8e7-8ef1b33c9287" data-media-type=3D"file" height=
+=3D"396"></span>
+<h3 local-id=3D"e9fba0c0a2df" id=3D"id-=C4=90=E1=BA=B7ct=E1=BA=A3c=E1=BA=AD=
+pnh=E1=BA=ADtth=C3=B4ngtingi=E1=BA=A3ing=C3=A2ntheoHHDVt=E1=BA=A1iS6-1.1Tab=
+&quot;H=C3=A0ngho=C3=A1d=E1=BB=8Bchv=E1=BB=A5&quot;(m=C3=A0nh=C3=ACnh&quot;=
+Th=C3=B4ngtin=C4=91=E1=BB=81ngh=E1=BB=8Bt=E1=BA=A1m=E1=BB=A9ng/thanhto=C3=
+=A1ntheoNCC&quot;)">1.1 Tab "H=C3=A0ng ho=C3=A1 d=E1=BB=8Bch v=E1=BB=A5" (m=
+=C3=A0n h=C3=ACnh "Th=C3=B4ng tin =C4=91=E1=BB=81 ngh=E1=BB=8B t=E1=BA=A1m =
+=E1=BB=A9ng/thanh to=C3=A1n theo NCC")</h3>
+<div class=3D"table-wrap">
+<table data-table-width=3D"1359" data-layout=3D"center" data-local-id=3D"da=
+f18438-059f-4ea9-a435-772267dd7343" class=3D"confluenceTable">
+<colgroup>
+<col style=3D"width: 92.0px;">
+<col style=3D"width: 194.0px;">
+<col style=3D"width: 130.0px;">
+<col style=3D"width: 114.0px;">
+<col style=3D"width: 151.0px;">
+<col style=3D"width: 243.0px;">
+<col style=3D"width: 313.0px;">
+<col style=3D"width: 116.0px;">
+</colgroup>
+<tbody>
+<tr data-local-id=3D"57147b69-ab56-40ec-97cf-cab67a680796">
+<th data-local-id=3D"c347bf40-1ab6-4292-9901-2741b6e19d34" class=3D"conflue=
+nceTh">
+<p local-id=3D"67e03890afed"><strong>STT</strong></p>
+</th>
+<th data-local-id=3D"9c7c3352-6211-4927-aa03-f42047036195" class=3D"conflue=
+nceTh">
+<p local-id=3D"d0d8cee362c8"><strong>T=C3=AAn tr=C6=B0=E1=BB=9Dng</strong><=
+/p>
+</th>
+<th data-local-id=3D"b95858bf-6daa-4a46-9970-7551b74bbe27" class=3D"conflue=
+nceTh">
+<p local-id=3D"884d585354c5"><strong>Ki=E1=BB=83u hi=E1=BB=83n th=E1=BB=8B<=
+/strong></p>
+</th>
+<th data-local-id=3D"c8494da3-094f-46d8-bd0a-0f5b747ee02b" class=3D"conflue=
+nceTh">
+<p local-id=3D"3a832571f10d"><strong>Ki=E1=BB=83u d=E1=BB=AF li=E1=BB=87u</=
+strong></p>
+</th>
+<th data-local-id=3D"7f9e924c-bb57-4a5d-a1dd-ba9dddb2e0b8" class=3D"conflue=
+nceTh">
+<p local-id=3D"19aecaa992c7"><strong><span class=3D"inline-comment-marker" =
+data-ref=3D"01fd3736-b6a1-45ef-8bb2-df93fff6ba4d">Ngu=E1=BB=93n</span></str=
+ong></p>
+</th>
+<th data-local-id=3D"52ef75f1-b32b-4b41-99ad-037c9bee51c3" class=3D"conflue=
+nceTh">
+<p local-id=3D"4fbda3989852"><strong>M=C3=B4 t=E1=BA=A3</strong></p>
+</th>
+<th data-local-id=3D"e439b08df9e5" class=3D"confluenceTh">
+<p local-id=3D"dcddcd554ed6"><strong>Mapping</strong></p>
+</th>
+<th data-local-id=3D"acf9c1ca-7b0e-4e21-bebf-76e494dcde5e" class=3D"conflue=
+nceTh">
+<p local-id=3D"55d1e522a8db"><strong>V=C3=AD d=E1=BB=A5</strong></p>
+</th>
+</tr>
+<tr data-local-id=3D"7e6c56a9-88ff-40af-a999-708554ab668f">
+<td colspan=3D"8" data-local-id=3D"87325eeb-d962-4bb9-ad93-f37768a5f280" cl=
+ass=3D"confluenceTd">
+<p local-id=3D"dd3978ceb689"><strong>Th=C3=B4ng tin t=C3=B3m t=E1=BA=AFt</s=
+trong></p>
+</td>
+</tr>
+<tr data-local-id=3D"42865ef5-70c4-4494-8b84-0adbd0349430">
+<td data-local-id=3D"e8fd66b1-be05-4e92-af65-3c32420576a7" class=3D"conflue=
+nceTd">
+<p local-id=3D"30a9f8b2acf6">1</p>
+</td>
+<td data-local-id=3D"b9c1462b-9e5b-4e3e-9476-6933e134ce96" class=3D"conflue=
+nceTd">
+<p local-id=3D"65a48447948d">S=E1=BB=91 ti=E1=BB=81n =C4=91=E1=BB=81 ngh=E1=
+=BB=8B thanh to=C3=A1n/t=E1=BA=A1m =E1=BB=A9ng</p>
+</td>
+<td data-local-id=3D"bd9fe6ed-9b34-4320-9e11-1bb493ff9a18" class=3D"conflue=
+nceTd">
+<p local-id=3D"9bfed370ddc2">OutputText</p>
+</td>
+<td data-local-id=3D"6927b81d-b7fd-44a0-a8e9-f835db8ad41b" class=3D"conflue=
+nceTd">
+<p local-id=3D"af26b62b91f9">Decimal</p>
+</td>
+<td data-local-id=3D"2fc59278-5b51-4853-b84e-16adf265a2f7" class=3D"conflue=
+nceTd">
+<p local-id=3D"852564c4af43">S6 - Th=C3=B4ng tin chung c=E1=BB=A7a =C4=91=
+=E1=BB=81 ngh=E1=BB=8B theo NCC</p>
+</td>
+<td data-local-id=3D"3a182bda-44c3-40d4-8cf7-c5d96b061936" class=3D"conflue=
+nceTd">
+<p local-id=3D"e7efd17815c6">S=E1=BB=91 ti=E1=BB=81n =C4=91=E1=BB=81 ngh=E1=
+=BB=8B c=E1=BB=A7a NCC</p>
+</td>
+<td data-local-id=3D"d0a82ed140ff" class=3D"confluenceTd">
+<p local-id=3D"cc864d7e00ce"></p>
+</td>
+<td data-local-id=3D"8e7bb31e-f1fc-434a-bd2f-1c2d7a1b5e42" class=3D"conflue=
+nceTd">
+<p local-id=3D"3eae6afa3cbc">67,000,000</p>
+</td>
+</tr>
+<tr data-local-id=3D"49c52f39-b792-4849-a137-4893b23f8ab5">
+<td data-local-id=3D"73aa4d15-34c6-41f1-ad7e-7c46f1863f9c" class=3D"conflue=
+nceTd">
+<p local-id=3D"c02adb094792">2</p>
+</td>
+<td data-local-id=3D"53f32208-f77a-4970-9733-8b17a5f97068" class=3D"conflue=
+nceTd">
+<p local-id=3D"4dac860b469b">T=E1=BB=95ng s=E1=BB=91 ti=E1=BB=81n gi=E1=BA=
+=A3i ng=C3=A2n theo HHDV</p>
+</td>
+<td data-local-id=3D"febfcdf5-c46a-4e84-b18a-b6e8656aed03" class=3D"conflue=
+nceTd">
+<p local-id=3D"e5fc9b25c949">OutputText</p>
+</td>
+<td data-local-id=3D"545be8dd-5918-4b26-8c25-8216021d597b" class=3D"conflue=
+nceTd">
+<p local-id=3D"fb50c2385fc1">Decimal</p>
+</td>
+<td data-local-id=3D"0a2ec514-562e-407e-91b6-5244e5de33ef" class=3D"conflue=
+nceTd">
+<p local-id=3D"95b9dc257a72">T=C3=ADnh to=C3=A1n</p>
+</td>
+<td data-local-id=3D"2bc716a5-2b37-4a39-9cfb-821e0ec66d74" class=3D"conflue=
+nceTd">
+<p local-id=3D"6838a0b79fe4">T=E1=BB=95ng S=E1=BB=91 ti=E1=BB=81n gi=E1=BA=
+=A3i ng=C3=A2n l=E1=BA=A7n n=C3=A0y c=E1=BB=A7a b=E1=BA=A3ng KH-01 v=C3=A0 =
+KH-02</p>
+</td>
+<td data-local-id=3D"c9b2240bca28" class=3D"confluenceTd">
+<p local-id=3D"b3790f429b31"></p>
+</td>
+<td data-local-id=3D"d654c58b-c477-4a52-be42-b3192a6d7469" class=3D"conflue=
+nceTd">
+<p local-id=3D"5ab969cdf521">67,000,000</p>
+</td>
+</tr>
+<tr data-local-id=3D"dd772136-d1d8-4f07-b4e3-0a178b252938">
+<td data-local-id=3D"fc3b3833-ae2f-41d6-940a-7e6203652fb7" class=3D"conflue=
+nceTd">
+<p local-id=3D"678c00c408ef">3</p>
+</td>
+<td data-local-id=3D"ba81d26b-e1aa-4ad6-8f44-1ab248ad1202" class=3D"conflue=
+nceTd">
+<p local-id=3D"b424cb785108">T=E1=BB=95ng s=E1=BB=91 ti=E1=BB=81n ch=C3=AAn=
+h l=E1=BB=87ch</p>
+</td>
+<td data-local-id=3D"81e50ca6-5eaf-4b85-967b-c0ac6c106586" class=3D"conflue=
+nceTd">
+<p local-id=3D"c5bc316bc097">OutputText</p>
+</td>
+<td data-local-id=3D"b7970608-8962-4dc8-9bc3-24d70ff5065e" class=3D"conflue=
+nceTd">
+<p local-id=3D"999106494f75">Decimal</p>
+</td>
+<td data-local-id=3D"49e1b396-8b36-4194-849d-7fc181968519" class=3D"conflue=
+nceTd">
+<p local-id=3D"916d1cf30b44">T=C3=ADnh to=C3=A1n</p>
+</td>
+<td data-local-id=3D"ecd97372-25aa-4915-a9d7-44cec5c150c1" class=3D"conflue=
+nceTd">
+<p local-id=3D"542e7b23abf2">S=E1=BB=91 ti=E1=BB=81n =C4=91=E1=BB=81 ngh=E1=
+=BB=8B thanh to=C3=A1n/t=E1=BA=A1m =E1=BB=A9ng tr=E1=BB=AB T=E1=BB=95ng s=
+=E1=BB=91 ti=E1=BB=81n gi=E1=BA=A3i ng=C3=A2n theo HHDV</p>
+</td>
+<td data-local-id=3D"a4c25e8cc7be" class=3D"confluenceTd">
+<p local-id=3D"8e9a05f82e48"></p>
+</td>
+<td data-local-id=3D"29ac24df-e440-4f01-851a-209be4be31a7" class=3D"conflue=
+nceTd">
+<p local-id=3D"602062dadb2b">0</p>
+</td>
+</tr>
+<tr data-local-id=3D"b549bfd7-1f2c-4c31-b6a9-3845ea10be9f">
+<td colspan=3D"8" data-local-id=3D"92d0ae48-3bbd-4e3c-b842-883d98d2fd99" cl=
+ass=3D"confluenceTd">
+<p local-id=3D"d83c34b04e2b"><strong>Th=C3=B4ng tin gi=E1=BA=A3i ng=C3=A2n =
+theo HHDV</strong></p>
+</td>
+</tr>
+<tr data-local-id=3D"2b40adb5-2f30-4698-b0a4-bd0b5a7c4d75">
+<td data-local-id=3D"497b3097-27ec-4e9e-987a-9eae04f19f13" class=3D"conflue=
+nceTd">
+<p local-id=3D"c325653efdd4">4</p>
+</td>
+<td data-local-id=3D"99079756-aa0e-442e-99e9-8e78f3bd269d" class=3D"conflue=
+nceTd">
+<p local-id=3D"5a68b4f9c036">Ch=E1=BB=89nh s=E1=BB=ADa</p>
+</td>
+<td data-local-id=3D"b3ab49f8-c9e1-44bf-ac0b-0e68f3772b6b" class=3D"conflue=
+nceTd">
+<p local-id=3D"0dec718b370c">Button</p>
+</td>
+<td data-local-id=3D"85302fa3-588f-42b6-9910-119f0cfb53fd" class=3D"conflue=
+nceTd">
+<p local-id=3D"2613b2f50d68"></p>
+</td>
+<td data-local-id=3D"3f5a245e-1516-4355-b86b-21e660d45991" class=3D"conflue=
+nceTd">
+<p local-id=3D"44ec3f402d5a"></p>
+</td>
+<td data-local-id=3D"369bb844-fe39-475c-88fa-36f4f9f11eac" class=3D"conflue=
+nceTd">
+<p local-id=3D"e171b8f06eb0">M=E1=BB=9F popup "Ch=E1=BB=89nh s=E1=BB=ADa th=
+=C3=B4ng tin gi=E1=BA=A3i ng=C3=A2n theo HHDV". Hi=E1=BB=83n th=E1=BB=8B v=
+=E1=BB=9Bi ng=C6=B0=E1=BB=9Di d=C3=B9ng c=C3=B3 quy=E1=BB=81n ch=E1=BB=89nh=
+ s=E1=BB=ADa =C4=91=E1=BB=81 ngh=E1=BB=8B</p>
+</td>
+<td data-local-id=3D"a364baa8e5cf" class=3D"confluenceTd">
+<p local-id=3D"478366c4bd5b"></p>
+</td>
+<td data-local-id=3D"c4b62b66-5440-4405-9083-16a732e636df" class=3D"conflue=
+nceTd">
+<p local-id=3D"238e2efb52cc"></p>
+</td>
+</tr>
+<tr data-local-id=3D"9f29e7066b05">
+<td colspan=3D"8" data-local-id=3D"064b9db2-ff77-4567-8fd0-0543da833930" cl=
+ass=3D"confluenceTd">
+<p local-id=3D"53481e1ecbe3"><strong>Ti=C3=AAu =C4=91=E1=BB=81 kh=E1=BB=91i=
+ k=E1=BA=BF ho=E1=BA=A1ch (d=C3=B9ng chung cho KH-01 v=C3=A0 KH-02)</strong=
+></p>
+</td>
+</tr>
+<tr data-local-id=3D"2a5e4365-328c-447d-a91a-7855cffdc9c2">
+<td data-local-id=3D"b77180c0-a977-4a7c-8e5d-23516986dab0" class=3D"conflue=
+nceTd">
+<p local-id=3D"437d2de58d69">5</p>
+</td>
+<td data-local-id=3D"1d0063a8-9abc-46d6-ac22-13158ab0d269" class=3D"conflue=
+nceTd">
+<p local-id=3D"6bc5544158eb">T=C3=AAn kh=E1=BB=91i k=E1=BA=BF ho=E1=BA=A1ch=
+</p>
+</td>
+<td data-local-id=3D"85200113-591e-40e8-bab8-03cafe00fddb" class=3D"conflue=
+nceTd">
+<p local-id=3D"96305676c2b3">OutputText</p>
+</td>
+<td data-local-id=3D"9c4f1dd2-bfad-43ef-9543-da76620f6f89" class=3D"conflue=
+nceTd">
+<p local-id=3D"b7e78c68d769">String</p>
+</td>
+<td data-local-id=3D"cb5f5009-d377-4364-a343-e9602e18f5bf" class=3D"conflue=
+nceTd">
+<p local-id=3D"19d8cb006575"></p>
+</td>
+<td data-local-id=3D"16b20953-ce33-4a36-997c-8e467fdfbc69" class=3D"conflue=
+nceTd">
+<p local-id=3D"157d3287f2cb">Hi=E1=BB=83n th=E1=BB=8B theo lo=E1=BA=A1i k=
+=E1=BA=BF ho=E1=BA=A1ch c=E1=BB=A7a HHDV: "K=E1=BA=BF ho=E1=BA=A1ch mua s=
+=E1=BA=AFm HHDV c=C3=B3 danh m=E1=BB=A5c" (KH-01) ho=E1=BA=B7c "K=E1=BA=BF =
+ho=E1=BA=A1ch mua s=E1=BA=AFm HHDV s=E1=BB=AD d=E1=BB=A5ng chi ph=C3=AD ho=
+=E1=BA=A1t =C4=91=E1=BB=99ng" (KH-02). Ch=E1=BB=89 hi=E1=BB=83n th=E1=BB=8B=
+ c=C3=A1c kh=E1=BB=91i c=C3=B3 HHDV</p>
+</td>
+<td data-local-id=3D"d9ed8181eb1a" class=3D"confluenceTd">
+<ul local-id=3D"ffa4823068e4">
+<li local-id=3D"3277b295b30b">
+<p local-id=3D"61b6d72bc2ca">B1: Mapping c=E1=BB=99t HHDV_ID b=E1=BA=A3ng e=
+sdhdcontracthhdvm1 v=E1=BB=9Bi c=E1=BB=99t ID b=E1=BA=A3ng esdmskmshhdvm1, =
+l=E1=BA=A5y ra gi=C3=A1 tr=E1=BB=8B HMCM_ID =E1=BB=9F b=E1=BA=A3ng esdmskms=
+hhdvm1 c=E1=BB=A7a m=E1=BB=97i HHDV =C4=91=C6=B0=E1=BB=A3c thanh to=C3=A1n/=
+t=E1=BA=A1m =E1=BB=A9ng</p>
+</li>
+<li local-id=3D"270104bfad8e">
+<p local-id=3D"d582040d763e">B2: Mapping HMCM_ID c=C3=B3 =E1=BB=9F B1 v=E1=
+=BB=9Bi ID =E1=BB=9F b=E1=BA=A3ng esdmsdxmsitemassignementm1, l=E1=BA=A5y g=
+i=C3=A1 tr=E1=BB=8B DXMS_TYPE c=E1=BB=A7a HHDV =C4=91=C6=B0=E1=BB=A3c thanh=
+ to=C3=A1n/t=E1=BA=A1m =E1=BB=A9ng</p>
+</li>
+<li local-id=3D"40bdc1d34c87">
+<p local-id=3D"ae17e4bf4f30">B3:</p>
+<ul local-id=3D"1f6b43c1ce10">
+<li local-id=3D"dbf8388d68bf">
+<p local-id=3D"02553f62f44c">N=E1=BA=BFu DXMS_TYPE in (=E2=80=98DXMS_01_01_=
+01=E2=80=99, =E2=80=98DXMS_01_01_03=E2=80=99, =E2=80=98DXMS_02_01_01=E2=80=
+=99) th=C3=AC h=C3=A0ng h=C3=B3a thu=E1=BB=99c k=E1=BA=BF ho=E1=BA=A1ch KH-=
+01</p>
+</li>
+<li local-id=3D"525fb6db432c">
+<p local-id=3D"9be6de1d4a82">N=E1=BA=BFu DXMS_TYPE in (=E2=80=98DXMS_01_01_=
+02=E2=80=99, =E2=80=98DXMS_02_01_02=E2=80=99) th=C3=AC h=C3=A0ng h=C3=B3a t=
+hu=E1=BB=99c k=E1=BA=BF ho=E1=BA=A1ch KH-02</p>
+</li>
+</ul>
+</li>
+</ul>
+</td>
+<td data-local-id=3D"9ba4994e-49df-45c4-9bdf-f96eebf53d9e" class=3D"conflue=
+nceTd">
+<p local-id=3D"116f2c9de16b">K=E1=BA=BF ho=E1=BA=A1ch mua s=E1=BA=AFm HHDV =
+c=C3=B3 danh m=E1=BB=A5c</p>
+</td>
+</tr>
+<tr data-local-id=3D"6086cd10200d">
+<td data-local-id=3D"c7909320-e4a4-4392-a4b0-147e544ba55b" class=3D"conflue=
+nceTd">
+<p local-id=3D"0a9b09e231d8">6</p>
+</td>
+<td data-local-id=3D"fd865876-97d7-408d-bcae-3b14abfa422f" class=3D"conflue=
+nceTd">
+<p local-id=3D"f7c92953e824">N=C4=83m k=E1=BA=BF ho=E1=BA=A1ch</p>
+</td>
+<td data-local-id=3D"51cffde6-8691-46b9-badf-99205f322265" class=3D"conflue=
+nceTd">
+<p local-id=3D"0c25899a8b15">OutputText</p>
+</td>
+<td data-local-id=3D"341b7cc0-dd77-4f51-aed4-1a58cff99b07" class=3D"conflue=
+nceTd">
+<p local-id=3D"5b799ecba24d">Integer</p>
+</td>
+<td data-local-id=3D"2681edce-0b2d-4303-885d-afa24fa27f02" class=3D"conflue=
+nceTd">
+<p local-id=3D"59bb1ee1c1df">T=C3=ADnh to=C3=A1n</p>
+</td>
+<td data-local-id=3D"2206efd6-4aee-4ede-a1b1-a1497ea6171f" class=3D"conflue=
+nceTd">
+<p local-id=3D"d49e6947a843">N=C4=83m c=E1=BB=A7a th=E1=BB=9Di =C4=91i=E1=
+=BB=83m gi=E1=BA=A3i ng=C3=A2n. Th=C3=B4ng tin k=E1=BA=BF ho=E1=BA=A1ch tro=
+ng kh=E1=BB=91i s=E1=BA=BD =C4=91=C6=B0=E1=BB=A3c l=E1=BA=A5y theo n=C4=83m=
+ n=C3=A0y</p>
+</td>
+<td data-local-id=3D"c0e8dc7e-ad79-499d-9d33-b29fe225589a" class=3D"conflue=
+nceTd">
+<p local-id=3D"7657dce04739">&nbsp;</p>
+</td>
+<td data-local-id=3D"206e48a1-da49-476b-9c70-5a3fe51a7294" class=3D"conflue=
+nceTd">
+<p local-id=3D"51025a0a82c7">2026</p>
+</td>
+</tr>
+<tr data-local-id=3D"f5fa5c5c-4ce0-4c9e-8cb9-e7157083417a">
+<td data-local-id=3D"eaa9a6f6-3249-419b-aebc-d87dbd6ae041" class=3D"conflue=
+nceTd">
+<p local-id=3D"a052b4c8a91a">7</p>
+</td>
+<td data-local-id=3D"ab558b62-faa0-47aa-9bc4-afddcf44e96b" class=3D"conflue=
+nceTd">
+<p local-id=3D"702e97da1cb9">S=E1=BB=91 HHDV</p>
+</td>
+<td data-local-id=3D"fac364ad-9ae9-4c41-b23c-1600ad3e5596" class=3D"conflue=
+nceTd">
+<p local-id=3D"e0ad03b2131f">OutputText</p>
+</td>
+<td data-local-id=3D"09a1a6ca-81dd-4ace-9316-f64be17715f7" class=3D"conflue=
+nceTd">
+<p local-id=3D"b875d582f9d5">Integer</p>
+</td>
+<td data-local-id=3D"374151ab-bed1-4e8f-a6d5-770c90fbfc85" class=3D"conflue=
+nceTd">
+<p local-id=3D"bda87993015f">T=C3=ADnh to=C3=A1n</p>
+</td>
+<td data-local-id=3D"9eb0fd60-8452-4648-a44c-5078e81454cc" class=3D"conflue=
+nceTd">
+<p local-id=3D"2f64f13f7499">S=E1=BB=91 d=C3=B2ng HHDV trong kh=E1=BB=91i</=
+p>
+</td>
+<td data-local-id=3D"30ad1bb5ac1c" class=3D"confluenceTd">
+<p local-id=3D"c2459d937eb4"></p>
+</td>
+<td data-local-id=3D"4adf18c3-3981-431c-91c5-574825140acc" class=3D"conflue=
+nceTd">
+<p local-id=3D"6987b16dd481">2</p>
+</td>
+</tr>
+<tr data-local-id=3D"7440e9c8-6427-4772-9543-7f148195bb90">
+<td colspan=3D"8" data-local-id=3D"e90f1221-a241-4b52-9910-b9713f5b2f6b" cl=
+ass=3D"confluenceTd">
+<p local-id=3D"88b8bcf4c2f1"><strong>B=E1=BA=A3ng K=E1=BA=BF ho=E1=BA=A1ch =
+mua s=E1=BA=AFm HHDV c=C3=B3 danh m=E1=BB=A5c</strong></p>
+</td>
+</tr>
+<tr data-local-id=3D"5adce011-f27e-4dc6-aa1c-71356afb1644">
+<td data-local-id=3D"241e9c63-9e8c-45cb-83a8-307350e406eb" class=3D"conflue=
+nceTd">
+<p local-id=3D"4b3d9e7fdc6a">8</p>
+</td>
+<td data-local-id=3D"0a061857-f635-482b-9ec6-d7a840413e38" class=3D"conflue=
+nceTd">
+<p local-id=3D"6074df357b9c">STT</p>
+</td>
+<td data-local-id=3D"4b5f9663-a6bf-4558-a79a-0ccc5864119e" class=3D"conflue=
+nceTd">
+<p local-id=3D"a03746d10e41">OutputText</p>
+</td>
+<td data-local-id=3D"47c52203-edfc-4fea-ada6-197ccb80c491" class=3D"conflue=
+nceTd">
+<p local-id=3D"7d177d8c6857">Integer</p>
+</td>
+<td data-local-id=3D"abbd5090-76c5-4eb4-96ae-0233575e7ac6" class=3D"conflue=
+nceTd">
+<p local-id=3D"ecf92e003160">T=C3=ADnh to=C3=A1n</p>
+</td>
+<td data-local-id=3D"ea24a925-2f0a-48e2-9d2c-2e1cff4ee465" class=3D"conflue=
+nceTd">
+<p local-id=3D"90132e310617"></p>
+</td>
+<td data-local-id=3D"298f2405d4f4" class=3D"confluenceTd">
+<p local-id=3D"f98878df31b9"></p>
+</td>
+<td data-local-id=3D"237e9663-b8a9-4c81-9d74-d36c776396d1" class=3D"conflue=
+nceTd">
+<p local-id=3D"e039bb0056b5">1</p>
+</td>
+</tr>
+<tr data-local-id=3D"b70224a3-1e9b-4191-9abf-354d40daa84b">
+<td data-local-id=3D"b3efc137-7a95-49f3-b2f9-bb02fce8230f" class=3D"conflue=
+nceTd">
+<p local-id=3D"337effaed8ff">9</p>
+</td>
+<td data-local-id=3D"8d589acb-e5dc-4dfe-a4a5-b1675eb2f507" class=3D"conflue=
+nceTd">
+<p local-id=3D"0260f4c3b989">M=C3=A3 HHDV</p>
+</td>
+<td data-local-id=3D"c53040f5-9425-44b6-b2a4-662a2d2e7219" class=3D"conflue=
+nceTd">
+<p local-id=3D"dca7926e5a56">Link</p>
+</td>
+<td data-local-id=3D"a684c690-0fbf-49c6-9d47-45bb229b54d0" class=3D"conflue=
+nceTd">
+<p local-id=3D"24b33cb5668d">String</p>
+</td>
+<td data-local-id=3D"74e1e779-05ce-4c1f-a4d0-2e21292b6411" class=3D"conflue=
+nceTd">
+<p local-id=3D"bf36b1b78aaf">S2 - HHDV c=E1=BB=A7a H=C4=90/KMS</p>
+</td>
+<td data-local-id=3D"bfbcc576-1eb9-4171-93b5-65a69d5612f5" class=3D"conflue=
+nceTd">
+<p local-id=3D"07bafea2118f">M=C3=A3 HHDV tr=C3=AAn H=C4=90/KMS, l=C3=A0 kh=
+=C3=B3a ghi nh=E1=BA=ADn s=E1=BB=91 ti=E1=BB=81n gi=E1=BA=A3i ng=C3=A2n v=
+=C3=A0 g=E1=BB=ADi sang S2. Click =C4=91=E1=BB=83 m=E1=BB=9F m=C3=A0n chi t=
+i=E1=BA=BFt HHDV</p>
+</td>
+<td data-local-id=3D"0853c58f1f83" class=3D"confluenceTd">
+<p local-id=3D"9d333331ffa5">esdhdcontracthhdvm1.=E2=80=9DID=E2=80=9D</p>
+</td>
+<td data-local-id=3D"18969907-eb47-4a77-a4aa-2d965b86b691" class=3D"conflue=
+nceTd">
+<p local-id=3D"cac8ed694adf">HMCM_0000003_P00900</p>
+</td>
+</tr>
+<tr data-local-id=3D"f7fde9a0-2dcf-4538-9051-5c859459d00a">
+<td data-local-id=3D"dc1e169e-e208-4fa0-bbfb-16fc1be97794" class=3D"conflue=
+nceTd">
+<p local-id=3D"9b7dcddf5f07">10</p>
+</td>
+<td data-local-id=3D"55602d6f-c343-4ad6-950d-8aa9d3fd416d" class=3D"conflue=
+nceTd">
+<p local-id=3D"411ba62f5484">T=C3=AAn HHDV</p>
+</td>
+<td data-local-id=3D"c8a129e6-244a-4de8-a12b-fc0454342515" class=3D"conflue=
+nceTd">
+<p local-id=3D"8c2544289171">OutputText</p>
+</td>
+<td data-local-id=3D"00733b74-1151-4341-868a-51ae1279cf4d" class=3D"conflue=
+nceTd">
+<p local-id=3D"74e5be090c8e">String</p>
+</td>
+<td data-local-id=3D"3d8d5b1a-95d8-4a14-b181-717235d8be46" class=3D"conflue=
+nceTd">
+<p local-id=3D"bd1b858fb9c5">S2 - HHDV c=E1=BB=A7a H=C4=90/KMS</p>
+</td>
+<td data-local-id=3D"e278b912-2dab-48bd-a4eb-cf0ebba91def" class=3D"conflue=
+nceTd">
+<p local-id=3D"f86bdf1a4695">T=C3=AAn HHDV theo H=C4=90/KMS. T=C3=AAn d=C3=
+=A0i t=E1=BB=B1 xu=E1=BB=91ng d=C3=B2ng</p>
+</td>
+<td data-local-id=3D"f5cbeb18-34c4-4ca7-84a4-5386d342b36f" class=3D"conflue=
+nceTd">
+<p local-id=3D"15a0fb558492">esdhdcontracthhdvm1.=E2=80=9DITEM_NAME=E2=80=
+=9D</p>
+</td>
+<td data-local-id=3D"b2ebbcc5-f2cf-4238-bb2a-b610fe4738af" class=3D"conflue=
+nceTd">
+<p local-id=3D"c132e952d6e4">M=C3=A1y t=C3=ADnh =C4=91=E1=BB=83 b=C3=A0n (P=
+C)</p>
+</td>
+</tr>
+<tr data-local-id=3D"b3e5ac91-d579-483d-907c-a28f9de2e1de">
+<td data-local-id=3D"d37f285c-8756-466e-8a3e-483cd8bfeba9" class=3D"conflue=
+nceTd">
+<p local-id=3D"69d66c9d89d9">11</p>
+</td>
+<td data-local-id=3D"5d107b01-da25-4509-bf78-7fa253d8ca71" class=3D"conflue=
+nceTd">
+<p local-id=3D"1131d24da6ff">=C4=90=C6=A1n v=E1=BB=8B t=C3=ADnh</p>
+</td>
+<td data-local-id=3D"47bafe9b-9008-4532-932e-3da9acecbb2d" class=3D"conflue=
+nceTd">
+<p local-id=3D"35c47cddd39a">OutputText</p>
+</td>
+<td data-local-id=3D"23503a35-300b-4674-ad06-e54826b61664" class=3D"conflue=
+nceTd">
+<p local-id=3D"e0663c1ebbe1">String</p>
+</td>
+<td data-local-id=3D"265842ca-c7b5-417f-abac-c2d1bd887a7b" class=3D"conflue=
+nceTd">
+<p local-id=3D"fb4c34d52591">S2 - HHDV c=E1=BB=A7a H=C4=90/KMS</p>
+</td>
+<td data-local-id=3D"30b3bf40-18ad-4399-aa09-f029982758a4" class=3D"conflue=
+nceTd">
+<p local-id=3D"949edaee6f49">=C4=90=C6=A1n v=E1=BB=8B t=C3=ADnh theo H=C4=
+=90/KMS</p>
+</td>
+<td data-local-id=3D"b6cc6e86a21f" class=3D"confluenceTd">
+<p local-id=3D"58bc4d332c2c">esdhdcontracthhdvm1.=E2=80=9DITEM_UNIT=E2=80=
+=9D</p>
+</td>
+<td data-local-id=3D"d3a38a57-f859-4f0b-85be-bf6ae806ab0f" class=3D"conflue=
+nceTd">
+<p local-id=3D"143282e34872">B=E1=BB=99</p>
+</td>
+</tr>
+<tr data-local-id=3D"e9ccbd64-865c-4933-981e-9a508eff046f">
+<td data-local-id=3D"d33db3f4-59a0-4f15-90f0-bc0ee0b23d4e" class=3D"conflue=
+nceTd">
+<p local-id=3D"0c73c3213c72">12</p>
+</td>
+<td data-local-id=3D"57d115a5-c84a-4888-8531-c6bc87f256a3" class=3D"conflue=
+nceTd">
+<p local-id=3D"3b1d19e879f7">S=E1=BB=91 l=C6=B0=E1=BB=A3ng</p>
+</td>
+<td data-local-id=3D"c88315f1-e2d9-4fbc-815c-188f2e8f5ef8" class=3D"conflue=
+nceTd">
+<p local-id=3D"d188f4d0a2bb">OutputText</p>
+</td>
+<td data-local-id=3D"3b35afe9-7b5b-42a8-9530-7bbc15730699" class=3D"conflue=
+nceTd">
+<p local-id=3D"56036832a443">Decimal</p>
+</td>
+<td data-local-id=3D"ddb5e02b-4721-4f0a-b797-7f9118a6cf62" class=3D"conflue=
+nceTd">
+<p local-id=3D"bfb981907030">S2 - HHDV c=E1=BB=A7a H=C4=90/KMS</p>
+</td>
+<td data-local-id=3D"ad284781-8f59-4d9f-9304-38ac6ff10425" class=3D"conflue=
+nceTd">
+<p local-id=3D"71e7cdb63356">S=E1=BB=91 l=C6=B0=E1=BB=A3ng theo H=C4=90/KMS=
+. =C4=90=E1=BB=83 tr=E1=BB=91ng v=E1=BB=9Bi HHDV ph=C3=A2n t=C3=A1ch theo g=
+i=C3=A1 tr=E1=BB=8B</p>
+</td>
+<td data-local-id=3D"39adf011bd8e" class=3D"confluenceTd">
+<p local-id=3D"476c5179976e"></p>
+</td>
+<td data-local-id=3D"29f24eb3-7ef7-4dfc-a4cc-f879867ce39e" class=3D"conflue=
+nceTd">
+<p local-id=3D"078ef50bcd06">10</p>
+</td>
+</tr>
+<tr data-local-id=3D"9b6e038b-8ee0-4f16-8d98-275adfff3cbc">
+<td data-local-id=3D"8d5d87f1-385d-421b-a858-f18d9330c19a" class=3D"conflue=
+nceTd">
+<p local-id=3D"51f8b8b35026">13</p>
+</td>
+<td data-local-id=3D"31a9dd9d-a195-4ae4-8075-4cea93f9e557" class=3D"conflue=
+nceTd">
+<p local-id=3D"d140a7936b87">Ph=C3=A2n lo=E1=BA=A1i ngu=E1=BB=93n v=E1=BB=
+=91n</p>
+</td>
+<td data-local-id=3D"2307a079-2c8d-46ae-ab8d-63bb2519d5b0" class=3D"conflue=
+nceTd">
+<p local-id=3D"076483bf732a">OutputText</p>
+</td>
+<td data-local-id=3D"60152b17-087a-47ab-a4d6-7b12384c3fb7" class=3D"conflue=
+nceTd">
+<p local-id=3D"8990b42daa2c">Enum</p>
+</td>
+<td data-local-id=3D"60873603-0bae-40a4-b07d-a549166fa05c" class=3D"conflue=
+nceTd">
+<p local-id=3D"a38de740a896">S2 - HHDV c=E1=BB=A7a H=C4=90/KMS</p>
+</td>
+<td data-local-id=3D"03958419-152b-46fb-b74d-226160d4f917" class=3D"conflue=
+nceTd">
+<p local-id=3D"556015fb2535"></p>
+</td>
+<td data-local-id=3D"dbaf6990b6fd" class=3D"confluenceTd">
+<p local-id=3D"700450ce6d4b">esdhdcontracthhdvm1.=E2=80=9DCAPITAL_SOURCE_TY=
+PE=E2=80=9D</p>
+</td>
+<td data-local-id=3D"1198327c-6a0a-4d0b-9c1b-77e45dd45fa5" class=3D"conflue=
+nceTd">
+<p local-id=3D"794877b1c5b3">V=E1=BB=91n =C4=91=E1=BA=A7u t=C6=B0</p>
+</td>
+</tr>
+<tr data-local-id=3D"1adb9b05-4634-419d-ad30-3f84a4131bf0">
+<td data-local-id=3D"87e25e39-e9d3-4ea8-befb-5c8c693fd9af" class=3D"conflue=
+nceTd">
+<p local-id=3D"89f68bdce54b">14</p>
+</td>
+<td data-local-id=3D"d7f7fa7a-13b5-4f64-9462-2b0f45345260" class=3D"conflue=
+nceTd">
+<p local-id=3D"32151f2e4a6b">H=E1=BA=A1ng m=E1=BB=A5c KH</p>
+</td>
+<td data-local-id=3D"0ac680ee-2644-41fe-9120-51cd510a30de" class=3D"conflue=
+nceTd">
+<p local-id=3D"7616a0b83976">OutputText</p>
+</td>
+<td data-local-id=3D"58caca5f-7c07-4e17-85b9-71bb567ea4cc" class=3D"conflue=
+nceTd">
+<p local-id=3D"9effeabd48d3">String</p>
+</td>
+<td data-local-id=3D"c0e89183-e6cb-46e8-86b4-8e8a95721d37" class=3D"conflue=
+nceTd">
+<p local-id=3D"766ec7ef937a"></p>
+</td>
+<td data-local-id=3D"90bff54f-27fd-448b-826a-12eee56b6ce1" class=3D"conflue=
+nceTd">
+<p local-id=3D"022ff902d4d9">H=E1=BA=A1ng m=E1=BB=A5c k=E1=BA=BF ho=E1=BA=
+=A1ch c=E1=BB=A7a HHDV theo N=C4=83m k=E1=BA=BF ho=E1=BA=A1ch</p>
+</td>
+<td data-local-id=3D"07775ac0108e" class=3D"confluenceTd">
+<p local-id=3D"477b90661ecd">esdkhpurchaseitemm1.=E2=80=9DID=E2=80=9D</p>
+<p local-id=3D"774f561b37bf">Logic:</p>
+<ul local-id=3D"ff33bdf8b920">
+<li local-id=3D"e7a1ba8874cc">
+<p local-id=3D"1b3068d09229">B1: Mapping ITEM_ID =E1=BB=9F esdhdcontracthhd=
+vm1 cho m=E1=BB=97i HHDV v=E1=BB=9Bi ITEM_ID trong esdkhpurchaseitemm1</p>
+</li>
+<li local-id=3D"3fe350c95ab9">
+<p local-id=3D"8beb6d1411bf">B2: Trong c=C3=A1c record l=E1=BA=A5y =C4=91=
+=C6=B0=E1=BB=A3c =E1=BB=9F B1, l=E1=BA=A5y ID c=E1=BB=A7a record c=C3=B3 YE=
+AR_REQUEST b=E1=BA=B1ng v=E1=BB=9Bi N=C4=83m k=E1=BA=BF ho=E1=BA=A1ch</p>
+</li>
+</ul>
+</td>
+<td data-local-id=3D"e5c13af4-79e5-4fde-a0e0-90c190aca411" class=3D"conflue=
+nceTd">
+<p local-id=3D"5020091acb5b">HM-1024</p>
+</td>
+</tr>
+<tr data-local-id=3D"9db14122-52c9-429b-b0b1-5e13bb3a9860">
+<td data-local-id=3D"cbc0cd9c-eaa0-4caa-93d7-97fa58e4d284" class=3D"conflue=
+nceTd">
+<p local-id=3D"069365bad709">15</p>
+</td>
+<td data-local-id=3D"d667f740-6070-4d77-a114-fc0e2f9bf0bd" class=3D"conflue=
+nceTd">
+<p local-id=3D"3996902a5e19">KHV c=C3=B2n l=E1=BA=A1i</p>
+</td>
+<td data-local-id=3D"8ea257c0-97b2-42fb-9ada-98ca41a72374" class=3D"conflue=
+nceTd">
+<p local-id=3D"25782f69e529">OutputText</p>
+</td>
+<td data-local-id=3D"e4e034d8-c744-48bb-9570-357969ab06cc" class=3D"conflue=
+nceTd">
+<p local-id=3D"f9e7b9c8bf25">Decimal</p>
+</td>
+<td data-local-id=3D"d5089dcb-37d7-4065-8f53-070d680d65ae" class=3D"conflue=
+nceTd">
+<p local-id=3D"9088d1137a42"></p>
+</td>
+<td data-local-id=3D"3524f4e9-99f1-42b4-b3ae-a73faddbee75" class=3D"conflue=
+nceTd">
+<p local-id=3D"b3fe823895dd">KHV c=C3=B2n l=E1=BA=A1i c=E1=BB=A7a h=E1=BA=
+=A1ng m=E1=BB=A5c theo N=C4=83m k=E1=BA=BF ho=E1=BA=A1ch</p>
+</td>
+<td data-local-id=3D"47dfabfa-07d6-4c4c-994b-72e0bd4e38b2" class=3D"conflue=
+nceTd">
+<p local-id=3D"ac1b08a79d56"></p>
+</td>
+<td data-local-id=3D"ab0eccbb-4bef-41fa-90ca-48d18773edb6" class=3D"conflue=
+nceTd">
+<p local-id=3D"aff17aee433e">700,000,000</p>
+</td>
+</tr>
+<tr data-local-id=3D"4f29aa65-c271-4940-b754-0402d43adb8b">
+<td data-local-id=3D"ad575d1f-4dec-4bd7-ab93-1445f7e98491" class=3D"conflue=
+nceTd">
+<p local-id=3D"fcd918f042c3">16</p>
+</td>
+<td data-local-id=3D"654ad819-3edb-4fa5-bf74-3ce7e207c379" class=3D"conflue=
+nceTd">
+<p local-id=3D"885e0dba7aef">Th=C3=A0nh ti=E1=BB=81n sau thu=E1=BA=BF</p>
+</td>
+<td data-local-id=3D"34b59c75-18c2-4e61-9658-3dce2bc2b61d" class=3D"conflue=
+nceTd">
+<p local-id=3D"2711aac8c898">OutputText</p>
+</td>
+<td data-local-id=3D"b8125773-2ad7-45a2-92be-adb73994c027" class=3D"conflue=
+nceTd">
+<p local-id=3D"59a3e44d4702">Decimal</p>
+</td>
+<td data-local-id=3D"45fd7599-038f-4867-8026-b07e8508dfa6" class=3D"conflue=
+nceTd">
+<p local-id=3D"178a421f965e">S2 - HHDV c=E1=BB=A7a H=C4=90/KMS</p>
+</td>
+<td data-local-id=3D"7649766b-71ee-4a3c-8e13-2ef78b149b4e" class=3D"conflue=
+nceTd">
+<p local-id=3D"e201eda798e0"></p>
+</td>
+<td data-local-id=3D"6cab8de60099" class=3D"confluenceTd">
+<p local-id=3D"b8078e253478">esdhdcontracthhdvm1.=E2=80=9DAMOUNT_AFTER_TAX=
+=E2=80=9D</p>
+</td>
+<td data-local-id=3D"f86acf57-4445-4429-8233-8cc4b341b972" class=3D"conflue=
+nceTd">
+<p local-id=3D"71b89d4e6e33">250,000,000</p>
+</td>
+</tr>
+<tr data-local-id=3D"7b066c18-a780-44ea-8d7f-acb2a4f911e9">
+<td data-local-id=3D"5bb6a850-dd7d-473d-ac92-3f9174fdd2d4" class=3D"conflue=
+nceTd">
+<p local-id=3D"fc1eba789e94">17</p>
+</td>
+<td data-local-id=3D"2423e420-e161-47a8-a626-c761aed4b340" class=3D"conflue=
+nceTd">
+<p local-id=3D"38845a708aab">S=E1=BB=91 ti=E1=BB=81n =C4=91=C3=A3 gi=E1=BA=
+=A3i ng=C3=A2n</p>
+</td>
+<td data-local-id=3D"40248d94-4c97-44f2-ad7d-5c338849558e" class=3D"conflue=
+nceTd">
+<p local-id=3D"c3b1ed35cc45">OutputText</p>
+</td>
+<td data-local-id=3D"01d6b135-90f1-47d4-8936-c1c16999ea7e" class=3D"conflue=
+nceTd">
+<p local-id=3D"4d0e24eda77f">Decimal</p>
+</td>
+<td data-local-id=3D"66d84de3-ce05-4173-80b1-d70ce75da203" class=3D"conflue=
+nceTd">
+<p local-id=3D"cc9d55a60ca0">T=C3=ADnh to=C3=A1n</p>
+</td>
+<td data-local-id=3D"5e39f96a-acc2-4ac1-93c0-194a3291d742" class=3D"conflue=
+nceTd">
+<p local-id=3D"148cd5546e38">T=E1=BB=95ng S=E1=BB=91 ti=E1=BB=81n gi=E1=BA=
+=A3i ng=C3=A2n l=E1=BA=A7n n=C3=A0y c=E1=BB=A7a c=C3=A1c =C4=91=E1=BB=81 ng=
+h=E1=BB=8B =C4=91=C3=A3 ph=C3=AA duy=E1=BB=87t</p>
+</td>
+<td data-local-id=3D"bd82ea8df40e" class=3D"confluenceTd">
+<p local-id=3D"d7bfa51312c9"></p>
+</td>
+<td data-local-id=3D"c0471085-baf8-4d77-8556-1ce8865663c4" class=3D"conflue=
+nceTd">
+<p local-id=3D"56d20c7e1d54">100,000,000</p>
+</td>
+</tr>
+<tr data-local-id=3D"2ea44b61-977e-4a19-9cde-38c837f3803b">
+<td data-local-id=3D"2232f28c-24bf-481b-87c5-708182bb8b8c" class=3D"conflue=
+nceTd">
+<p local-id=3D"3502d0193ff7">18</p>
+</td>
+<td data-local-id=3D"100d0047-a1ce-4333-8b14-efd264281785" class=3D"conflue=
+nceTd">
+<p local-id=3D"611795006225">S=E1=BB=91 ti=E1=BB=81n gi=E1=BA=A3i ng=C3=A2n=
+ c=C3=B2n l=E1=BA=A1i</p>
+</td>
+<td data-local-id=3D"55be78f3-a617-4c8d-932a-2639f89fb835" class=3D"conflue=
+nceTd">
+<p local-id=3D"4f352b7fb6be">OutputText</p>
+</td>
+<td data-local-id=3D"cb83eccb-d057-453d-89a8-f9e527311540" class=3D"conflue=
+nceTd">
+<p local-id=3D"a208f61caf56">Decimal</p>
+</td>
+<td data-local-id=3D"6a100dfc-0eaf-4352-9acb-52ddc674d362" class=3D"conflue=
+nceTd">
+<p local-id=3D"bc486bef74d1">T=C3=ADnh to=C3=A1n</p>
+</td>
+<td data-local-id=3D"bec06b92-557e-40ad-995b-f1d463bdbf33" class=3D"conflue=
+nceTd">
+<p local-id=3D"154ad91b0304">Th=C3=A0nh ti=E1=BB=81n sau thu=E1=BA=BF tr=E1=
+=BB=AB S=E1=BB=91 ti=E1=BB=81n =C4=91=C3=A3 gi=E1=BA=A3i ng=C3=A2n</p>
+</td>
+<td data-local-id=3D"814b534a9b77" class=3D"confluenceTd">
+<p local-id=3D"df922c1c3793"></p>
+</td>
+<td data-local-id=3D"5d88ce0d-d7ee-4fd7-86fc-8d0a2dc70cf0" class=3D"conflue=
+nceTd">
+<p local-id=3D"e0d4dcd865f3">150,000,000</p>
+</td>
+</tr>
+<tr data-local-id=3D"2412f92d-83d6-4777-a7e7-3da742dcaaf8">
+<td data-local-id=3D"8b3f16e1-f6f4-43d5-a51b-2d5377b0f19e" class=3D"conflue=
+nceTd">
+<p local-id=3D"7731f99d4d93">19</p>
+</td>
+<td data-local-id=3D"532aaaee-1a18-4b9d-99f8-47f0cd2641a3" class=3D"conflue=
+nceTd">
+<p local-id=3D"02d3d3878fe4">S=E1=BB=91 ti=E1=BB=81n gi=E1=BA=A3i ng=C3=A2n=
+ l=E1=BA=A7n n=C3=A0y</p>
+</td>
+<td data-local-id=3D"09308627-25cb-4fb8-9411-c9c15fd60b0a" class=3D"conflue=
+nceTd">
+<p local-id=3D"a123e0928877">OutputText</p>
+</td>
+<td data-local-id=3D"e07d2458-ced0-40b0-b4ae-8e9f66286762" class=3D"conflue=
+nceTd">
+<p local-id=3D"74e8cc7c15f3">Decimal</p>
+</td>
+<td data-local-id=3D"b2de7f46-f75d-4d6f-b6a6-b6e18cf71d64" class=3D"conflue=
+nceTd">
+<p local-id=3D"227bedac6ae2">S6</p>
+</td>
+<td data-local-id=3D"9bd6ec63-95f4-42b2-a4b1-50d0dca56bc8" class=3D"conflue=
+nceTd">
+<p local-id=3D"23fbdfb76644">S=E1=BB=91 ti=E1=BB=81n =C4=91=C3=A3 l=C6=B0u =
+t=E1=BA=A1i popup ch=E1=BB=89nh s=E1=BB=ADa</p>
+</td>
+<td data-local-id=3D"39909c29e8e1" class=3D"confluenceTd">
+<p local-id=3D"017bd23895e0"></p>
+</td>
+<td data-local-id=3D"c62b34ce-542a-43ce-873b-36f90ba72215" class=3D"conflue=
+nceTd">
+<p local-id=3D"e034e0dfde78">50,000,000</p>
+</td>
+</tr>
+<tr data-local-id=3D"d4bdc19c-2e2d-49ba-bbc1-c27a43a291ed">
+<td data-local-id=3D"396caef3-4b67-4288-945e-bcc140d98074" class=3D"conflue=
+nceTd">
+<p local-id=3D"fe20202707a9">20</p>
+</td>
+<td data-local-id=3D"168eba28-0f6b-4153-a6f7-b38e666ac175" class=3D"conflue=
+nceTd">
+<p local-id=3D"4b48a883507f">T=E1=BB=95ng c=E1=BB=99ng</p>
+</td>
+<td data-local-id=3D"526ee32e-f540-455a-960f-f930213be2e7" class=3D"conflue=
+nceTd">
+<p local-id=3D"bbf7e3b4495c">OutputText</p>
+</td>
+<td data-local-id=3D"37a446e7-a7fb-4905-97ee-3e9e7dc9ad94" class=3D"conflue=
+nceTd">
+<p local-id=3D"cf7672041777">Decimal</p>
+</td>
+<td data-local-id=3D"fc83d1c5-63dc-4f4e-b40b-b8857d2b9208" class=3D"conflue=
+nceTd">
+<p local-id=3D"1f59ebb52086">T=C3=ADnh to=C3=A1n</p>
+</td>
+<td data-local-id=3D"01cadde2-5113-49fb-bd50-2901fa06f97d" class=3D"conflue=
+nceTd">
+<p local-id=3D"aa49efaf2b58">T=E1=BB=95ng c=C3=A1c c=E1=BB=99t Th=C3=A0nh t=
+i=E1=BB=81n sau thu=E1=BA=BF, S=E1=BB=91 ti=E1=BB=81n =C4=91=C3=A3 gi=E1=BA=
+=A3i ng=C3=A2n, S=E1=BB=91 ti=E1=BB=81n gi=E1=BA=A3i ng=C3=A2n c=C3=B2n l=
+=E1=BA=A1i, S=E1=BB=91 ti=E1=BB=81n gi=E1=BA=A3i ng=C3=A2n l=E1=BA=A7n n=C3=
+=A0y</p>
+</td>
+<td data-local-id=3D"4b71493906de" class=3D"confluenceTd">
+<p local-id=3D"cc7d9732e21d"></p>
+</td>
+<td data-local-id=3D"7956079c-9881-44c7-8cd7-b34c63696844" class=3D"conflue=
+nceTd">
+<p local-id=3D"18da6489aee9"></p>
+</td>
+</tr>
+<tr data-local-id=3D"70e19e6d-6a20-4785-b6e0-6cd7d28803c8">
+<td colspan=3D"8" data-local-id=3D"e76d1982-932b-49a0-bc8f-c88e2d72ec9a" cl=
+ass=3D"confluenceTd">
+<p local-id=3D"9354688d6179"><strong>B=E1=BA=A3ng K=E1=BA=BF ho=E1=BA=A1ch =
+02</strong></p>
+</td>
+</tr>
+<tr data-local-id=3D"6ab8f316-ae14-4431-97ea-79d4f89f3b74">
+<td data-local-id=3D"12435ca0-efbf-4ab9-ae9f-a2043d810a55" class=3D"conflue=
+nceTd">
+<p local-id=3D"fe6fb79ac053">21</p>
+</td>
+<td data-local-id=3D"a8c65572-732a-46ba-a34e-75e1e28a2d57" class=3D"conflue=
+nceTd">
+<p local-id=3D"81dc379facc4">STT, M=C3=A3 HHDV, T=C3=AAn HHDV, =C4=90=C6=A1=
+n v=E1=BB=8B t=C3=ADnh, S=E1=BB=91 l=C6=B0=E1=BB=A3ng, Ph=C3=A2n lo=E1=BA=
+=A1i ngu=E1=BB=93n v=E1=BB=91n</p>
+</td>
+<td data-local-id=3D"cba2d7a6-242c-47a2-918e-fac4f794c64c" class=3D"conflue=
+nceTd">
+<p local-id=3D"fe35c74a9cff">Nh=C6=B0 b=E1=BA=A3ng KH-01</p>
+</td>
+<td data-local-id=3D"8f45469d-ad3c-4c1b-8812-656839f81085" class=3D"conflue=
+nceTd">
+<p local-id=3D"daef8dda7f0b"></p>
+</td>
+<td data-local-id=3D"3057f422-ad50-44d3-ba3c-ed4f73741e25" class=3D"conflue=
+nceTd">
+<p local-id=3D"4016c91883c8"></p>
+</td>
+<td data-local-id=3D"0cfa31f7-350b-443e-96f9-46203ac9d3e3" class=3D"conflue=
+nceTd">
+<p local-id=3D"86043b25cae3">STT k=C3=A8m Icon m=E1=BB=9F r=E1=BB=99ng/thu =
+g=E1=BB=8Dn d=C3=B2ng con</p>
+</td>
+<td data-local-id=3D"3b0b11c317e4" class=3D"confluenceTd">
+<p local-id=3D"b90dbb491234"></p>
+</td>
+<td data-local-id=3D"b8a0872d-06d6-4d06-92cd-1cf8a0d8b3fa" class=3D"conflue=
+nceTd">
+<p local-id=3D"9c9210512580"></p>
+</td>
+</tr>
+<tr data-local-id=3D"cbff13fa-e35f-43f1-a820-bacc97979f5c">
+<td data-local-id=3D"be05d19d-9ba9-44d4-8b90-bf348f08baf1" class=3D"conflue=
+nceTd">
+<p local-id=3D"7084dd4b9310">22</p>
+</td>
+<td data-local-id=3D"67f17a5e-88db-41fc-96a1-e1ae778770f1" class=3D"conflue=
+nceTd">
+<p local-id=3D"0a7ebd61d931">Kho=E1=BA=A3n m=E1=BB=A5c / Ch=E1=BB=89 ti=C3=
+=AAu</p>
+</td>
+<td data-local-id=3D"755aa0fd-e957-46b0-a49b-84c8ad089101" class=3D"conflue=
+nceTd">
+<p local-id=3D"69e353ec8e4d">OutputText</p>
+</td>
+<td data-local-id=3D"6d4df01d-2c11-4a74-bfa7-e5c5faba1090" class=3D"conflue=
+nceTd">
+<p local-id=3D"4bd422a7ccc0">String</p>
+</td>
+<td data-local-id=3D"4093362f-f1a3-411c-b3fc-e3240241dafd" class=3D"conflue=
+nceTd">
+<p local-id=3D"6dcd82066e26"></p>
+</td>
+<td data-local-id=3D"09d154a4-437f-4577-ab5f-819fc77e30f3" class=3D"conflue=
+nceTd">
+<p local-id=3D"02618fc03dea">Hi=E1=BB=83n th=E1=BB=8B 2 d=C3=B2ng: m=C3=A3 =
+- t=C3=AAn kho=E1=BA=A3n m=E1=BB=A5c v=C3=A0 m=C3=A3 - t=C3=AAn ch=E1=BB=89=
+ ti=C3=AAu. N=E1=BB=99i dung d=C3=A0i =C4=91=C6=B0=E1=BB=A3c r=C3=BAt g=E1=
+=BB=8Dn b=E1=BA=B1ng d=E1=BA=A5u "=E2=80=A6", di chu=E1=BB=99t =C4=91=E1=BB=
+=83 xem =C4=91=E1=BA=A7y =C4=91=E1=BB=A7</p>
+</td>
+<td data-local-id=3D"693ac3faab52" class=3D"confluenceTd">
+<p local-id=3D"da9365ee9812">esdmsdxmsm1.=E2=80=9DINDICATOR_ID=E2=80=9D</p>
+<p local-id=3D"ce7850fffc86">esdmsdxmsm1.=E2=80=9DCOST_ID=E2=80=9D</p>
+<p local-id=3D"6d659d8cdcec">Logic:</p>
+<ul local-id=3D"0d800b20155b">
+<li local-id=3D"f8888c8f1aa8">
+<p local-id=3D"f6d1d6ebede3">B1: Mapping HHDV_ID =E1=BB=9F esdhdcontracthhd=
+vm1 v=E1=BB=9Bi ID =E1=BB=9F esdmskmshhdvm1, l=E1=BA=A5y ra gi=C3=A1 tr=E1=
+=BB=8B HMCM_ID cho m=E1=BB=97i HHDV</p>
+</li>
+<li local-id=3D"76e8bcc359b8">
+<p local-id=3D"758296a95635">B2: Mapping HMCM_ID =E1=BB=9F esdmskmshhdvm1 t=
+=E1=BB=AB B1 v=E1=BB=9Bi ID =E1=BB=9F esdmsdxmsitemassignmentm1, l=E1=BA=A5=
+y ra gi=C3=A1 tr=E1=BB=8B DXMS_ID cho m=E1=BB=97i HHDV</p>
+</li>
+<li local-id=3D"acb9a604f9da">
+<p local-id=3D"320ad9ed9fae">B3: Mapping DXMS_ID =E1=BB=9F esdmsdxmsitemass=
+ignmentm1 v=E1=BB=9Bi ID =E1=BB=9F esdmsdxmsm1, l=E1=BA=A5y ra gi=C3=A1 tr=
+=E1=BB=8B INDICATOR_ID (m=C3=A3 ch=E1=BB=89 ti=C3=AAu) v=C3=A0 COST_ID (m=
+=C3=A3 kho=E1=BA=A3n m=E1=BB=A5c) cho m=E1=BB=97i HHDV</p>
+</li>
+</ul>
+</td>
+<td data-local-id=3D"e02ba176-bfc5-421d-9b1d-aab08cb0b473" class=3D"conflue=
+nceTd">
+<p local-id=3D"f9090107b54e">002 - Chi b=E1=BA=A3o d=C6=B0=E1=BB=A1ng, s=E1=
+=BB=ADa ch=E1=BB=AFa t=C3=A0i s=E1=BA=A3n kh=C3=A1c / 20500 - Chi b=E1=BA=
+=A3o d=C6=B0=E1=BB=A1ng, s=E1=BB=ADa ch=E1=BB=AFa</p>
+</td>
+</tr>
+<tr data-local-id=3D"1bf1e572-5381-45a1-9c0e-4b87fdf35a1b">
+<td data-local-id=3D"cde217f7-29c5-4c16-ab82-f9f323def1bf" class=3D"conflue=
+nceTd">
+<p local-id=3D"48edae53b109">22</p>
+</td>
+<td data-local-id=3D"a544e8f8-7986-47be-8734-ed623a317ea9" class=3D"conflue=
+nceTd">
+<p local-id=3D"e19cccfd07d1">D=C3=B2ng con =C4=90V/PB</p>
+</td>
+<td data-local-id=3D"8b609d9c-2e11-4942-a508-36035a3ec482" class=3D"conflue=
+nceTd">
+<p local-id=3D"5b177b970d74">OutputText</p>
+</td>
+<td data-local-id=3D"9e1a776c-a058-4989-8d87-e20fbc708123" class=3D"conflue=
+nceTd">
+<p local-id=3D"5f8d27262e0f">String</p>
+</td>
+<td data-local-id=3D"09b40186-7ed0-4590-b041-06be5d299b57" class=3D"conflue=
+nceTd">
+<p local-id=3D"b70fc4372809"></p>
+</td>
+<td data-local-id=3D"32fcce70-66d9-4b19-a12f-dc68290c1bcc" class=3D"conflue=
+nceTd">
+<p local-id=3D"46dd5859e696">Danh s=C3=A1ch =C4=91=C6=A1n v=E1=BB=8B/ph=C3=
+=B2ng ban qu=E1=BA=A3n l=C3=BD chi ph=C3=AD c=E1=BB=A7a HHDV, hi=E1=BB=83n =
+th=E1=BB=8B t=E1=BA=A1i c=E1=BB=99t M=C3=A3 HHDV. C=C3=A1c d=C3=B2ng con c=
+=C3=B9ng m=E1=BB=99t c=E1=BA=A5p theo ph=E1=BA=A1m vi ch=E1=BB=89 ti=C3=AAu=
+.</p>
+<ul local-id=3D"6051aa97-b79a-4b8f-8801-ca3519ef7a6c">
+<li local-id=3D"2e1f91e7-4816-421e-a86f-34b7426686d2">
+<p local-id=3D"fd66674a35a4">=C4=90XMS c=E1=BB=A7a TSC: m=E1=BB=99t ho=E1=
+=BA=B7c nhi=E1=BB=81u Kh=E1=BB=91i, m=E1=BB=99t ho=E1=BA=B7c nhi=E1=BB=81u =
+ph=C3=B2ng ban, ho=E1=BA=B7c 1 d=C3=B2ng To=C3=A0n h=C3=A0ng.</p>
+</li>
+<li local-id=3D"d7490656f3ce">
+<p local-id=3D"204b2e5cf975">=C4=90XMS c=E1=BB=A7a chi nh=C3=A1nh: 1 d=C3=
+=B2ng l=C3=A0 ch=C3=ADnh chi nh=C3=A1nh =C4=91=C3=B3.</p>
+</li>
+<li local-id=3D"4c77e91e-02ae-4f72-9654-57ba3c859e27">
+<p local-id=3D"a6858ba64914">=C4=90XMS to=C3=A0n h=C3=A0ng: 1 d=C3=B2ng To=
+=C3=A0n h=C3=A0ng.</p>
+</li>
+</ul>
+<p local-id=3D"b1c5765e2ad3">Hi=E1=BB=83n th=E1=BB=8B t=C3=AAn =C4=90V/PB, =
+m=C3=A3 =C4=90V/PB =C4=91=C6=B0=E1=BB=A3c l=C6=B0u k=C3=A8m =C4=91=E1=BB=83=
+ tra KHCP kh=E1=BA=A3 d=E1=BB=A5ng v=C3=A0 g=E1=BB=ADi sang S2</p>
+</td>
+<td data-local-id=3D"47ce7fcf68f5" class=3D"confluenceTd">
+<p local-id=3D"7dea173f43d6">esdmsdxmscostm1.=E2=80=9DUNIT_NAME=E2=80=9D</p=
+>
+<p local-id=3D"c0f1ba7c59e1">Logic:</p>
+<ul local-id=3D"94b09255-f7a5-4f98-bf73-8cfb875a26c3">
+<li local-id=3D"7091584a-6aff-4059-8108-6c40fd3ec812">
+<p local-id=3D"422b6fb95f66">B1: Mapping HHDV_ID =E1=BB=9F esdhdcontracthhd=
+vm1 v=E1=BB=9Bi ID =E1=BB=9F esdmskmshhdvm1, l=E1=BA=A5y ra gi=C3=A1 tr=E1=
+=BB=8B HMCM_ID cho m=E1=BB=97i HHDV</p>
+</li>
+<li local-id=3D"3e316fff-1077-4912-8187-30d18bed5491">
+<p local-id=3D"36fce960781a">B2: Mapping HMCM_ID =E1=BB=9F esdmskmshhdvm1 t=
+=E1=BB=AB B1 v=E1=BB=9Bi ID =E1=BB=9F esdmsdxmsitemassignmentm1, l=E1=BA=A5=
+y ra gi=C3=A1 tr=E1=BB=8B DXMS_ID cho m=E1=BB=97i HHDV</p>
+</li>
+<li local-id=3D"3fff99804ca4">
+<p local-id=3D"3649609a785d">B3: Mapping DXMS_ID =E1=BB=9F esdmsdxmsitemass=
+ignmentm1 v=E1=BB=9Bi DXMS_ID =E1=BB=9F esdmsdxmscostm1, l=E1=BA=A5y ra c=
+=C3=A1c gi=C3=A1 tr=E1=BB=8B UNIT_NAME li=C3=AAn quan =C4=91=E1=BA=BFn m=C3=
+=A3 =C4=91=E1=BB=81 xu=E1=BA=A5t</p>
+</li>
+</ul>
+</td>
+<td data-local-id=3D"c0e9b4d3-187d-4dff-b288-ea434a772572" class=3D"conflue=
+nceTd">
+<p local-id=3D"21ac1e87ca69">Kh=E1=BB=91i C=C3=B4ng ngh=E1=BB=87 th=C3=B4ng=
+ tin</p>
+</td>
+</tr>
+<tr data-local-id=3D"91569dd6-c5eb-4347-bc0b-4798231066cb">
+<td data-local-id=3D"4ca58081-6642-4789-9f01-a1f7d65a7b74" class=3D"conflue=
+nceTd">
+<p local-id=3D"132999b8772b">23</p>
+</td>
+<td data-local-id=3D"ca7c091f-537e-48c0-b8fa-82d54370757d" class=3D"conflue=
+nceTd">
+<p local-id=3D"d36840c44dc0">KHCP kh=E1=BA=A3 d=E1=BB=A5ng</p>
+</td>
+<td data-local-id=3D"2dd834ee-64f8-4af1-855e-598c7f147482" class=3D"conflue=
+nceTd">
+<p local-id=3D"c4fc3ae8e61a">OutputText</p>
+</td>
+<td data-local-id=3D"eace99f9-de39-472e-a9d3-1e52af89bf86" class=3D"conflue=
+nceTd">
+<p local-id=3D"9564c03f5be7">Decimal</p>
+</td>
+<td data-local-id=3D"004c8373-41e6-4e00-a8fa-9e5b7528ccf0" class=3D"conflue=
+nceTd">
+<p local-id=3D"6253bccee908"></p>
+</td>
+<td data-local-id=3D"d3de1a36-e32c-4796-85a0-869d55d5cc8a" class=3D"conflue=
+nceTd">
+<p local-id=3D"e8f4a39fe1ea"><span class=3D"inline-comment-marker" data-ref=
+=3D"1ab46179-58e4-44b7-991a-134e239dda47">KHCP kh=E1=BA=A3 d=E1=BB=A5ng c=
+=E1=BB=A7a ch=E1=BB=89 ti=C3=AAu t=E1=BA=A1i =C4=90V/PB theo N=C4=83m k=E1=
+=BA=BF ho=E1=BA=A1ch, hi=E1=BB=83n th=E1=BB=8B t=E1=BA=A1i t=E1=BB=ABng d=
+=C3=B2ng con =C4=90V/PB</span></p>
+</td>
+<td data-local-id=3D"635a91c36b9c" class=3D"confluenceTd">
+<p local-id=3D"9103c9572007"><span class=3D"inline-comment-marker" data-ref=
+=3D"ed167522-1a9f-48b7-bb10-54635d0903a7">esdkhplanindicatorsm1.=E2=80=9DPL=
+AN_COST_AVAILABLE=E2=80=9D</span></p>
+<p local-id=3D"00aae2f7f7dc">Logic:</p>
+<ul local-id=3D"672ba69d-039a-449b-8a12-e3daf3785837">
+<li local-id=3D"52b320cf-731c-480f-b948-e0b35addc43f">
+<p local-id=3D"30667464bee4">B1: D=E1=BB=B1a tr=C3=AAn Kho=E1=BA=A3n m=E1=
+=BB=A5c/Ch=E1=BB=89 ti=C3=AAu v=C3=A0 =C4=90V/PB =C4=91=C6=B0=E1=BB=A3c x=
+=C3=A1c =C4=91=E1=BB=8Bnh, mapping v=E1=BB=9Bi b=E1=BA=A3ng esdkhplanindica=
+torsm1 =E1=BB=9F c=C3=A1c c=E1=BB=99t sau:</p>
+<ul local-id=3D"80ab758f-08b3-4582-8d45-b34ad968b375">
+<li local-id=3D"91c7a6d4-0e46-4fb6-80b9-7ffdc41b5333">
+<p local-id=3D"8efadc5dcbf0">INDICATOR_ID</p>
+</li>
+<li local-id=3D"2e922f3d-91b1-4bc8-9c16-4c386d2ae1a4">
+<p local-id=3D"c1c6552284a1">REGISTER_SCOPE l=C3=A0 ph=E1=BA=A1m vi ch=E1=
+=BB=89 ti=C3=AAu</p>
+</li>
+<li local-id=3D"3310bbad-d318-4467-94cb-ce5a27d50908">
+<p local-id=3D"83c8961b22e3">UNIT_ID ho=E1=BA=B7c DEPT_ID t=C3=B9y v=C3=A0o=
+ ph=E1=BA=A1m vi ch=E1=BB=89 ti=C3=AAu</p>
+</li>
+</ul>
+</li>
+<li local-id=3D"45e1f031-76ca-4e4f-9f2c-12cd015ea3d0">
+<p local-id=3D"94d303d89b73">B2: D=E1=BB=B1a tr=C3=AAn c=C3=A1c th=C3=B4ng =
+tin n=C3=A0y, s=E1=BA=BD t=C3=ACm ra record c=E1=BB=A7a ch=E1=BB=89 ti=C3=
+=AAu c=E1=BB=A7a 1 =C4=91=C6=A1n v=E1=BB=8B ho=E1=BA=B7c ph=C3=B2ng ban ph=
+=C3=A2n b=E1=BB=95 chi ph=C3=AD cho HHDV, l=E1=BA=A5y gi=C3=A1 tr=E1=BB=8B =
+PLAN_COST_AVAILABLE</p>
+</li>
+<li local-id=3D"7ce46bd6d7c4">
+<p local-id=3D"e58e89f66b84">L=C6=B0u =C3=BD: To=C3=A0n h=C3=A0ng s=E1=BA=
+=BD kh=C3=B4ng c=C3=B3 gi=C3=A1 tr=E1=BB=8B =E1=BB=9F c=E1=BB=99t n=C3=A0y<=
+/p>
+</li>
+</ul>
+</td>
+<td data-local-id=3D"f0beb1b6-7ff6-4e21-960b-d772f723e21b" class=3D"conflue=
+nceTd">
+<p local-id=3D"1746fe1a34ad">40,000,000</p>
+</td>
+</tr>
+<tr data-local-id=3D"24384224-90a4-4ee2-b89f-fa1d2b725e68">
+<td data-local-id=3D"cc5dd6bb-dddc-4fc1-8448-eedbe3e8ec40" class=3D"conflue=
+nceTd">
+<p local-id=3D"a4b61cd29d65">24</p>
+</td>
+<td data-local-id=3D"932b5c03-71ef-434a-a973-988ba73f68a1" class=3D"conflue=
+nceTd">
+<p local-id=3D"addca2763adb">Th=C3=A0nh ti=E1=BB=81n sau thu=E1=BA=BF, S=E1=
+=BB=91 ti=E1=BB=81n =C4=91=C3=A3 gi=E1=BA=A3i ng=C3=A2n, S=E1=BB=91 ti=E1=
+=BB=81n gi=E1=BA=A3i ng=C3=A2n c=C3=B2n l=E1=BA=A1i</p>
+</td>
+<td data-local-id=3D"585323eb-237d-4e01-bbe7-07084a4a8232" class=3D"conflue=
+nceTd">
+<p local-id=3D"8a5180a70060">OutputText</p>
+</td>
+<td data-local-id=3D"4ba67888-7a82-4e20-84e7-fa26a1ea5b4e" class=3D"conflue=
+nceTd">
+<p local-id=3D"d09975aaa8e5">Decimal</p>
+</td>
+<td data-local-id=3D"f02d5e35-abbf-4d62-8dcc-b06106cdfea5" class=3D"conflue=
+nceTd">
+<p local-id=3D"18a00a76902e"></p>
+</td>
+<td data-local-id=3D"8c271a00-2bfc-4a83-9aad-005077524791" class=3D"conflue=
+nceTd">
+<p local-id=3D"abc814cd834c">Hi=E1=BB=83n th=E1=BB=8B t=E1=BA=A1i d=C3=B2ng=
+ HHDV. S=E1=BB=91 ti=E1=BB=81n =C4=91=C3=A3 gi=E1=BA=A3i ng=C3=A2n hi=E1=BB=
+=83n th=E1=BB=8B th=C3=AAm t=E1=BA=A1i t=E1=BB=ABng d=C3=B2ng con</p>
+</td>
+<td data-local-id=3D"d3d8a571f20a" class=3D"confluenceTd">
+<p local-id=3D"6ad41417e481"></p>
+</td>
+<td data-local-id=3D"b2d929c5-8993-463c-ac35-865760196a1e" class=3D"conflue=
+nceTd">
+<p local-id=3D"6e810e53b2ba"></p>
+</td>
+</tr>
+<tr data-local-id=3D"a7c8329e-769b-4e02-b1c3-ad1ff184ae28">
+<td data-local-id=3D"d6e4b607-c1ec-45c1-9154-e6f1bc2f936c" class=3D"conflue=
+nceTd">
+<p local-id=3D"e2351ac07ccf">25</p>
+</td>
+<td data-local-id=3D"24f5ee51-da9a-4456-a48a-180e29ba4160" class=3D"conflue=
+nceTd">
+<p local-id=3D"d7a1d7db4049">S=E1=BB=91 ti=E1=BB=81n gi=E1=BA=A3i ng=C3=A2n=
+ l=E1=BA=A7n n=C3=A0y</p>
+</td>
+<td data-local-id=3D"c6e00509-3cb0-4c04-9cb5-811c0fcda182" class=3D"conflue=
+nceTd">
+<p local-id=3D"b28c1071bbd1">OutputText</p>
+</td>
+<td data-local-id=3D"df0fc1a6-de6d-4f3b-8f4d-bdafd5b03f92" class=3D"conflue=
+nceTd">
+<p local-id=3D"912a89d77949">Decimal</p>
+</td>
+<td data-local-id=3D"ae535ad2-c117-44cd-9d3d-ce4ebdd4ee9c" class=3D"conflue=
+nceTd">
+<p local-id=3D"3507b10f449d">S6</p>
+</td>
+<td data-local-id=3D"d87f33b9-124c-4b7d-bbe3-72cbf3303221" class=3D"conflue=
+nceTd">
+<p local-id=3D"aaa1c531f61b"><span class=3D"inline-comment-marker" data-ref=
+=3D"66ec5d45-c67a-4638-afc8-b308e469beaf">D=C3=B2ng con: s=E1=BB=91 ti=E1=
+=BB=81n =C4=91=C3=A3 l=C6=B0u c=E1=BB=A7a t=E1=BB=ABng =C4=90V/PB. D=C3=B2n=
+g HHDV: t=E1=BB=95ng c=C3=A1c d=C3=B2ng con</span></p>
+</td>
+<td data-local-id=3D"0a6e8880a09b" class=3D"confluenceTd">
+<p local-id=3D"62390bbd0660"></p>
+</td>
+<td data-local-id=3D"8a14cb6c-793c-4a04-a598-3659ca1d7e15" class=3D"conflue=
+nceTd">
+<p local-id=3D"56b133c4febc">15,000,000</p>
+</td>
+</tr>
+<tr data-local-id=3D"f05c99a4-3e25-4205-b8e4-0a1378258560">
+<td data-local-id=3D"4bd2653d-33b0-4d1c-ad40-a61800e508c0" class=3D"conflue=
+nceTd">
+<p local-id=3D"d6e242803bb4">26</p>
+</td>
+<td data-local-id=3D"59c7dfb2-4eec-4ba8-9b2a-08142c579012" class=3D"conflue=
+nceTd">
+<p local-id=3D"7079aaa89cb1">T=E1=BB=95ng c=E1=BB=99ng</p>
+</td>
+<td data-local-id=3D"e254a13f-9b57-47d9-90c5-9bce5b6fcd2a" class=3D"conflue=
+nceTd">
+<p local-id=3D"f084b5819d19">OutputText</p>
+</td>
+<td data-local-id=3D"8c879ad5-df89-4830-a770-e322855d3ac1" class=3D"conflue=
+nceTd">
+<p local-id=3D"4a2a93c81711">Decimal</p>
+</td>
+<td data-local-id=3D"14aea097-4c17-4228-98da-1b747945ff49" class=3D"conflue=
+nceTd">
+<p local-id=3D"6e27e1d9a4dc">T=C3=ADnh to=C3=A1n</p>
+</td>
+<td data-local-id=3D"75bc305c-99eb-4cb3-90c4-0420b698ea0d" class=3D"conflue=
+nceTd">
+<p local-id=3D"4c0c39650245">T=E1=BB=95ng theo c=C3=A1c d=C3=B2ng HHDV, c=
+=C3=A1ch t=C3=ADnh nh=C6=B0 b=E1=BA=A3ng KH-01</p>
+</td>
+<td data-local-id=3D"4dca2927e109" class=3D"confluenceTd">
+<p local-id=3D"a1cad4d2c002"></p>
+</td>
+<td data-local-id=3D"d41ffa90-fa09-4360-8661-bbc7aff6b2bb" class=3D"conflue=
+nceTd">
+<p local-id=3D"1b1b139b73f3"></p>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<h3 local-id=3D"ace641a8581b" id=3D"id-=C4=90=E1=BA=B7ct=E1=BA=A3c=E1=BA=AD=
+pnh=E1=BA=ADtth=C3=B4ngtingi=E1=BA=A3ing=C3=A2ntheoHHDVt=E1=BA=A1iS6-1.2Pop=
+up&quot;Ch=E1=BB=89nhs=E1=BB=ADath=C3=B4ngtingi=E1=BA=A3ing=C3=A2ntheoHHDV&=
+quot;">1.2 Popup "Ch=E1=BB=89nh s=E1=BB=ADa th=C3=B4ng tin gi=E1=BA=A3i ng=
+=C3=A2n theo HHDV"</h3>
+<ul local-id=3D"140ce8f7">
+<li local-id=3D"24759219">
+<p local-id=3D"ec876120aa50"><strong>B=E1=BA=A3ng KH-01, KH-02:</strong> hi=
+=E1=BB=83n th=E1=BB=8B d=E1=BA=A1ng table, read-only, ngu=E1=BB=93n nh=C6=
+=B0 tab. C=C3=A1c c=E1=BB=99t gi=E1=BB=91ng tab, ri=C3=AAng c=E1=BB=99t <st=
+rong>S=E1=BB=91 ti=E1=BB=81n gi=E1=BA=A3i ng=C3=A2n l=E1=BA=A7n n=C3=A0y</s=
+trong> chuy=E1=BB=83n th=C3=A0nh =C3=B4 nh=E1=BA=ADp. B=E1=BA=A3ng K=E1=BA=
+=BF ho=E1=BA=A1ch 02 m=E1=BB=9F s=E1=BA=B5n c=C3=A1c d=C3=B2ng con.</p>
+</li>
+<li local-id=3D"6b5a65f3">
+<p local-id=3D"9ca03ef9318a"><strong>S=E1=BB=91 ti=E1=BB=81n gi=E1=BA=A3i n=
+g=C3=A2n l=E1=BA=A7n n=C3=A0y:</strong> B=E1=BA=AFt bu=E1=BB=99c nh=E1=BA=
+=ADp v=C3=A0 cho ph=C3=A9p ch=E1=BB=89nh s=E1=BB=ADa. Ng=C6=B0=E1=BB=9Di d=
+=C3=B9ng nh=E1=BA=ADp gi=C3=A1 tr=E1=BB=8B theo tu=E1=BB=B3 b=E1=BA=A3ng K=
+=E1=BA=BF ho=E1=BA=A1ch:</p>
+<ul local-id=3D"9767e97fe821">
+<li local-id=3D"9708a9b63014">
+<p local-id=3D"600bc5230c8d">V=E1=BB=9Bi KH-01, nh=E1=BA=ADp t=E1=BA=A1i d=
+=C3=B2ng HHDV.</p>
+</li>
+<li local-id=3D"a12757193fda">
+<p local-id=3D"5019dfe2a218">V=E1=BB=9Bi KH-02, nh=E1=BA=ADp t=E1=BA=A1i t=
+=E1=BB=ABng d=C3=B2ng con =C4=90V/PB, d=C3=B2ng HHDV t=E1=BB=B1 t=C3=ADnh t=
+=E1=BB=95ng.</p>
+</li>
+<li local-id=3D"0be5c3370283">
+<p local-id=3D"05e76d586f40">Quy t=E1=BA=AFc chung: Gi=C3=A1 tr=E1=BB=8B m=
+=E1=BA=B7c =C4=91=E1=BB=8Bnh l=C3=A0 s=E1=BB=91 =C4=91=C3=A3 l=C6=B0u, l=E1=
+=BA=A7n =C4=91=E1=BA=A7u b=E1=BA=B1ng 0. Khi vi ph=E1=BA=A1m BR-04, BR-05, =
+=C3=B4 nh=E1=BA=ADp =C4=91=C6=B0=E1=BB=A3c vi=E1=BB=81n =C4=91=E1=BB=8F v=
+=C3=A0 hi=E1=BB=83n th=E1=BB=8B th=C3=B4ng b=C3=A1o l=E1=BB=97i b=C3=AAn d=
+=C6=B0=E1=BB=9Bi. KH-02, l=E1=BB=97i theo BR-04 hi=E1=BB=83n th=E1=BB=8B t=
+=E1=BA=A1i d=C3=B2ng HHDV, l=E1=BB=97i theo BR-05 hi=E1=BB=83n th=E1=BB=8B =
+t=E1=BA=A1i d=C3=B2ng con.</p>
+</li>
+</ul>
+</li>
+<li local-id=3D"09e39aac">
+<p local-id=3D"5717c699d164"><strong>T=E1=BB=95ng c=E1=BB=99ng:</strong> hi=
+=E1=BB=83n th=E1=BB=8B d=E1=BA=A1ng OutputText, ki=E1=BB=83u d=E1=BB=AF li=
+=E1=BB=87u Decimal, kh=C3=B4ng b=E1=BA=AFt bu=E1=BB=99c, read-only, ngu=E1=
+=BB=93n t=C3=ADnh to=C3=A1n. Gi=C3=A1 tr=E1=BB=8B =C4=91=C6=B0=E1=BB=A3c c=
+=E1=BA=ADp nh=E1=BA=ADt ngay khi ng=C6=B0=E1=BB=9Di d=C3=B9ng nh=E1=BA=ADp.=
+</p>
+</li>
+<li local-id=3D"5ca8e813">
+<p local-id=3D"02aab34a847c"><strong>H=E1=BB=A7y:</strong> button =C4=91=C3=
+=B3ng popup v=C3=A0 gi=E1=BB=AF nguy=C3=AAn d=E1=BB=AF li=E1=BB=87u =C4=91=
+=C3=A3 l=C6=B0u tr=C6=B0=E1=BB=9Bc =C4=91=C3=B3.</p>
+</li>
+<li local-id=3D"1de6bbad">
+<p local-id=3D"0c3d13033471"><strong>L=C6=B0u:</strong> button ki=E1=BB=83m=
+ tra BR-04, BR-05, l=C6=B0u d=E1=BB=AF li=E1=BB=87u v=C3=A0 c=E1=BA=ADp nh=
+=E1=BA=ADt l=E1=BA=A1i tab c=C3=B9ng ph=E1=BA=A7n Th=C3=B4ng tin t=C3=B3m t=
+=E1=BA=AFt.</p>
+</li>
+</ul>
+<h2 local-id=3D"d2045c720e74" id=3D"id-=C4=90=E1=BA=B7ct=E1=BA=A3c=E1=BA=AD=
+pnh=E1=BA=ADtth=C3=B4ngtingi=E1=BA=A3ing=C3=A2ntheoHHDVt=E1=BA=A1iS6-2.Busi=
+nessrules">2. Business rules</h2>
+<div class=3D"table-wrap">
+<table data-table-width=3D"760" data-layout=3D"default" data-local-id=3D"fd=
+5e78dd-6fa6-4904-ac6f-0a4f3cd8d8a6" class=3D"confluenceTable">
+<colgroup>
+<col style=3D"width: 73.0px;">
+<col style=3D"width: 159.0px;">
+<col style=3D"width: 160.0px;">
+<col style=3D"width: 365.0px;">
+</colgroup>
+<tbody>
+<tr data-local-id=3D"faad8b3c-3793-4acc-91dd-0270a60ff7de">
+<th data-local-id=3D"6542356c-36e0-4342-9463-e79164aa56f8" class=3D"conflue=
+nceTh">
+<p local-id=3D"cd59a8f882d0"><strong>STT</strong></p>
+</th>
+<th data-local-id=3D"0feaf0f6-fbe9-4a33-bf13-dd20ae5c95b7" class=3D"conflue=
+nceTh">
+<p local-id=3D"09440e3ce0c5"><strong>M=C3=B4 t=E1=BA=A3 rule</strong></p>
+</th>
+<th data-local-id=3D"11271f8f-5aec-492f-8eec-4badd54ce866" class=3D"conflue=
+nceTh">
+<p local-id=3D"4e6483566333"><strong>=C3=81p d=E1=BB=A5ng t=E1=BA=A1i b=C6=
+=B0=E1=BB=9Bc</strong></p>
+</th>
+<th data-local-id=3D"20577b7f-4b0e-434c-857d-3d2b6da0adb8" class=3D"conflue=
+nceTh">
+<p local-id=3D"a05d0f5ed5be"><strong>N=E1=BB=99i dung chi ti=E1=BA=BFt</str=
+ong></p>
+</th>
+</tr>
+<tr data-local-id=3D"87aee4ee-546d-4e32-a108-489019331b93">
+<td data-local-id=3D"655214a5-b95f-4631-9bee-a0d10d6764dc" class=3D"conflue=
+nceTd">
+<p local-id=3D"904162ca3335">BR-01</p>
+</td>
+<td data-local-id=3D"0dc379e0-8b50-499f-ac92-38cdb5bd846f" class=3D"conflue=
+nceTd">
+<p local-id=3D"e3d996c18499">Quy=E1=BB=81n thao t=C3=A1c</p>
+</td>
+<td data-local-id=3D"0d8a54a9-aee8-4a69-800b-eca756991f2d" class=3D"conflue=
+nceTd">
+<p local-id=3D"44e313ee6772">Tab, popup</p>
+</td>
+<td data-local-id=3D"2208f917-c076-465a-a5b2-eea4ad05ae6d" class=3D"conflue=
+nceTd">
+<p local-id=3D"a45a4ca40cd7">Ng=C6=B0=E1=BB=9Di kh=E1=BB=9Fi t=E1=BA=A1o =
+=C4=91=E1=BB=81 ngh=E1=BB=8B (CB =C4=90MMS ho=E1=BA=B7c CB KTTC) =C4=91=C6=
+=B0=E1=BB=A3c ch=E1=BB=89nh s=E1=BB=ADa. Ng=C6=B0=E1=BB=9Di d=C3=B9ng c=C3=
+=B3 quy=E1=BB=81n xem =C4=91=E1=BB=81 ngh=E1=BB=8B =C4=91=C6=B0=E1=BB=A3c x=
+em. D=E1=BB=AF li=E1=BB=87u =C4=91=C6=B0=E1=BB=A3c kh=C3=B3a sau khi =C4=91=
+=E1=BB=81 ngh=E1=BB=8B g=E1=BB=ADi duy=E1=BB=87t</p>
+</td>
+</tr>
+<tr data-local-id=3D"8023e4df-89fd-4abf-8d26-3a3398d6d40b">
+<td data-local-id=3D"9fe76ea2-71ee-4774-a88d-985adf708f51" class=3D"conflue=
+nceTd">
+<p local-id=3D"20167247641b">BR-02</p>
+</td>
+<td data-local-id=3D"97bec39b-36df-4a01-831e-051cd707d34c" class=3D"conflue=
+nceTd">
+<p local-id=3D"77321c477936">Danh s=C3=A1ch HHDV</p>
+</td>
+<td data-local-id=3D"a1b5ff71-032c-49dd-aaa9-42a35292e9e0" class=3D"conflue=
+nceTd">
+<p local-id=3D"08b4b0d17679">M=E1=BB=9F tab</p>
+</td>
+<td data-local-id=3D"97264d4f-4561-48fd-88ab-605f0ac44c12" class=3D"conflue=
+nceTd">
+<p local-id=3D"127ffcf3467a">H=E1=BB=87 th=E1=BB=91ng l=E1=BA=A5y to=C3=A0n=
+ b=E1=BB=99 HHDV c=E1=BB=A7a H=C4=90/KMS thu=E1=BB=99c NCC c=E1=BB=A7a =C4=
+=91=E1=BB=81 ngh=E1=BB=8B. M=E1=BB=97i HHDV thu=E1=BB=99c m=E1=BB=99t lo=E1=
+=BA=A1i k=E1=BA=BF ho=E1=BA=A1ch. HHDV ch=C6=B0a gi=E1=BA=A3i ng=C3=A2n tro=
+ng l=E1=BA=A7n n=C3=A0y gi=E1=BB=AF l=E1=BA=A1i v=E1=BB=9Bi s=E1=BB=91 ti=
+=E1=BB=81n b=E1=BA=B1ng 0. Khi ng=C6=B0=E1=BB=9Di d=C3=B9ng =C4=91=E1=BB=95=
+i H=C4=90/KMS ho=E1=BA=B7c NCC, h=E1=BB=87 th=E1=BB=91ng x=C3=B3a d=E1=BB=
+=AF li=E1=BB=87u =C4=91=C3=A3 khai v=C3=A0 n=E1=BA=A1p l=E1=BA=A1i danh s=
+=C3=A1ch m=E1=BB=9Bi</p>
+</td>
+</tr>
+<tr data-local-id=3D"2cd49742-e079-4a73-92a9-5d30dfe8fd20">
+<td data-local-id=3D"5639c0fb-81c2-4abb-9c52-76a3f6a63f54" class=3D"conflue=
+nceTd">
+<p local-id=3D"322a14e56f90">BR-03</p>
+</td>
+<td data-local-id=3D"eb85e053-4a46-4ce9-8fcb-3321a1101605" class=3D"conflue=
+nceTd">
+<p local-id=3D"4b7dfe0e1351">S=E1=BB=91 ti=E1=BB=81n gi=E1=BA=A3i ng=C3=A2n=
+</p>
+</td>
+<td data-local-id=3D"e24d6bfc-00de-433a-bf9b-210a86e668f9" class=3D"conflue=
+nceTd">
+<p local-id=3D"b31d622eed58">Nh=E1=BA=ADp s=E1=BB=91 ti=E1=BB=81n</p>
+</td>
+<td data-local-id=3D"ca258d0d-fa2a-4e66-a8b3-88277adabee6" class=3D"conflue=
+nceTd">
+<p local-id=3D"cd655cbcc3a1">S=E1=BB=91 ti=E1=BB=81n gi=E1=BA=A3i ng=C3=A2n=
+ l=C3=A0 s=E1=BB=91 ti=E1=BB=81n th=E1=BB=B1c chi cho NCC, =C4=91=C3=A3 bao=
+ g=E1=BB=93m thu=E1=BA=BF, l=E1=BB=9Bn h=C6=A1n ho=E1=BA=B7c b=E1=BA=B1ng 0=
+. V=E1=BB=9Bi =C4=91=E1=BB=81 ngh=E1=BB=8B thanh to=C3=A1n c=C3=B3 c=E1=BA=
+=A5n tr=E1=BB=AB t=E1=BA=A1m =E1=BB=A9ng, ng=C6=B0=E1=BB=9Di d=C3=B9ng khai=
+ ph=E1=BA=A7n ti=E1=BB=81n chuy=E1=BB=83n =C4=91i m=E1=BB=9Bi. Ng=C6=B0=E1=
+=BB=9Di d=C3=B9ng nh=E1=BA=ADp tay s=E1=BB=91 ti=E1=BB=81n cho t=E1=BB=ABng=
+ d=C3=B2ng</p>
+</td>
+</tr>
+<tr data-local-id=3D"0045a7d4-f4a9-4bdf-8670-2773f42d970b">
+<td data-local-id=3D"00b5af5f-848b-443c-8870-0f505540b3ec" class=3D"conflue=
+nceTd">
+<p local-id=3D"69931b22c7c4">BR-04</p>
+</td>
+<td data-local-id=3D"c5ab0e2c-8d56-4136-8fbd-127d04da16da" class=3D"conflue=
+nceTd">
+<p local-id=3D"e90cf6913b0c">Gi=E1=BB=9Bi h=E1=BA=A1n theo H=C4=90</p>
+</td>
+<td data-local-id=3D"0871314a-876c-413c-a556-a18208bb2a91" class=3D"conflue=
+nceTd">
+<p local-id=3D"9036ff0920cc">L=C6=B0u</p>
+</td>
+<td data-local-id=3D"cb5f0471-4d4b-4fa7-9555-0b2aeeb2907b" class=3D"conflue=
+nceTd">
+<p local-id=3D"f6ecb186a605">S=E1=BB=91 ti=E1=BB=81n gi=E1=BA=A3i ng=C3=A2n=
+ l=E1=BA=A7n n=C3=A0y c=E1=BB=A7a m=E1=BB=97i HHDV nh=E1=BB=8F h=C6=A1n ho=
+=E1=BA=B7c b=E1=BA=B1ng S=E1=BB=91 ti=E1=BB=81n gi=E1=BA=A3i ng=C3=A2n c=C3=
+=B2n l=E1=BA=A1i</p>
+</td>
+</tr>
+<tr data-local-id=3D"21cbea18-4442-4978-a93f-c6cd84fd266d">
+<td data-local-id=3D"0a702a4e-b0e8-4a0f-9cac-bda74163bbda" class=3D"conflue=
+nceTd">
+<p local-id=3D"b9b6b2da8fc7">BR-05</p>
+</td>
+<td data-local-id=3D"a8227bf6-527d-4d43-8c9c-02e6efc4a538" class=3D"conflue=
+nceTd">
+<p local-id=3D"a4c8888398b2">Gi=E1=BB=9Bi h=E1=BA=A1n theo KH</p>
+</td>
+<td data-local-id=3D"58aa2e19-30c3-498c-9e5f-c67cd308d6e7" class=3D"conflue=
+nceTd">
+<p local-id=3D"5b5ab5502095">L=C6=B0u</p>
+</td>
+<td data-local-id=3D"baa3f1a0-59c9-456b-b777-55291afbca48" class=3D"conflue=
+nceTd">
+<ul local-id=3D"7384a8108ca4">
+<li local-id=3D"cd65c870d431">
+<p local-id=3D"6082f56ca220">KH-01: t=E1=BB=95ng S=E1=BB=91 ti=E1=BB=81n gi=
+=E1=BA=A3i ng=C3=A2n l=E1=BA=A7n n=C3=A0y c=E1=BB=A7a c=C3=A1c HHDV c=C3=B9=
+ng h=E1=BA=A1ng m=E1=BB=A5c KH nh=E1=BB=8F h=C6=A1n ho=E1=BA=B7c b=E1=BA=B1=
+ng KHV c=C3=B2n l=E1=BA=A1i.</p>
+</li>
+<li local-id=3D"e379bb5d957a">
+<p local-id=3D"0ed2b64a5277">KH-02: t=E1=BB=95ng S=E1=BB=91 ti=E1=BB=81n gi=
+=E1=BA=A3i ng=C3=A2n l=E1=BA=A7n n=C3=A0y c=E1=BB=A7a c=C3=A1c d=C3=B2ng co=
+n c=C3=B9ng ch=E1=BB=89 ti=C3=AAu v=C3=A0 c=C3=B9ng =C4=90V/PB nh=E1=BB=8F =
+h=C6=A1n ho=E1=BA=B7c b=E1=BA=B1ng KHCP kh=E1=BA=A3 d=E1=BB=A5ng c=E1=BB=A7=
+a =C4=90V/PB =C4=91=C3=B3. D=C3=B2ng To=C3=A0n h=C3=A0ng kh=C3=B4ng ki=E1=
+=BB=83m tra.</p>
+</li>
+<li local-id=3D"dc0bdf5abab9">
+<p local-id=3D"110f1942193e">KHV c=C3=B2n l=E1=BA=A1i v=C3=A0 KHCP kh=E1=BA=
+=A3 d=E1=BB=A5ng =C4=91=C6=B0=E1=BB=A3c l=E1=BA=A5y theo N=C4=83m k=E1=BA=
+=BF ho=E1=BA=A1ch, =C4=91=C3=A3 tr=E1=BB=AB s=E1=BB=91 ti=E1=BB=81n c=E1=BB=
+=A7a c=C3=A1c =C4=91=E1=BB=81 ngh=E1=BB=8B =C4=91=C6=B0=E1=BB=A3c ph=C3=AA =
+duy=E1=BB=87t ho=C3=A0n t=E1=BA=A5t. H=E1=BB=87 th=E1=BB=91ng ch=E1=BA=B7n =
+l=C6=B0u khi v=C6=B0=E1=BB=A3t</p>
+</li>
+</ul>
+</td>
+</tr>
+<tr data-local-id=3D"7bc5882e-f964-4506-92a4-52f44d2d6e46">
+<td data-local-id=3D"4647b2f1-1ecb-42d2-b1dd-1c85ec771599" class=3D"conflue=
+nceTd">
+<p local-id=3D"fe42f5c02669">BR-06</p>
+</td>
+<td data-local-id=3D"c6677e66-a24d-4110-916d-da37be76a279" class=3D"conflue=
+nceTd">
+<p local-id=3D"0ddf39b25d58">=C4=90i=E1=BB=81u ki=E1=BB=87n g=E1=BB=ADi duy=
+=E1=BB=87t</p>
+</td>
+<td data-local-id=3D"59efb2ab-b9f5-49ca-ae34-a5c142da8229" class=3D"conflue=
+nceTd">
+<p local-id=3D"bc82325c72cb">G=E1=BB=ADi duy=E1=BB=87t</p>
+</td>
+<td data-local-id=3D"a2e49589-7667-4e5d-8b66-e3f38557db2e" class=3D"conflue=
+nceTd">
+<p local-id=3D"8fed3c8f151d">Ng=C6=B0=E1=BB=9Di d=C3=B9ng c=C3=B3 th=E1=BB=
+=83 l=C6=B0u khi T=E1=BB=95ng s=E1=BB=91 ti=E1=BB=81n ch=C3=AAnh l=E1=BB=87=
+ch kh=C3=A1c 0. =C4=90=E1=BB=81 ngh=E1=BB=8B =C4=91=C6=B0=E1=BB=A3c g=E1=BB=
+=ADi duy=E1=BB=87t khi T=E1=BB=95ng s=E1=BB=91 ti=E1=BB=81n ch=C3=AAnh l=E1=
+=BB=87ch b=E1=BA=B1ng 0. Khi S=E1=BB=91 ti=E1=BB=81n =C4=91=E1=BB=81 ngh=E1=
+=BB=8B thay =C4=91=E1=BB=95i, ng=C6=B0=E1=BB=9Di d=C3=B9ng khai l=E1=BA=A1i=
+ s=E1=BB=91 ti=E1=BB=81n gi=E1=BA=A3i ng=C3=A2n theo HHDV</p>
+</td>
+</tr>
+<tr data-local-id=3D"275a7333-9b79-4cde-933b-f334404f8368">
+<td data-local-id=3D"bdf804c0-991e-4d67-acf6-0b4d1672338d" class=3D"conflue=
+nceTd">
+<p local-id=3D"c1b23ba27aa3">BR-07</p>
+</td>
+<td data-local-id=3D"a97ebcfb-f179-427d-b912-d3937940e534" class=3D"conflue=
+nceTd">
+<p local-id=3D"f5b9cd18417f">Ki=E1=BB=83m tra l=E1=BA=A1i khi ph=C3=AA duy=
+=E1=BB=87t</p>
+</td>
+<td data-local-id=3D"07dd492a-81b4-4a37-8491-f95efadf297a" class=3D"conflue=
+nceTd">
+<p local-id=3D"8d7d0e056d92">Ph=C3=AA duy=E1=BB=87t</p>
+</td>
+<td data-local-id=3D"987fcec9-f163-4534-a2b0-6151a4a1b3fc" class=3D"conflue=
+nceTd">
+<p local-id=3D"907f11676fc1">H=E1=BB=87 th=E1=BB=91ng ki=E1=BB=83m tra l=E1=
+=BA=A1i BR-04, BR-05 theo s=E1=BB=91 li=E1=BB=87u t=E1=BA=A1i th=E1=BB=9Di =
+=C4=91i=E1=BB=83m ph=C3=AA duy=E1=BB=87t v=C3=A0 ch=E1=BA=B7n ph=C3=AA duy=
+=E1=BB=87t khi v=C6=B0=E1=BB=A3t</p>
+</td>
+</tr>
+<tr data-local-id=3D"0494065c-516c-4e35-b5fc-216bec274c04">
+<td data-local-id=3D"643d1ac3-f566-42ec-99fe-e9a9cc378346" class=3D"conflue=
+nceTd">
+<p local-id=3D"98461dd82766">BR-08</p>
+</td>
+<td data-local-id=3D"de54b0c1-5b70-4801-9561-ebd88fd4afda" class=3D"conflue=
+nceTd">
+<p local-id=3D"8b8f2c39280e">G=E1=BB=ADi d=E1=BB=AF li=E1=BB=87u sang c=C3=
+=A1c ph=C3=A2n h=E1=BB=87 =C4=91=E1=BB=A9ng tr=C6=B0=E1=BB=9Bc</p>
+</td>
+<td data-local-id=3D"c63d8e01-f7f3-4413-ae81-c49587dd7cb1" class=3D"conflue=
+nceTd">
+<p local-id=3D"a3611648d803">Sau ph=C3=AA duy=E1=BB=87t</p>
+</td>
+<td data-local-id=3D"69e0436d-73fa-4a07-8b24-ac4bab144f0d" class=3D"conflue=
+nceTd">
+<p local-id=3D"a904eb78a634">H=E1=BB=87 th=E1=BB=91ng g=E1=BB=ADi d=E1=BB=
+=AF li=E1=BB=87u khi =C4=91=E1=BB=81 ngh=E1=BB=8B =C4=91=C6=B0=E1=BB=A3c ph=
+=C3=AA duy=E1=BB=87t v=C3=A0 c=E1=BA=ADp nh=E1=BA=ADt khi =C4=91=E1=BB=81 n=
+gh=E1=BB=8B =C4=91=C6=B0=E1=BB=A3c h=E1=BA=A1ch to=C3=A1n. Khi =C4=91=E1=BB=
+=81 ngh=E1=BB=8B b=E1=BB=8B h=E1=BB=A7y, t=E1=BB=AB ch=E1=BB=91i ho=E1=BA=
+=B7c ho=C3=A0n, h=E1=BB=87 th=E1=BB=91ng g=E1=BB=ADi c=E1=BA=ADp nh=E1=BA=
+=ADt gi=E1=BA=A3m.</p>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+<p local-id=3D"e69f2a4a4381"></p>
+    </div>
+</body>
+</html>
+------=_Part_32_977409732.1794798262288
+Content-Type: application/octet-stream
+Content-Transfer-Encoding: base64
+Content-Location: file:///C:/cf8db26af1c11b9fa47cc86a48be943523fe2fdc6083212460df3d8eb047f50b
+
+iVBORw0KGgoAAAANSUhEUgAAAScAAAD6CAYAAADjjYEEAABi6ElEQVR4Ae3AA6AkWZbG8f937o3I
+zKdyS2Oubdu2bdu2bdu2bWmMnpZKr54yMyLu+Xa3anqmhztr1a+uh9F9V7nqqquu+h8CgMpzyTTj
+NIG56qqrrvovUWpQS+GZAKg8l3GamKbG/STxQLa5XylBa8mLShIRwobMJCKwjW0eSBIAtrmfJCTI
+NP9WAqIENmQmIWHANveTxP1s80CSuJ9tJAEABoRtXpAQIK4wpHkOpUBrXCZAAZkQgghoDSQuS3PV
+Vf+ntEzKvCABAEDw3MyzSOLwcMnB4RFHyxUXd/cAkATA059xN1NrjNNEa8kLI4mj5YonP+0Obr/z
+Xmy4577zHB6tAJCEbVpL9g+OODg8AkASAAeHS+665zwSl9nGNraRRNoM48gLIsE4NZ5x+73cdc85
+xmni7IVLXNo7AEASkti9tM/B4RH7h0dMU0MSIbFcDZy/cInVas1ytUYSq9Wai7t7rFYj+wdHSOL5
+CcH5S8mFS8md9zXO7iYSILBhavDk2yYiwIaxmTvuaXRV3Hex8finj0wN7jnfuO9iIwIkLpO46qr/
+I8wzAVB5IWopPO5Jt/L02+7mxPFtbDOb9Zw+cYxSgj/+y8dx8w3XcHi4RBIPf+hNvPijHsLUGs+P
+DU948jOQxOOedCvDONF3ldaSxWJGLYUbrz/Nk592B7UWVquBV3yZx/CUW++kteTchV3m8xmzruNw
+ueQVX+ax/N3jn0ooOFqtuOHa07zcSz6KqTWeWyjY3bvEb/zen7O1tcHmxpz5rOfoaIVCvORjHsa5
+C5e4tHfI+YuXOH3qGABbGwuOHdvmvrMXuP3O+zh98hiPfsSD+MvbnsSl/QOOjlYcP7bFiz3qIRzb
+2aQ189z6Tvz2n6/4k79b8diH9dx1tnFsM+h72N1L3uZ1N/mBnz/gxusqy3Vy7cnCM+6eeKc33uLb
+fmKfY5vi+LGgK+KJt468/9tu8yd/v+bwyGxvild9qTm3XF9ojauu+r8AgMoLkZmcOX2cra0Fh4cr
+1uPIcrmm6wogHvGQGymlcPL4Nl2tzGcdtnl+bDOf9TzioTcRERwerdg/OKLrKpsbc578tDvouspj
+H/lgjh/bokTh9MmCJLpaWcwLdrKzvcn+wZL7brvINDWuv+YUy/XA4dGSm244Q9o8P7bpusprvPJL
+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
+AAAAAElFTkSuQmCC
+------=_Part_32_977409732.1794798262288--
