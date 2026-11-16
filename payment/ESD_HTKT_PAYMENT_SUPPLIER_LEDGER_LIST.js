@@ -435,10 +435,10 @@ function getListAccountsPayable(input) {
 function buildAccountsPayableQueryScope(vendorId, contractId, currentPaymentId) {
     return (
             "FROM esdHTKTaccountingInformation ai " +
-            "JOIN esdHTKTpayment payment " +
+            "LEFT JOIN esdHTKTpayment payment " +
             'ON (ai.prepayment.id = payment.id ' +
             'AND (ai.sub.type = "DU_CHI" OR payment.status = "accounted")) ' +
-            "JOIN esdHTKTpaymentEntry pe " +
+            "LEFT JOIN esdHTKTpaymentEntry pe " +
             "ON (ai.prepayment.id = pe.payment.id " +
             'AND pe.entry.type = "PAYABLE" ' +
             'AND pe.account.type = "ASSET" ' +
@@ -459,6 +459,7 @@ function buildAccountsPayableQueryScope(vendorId, contractId, currentPaymentId) 
             'AND ai.vendor.id = "' + escapeSmQueryValue(vendorId) + '" ' +
             'AND ai.status = "COMPLETED" ' +
             'AND ai.type = "AP" ' +
+            'AND ai.has.payable = true ' +
             (currentPaymentId ? 'AND ai.prepayment.id ~= "' + escapeSmQueryValue(currentPaymentId) + '" ' : "")
     );
 }

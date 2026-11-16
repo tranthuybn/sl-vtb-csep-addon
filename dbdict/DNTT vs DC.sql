@@ -111,6 +111,7 @@ Table esdHTKTaccountingInformation {
   "contract.id" varchar // Mã HĐ/KMS để tra cứu/đối soát
   "payment.entry.id" varchar // mã bảng entry
   "vendor.id" varchar // mã nhà cung cấp
+  "has.payable" bool // Có khoản phải trả treo (paymentEntry PAYABLE/ASSET cùng nhà cung cấp)
   type varchar // loại hạch toán (OGL/Core)
   data varchar // dữ liệu hạch toán
   status varchar // trạng thái hạch toán (Khởi tạo/Hạch toán thành công/Hạch toán lỗi)
