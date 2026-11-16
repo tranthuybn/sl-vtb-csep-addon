@@ -14,7 +14,7 @@
  *   3) total.refund.amount  : Số tiền hoàn ứng từ NCC
  *      -> Lấy theo các khoản hoàn ứng PREPAYMENT thuộc phiếu ĐNTT (phiếu approved/accounted).
  *   4) total.paid.amount    : Số tiền đã thanh toán thực tế cho NCC
- *      -> Lấy theo các phiếu ĐNTT & thuế ĐNTƯ (phiếu approved/accounted).
+ *      -> Lấy theo các phiếu ĐNTT & thuế ĐNTƯ (phiếu approved/accounted).  
  * - Lưu / Cập nhật (Upsert) dữ liệu vào bảng esdHTKTreportVendorDebt.
  * -----------------------------------------------------------------------------
  */
@@ -198,8 +198,44 @@ function syncVendorDebtReportForHTKT(recordId, type, operatorName) {
  */
 
 /**
+ * Lấy tổng số tiền thanh toán từ dòng CORE của phiếu Payment trong esdHTKTaccountingInformation (type="CORE").
+ * Nếu không có dòng CORE (ví dụ thanh toán tiền mặt/chưa sinh CORE), fallback về fallbackAmount (pvFile["amount"]).
+ * @param {string} paymentId - ID phiếu thanh toán
+ * @param {string} vendorId  - ID nhà cung cấp
+ * @param {number} fallbackAmount - Số tiền dự phòng nếu chưa có accountingInformation
+ * @returns {number} Số tiền thanh toán thực tế dòng CORE
+ */
+function getPaymentCorePayAmount(paymentId, vendorId, fallbackAmount) {
+    var aiFile = null;
+    try {
+        aiFile = new SCFile("esdHTKTaccountingInformation", SCFILE_READONLY);
+        var q = 'prepayment.id="' + escapeSmQueryValue(paymentId) + '" and type="CORE"';
+        if (vendorId) {
+            q += ' and vendor.id="' + escapeSmQueryValue(vendorId) + '"';
+        }
+        var rc = aiFile.doSelect(q);
+        var totalCore = 0;
+        var found = false;
+        while (rc == RC_SUCCESS) {
+            var amt = getNumberField(aiFile, ["amount", "ai.amount"]);
+            if (amt > 0) {
+                totalCore += amt;
+                found = true;
+            }
+            rc = aiFile.getNext();
+        }
+        if (found) return totalCore;
+    } catch (eAi) {
+    } finally {
+        closeSCFile(aiFile);
+    }
+    return fallbackAmount || 0;
+}
+
+/**
  * Xử lý tính tổng công nợ cộng dồn cho phiếu PAYMENT:
  * - Lấy debt.amount của paymentVendor ứng với payment.id hiện tại.
+ * - Lấy số tiền thanh toán thực tế từ dòng CORE của payment (type="CORE" trong esdHTKTaccountingInformation).
  * - Nếu thanh toán có nhiều NCC thì gom nhóm và tính tổng theo từng NCC.
  * - Nếu (contract.id, vendor.id) chưa có trong esdHTKTreportVendorDebt: Ghi mới từ 0 + debt.amount.
  * - Từ những lần hạch toán sau: Lấy công nợ hiện tại (lần trước) cộng dồn với debt.amount của phiếu hiện tại.
@@ -279,6 +315,12 @@ function syncPaymentIncremental(paymentId, contractId, user) {
 
     result.totalVendors = vendorList.length;
 
+    // Cập nhật trường amount theo đúng số tiền thực chi từ dòng CORE của payment (type="CORE")
+    for (var vi = 0; vi < vendorList.length; vi++) {
+        var curVid = vendorList[vi];
+        vendorMap[curVid].amount = getPaymentCorePayAmount(paymentId, curVid, vendorMap[curVid].amount);
+    }
+
     for (var i = 0; i < vendorList.length; i++) {
         var vId = vendorList[i];
         var item = vendorMap[vId];
@@ -291,6 +333,18 @@ function syncPaymentIncremental(paymentId, contractId, user) {
             var isUpdate = (checkFile.doSelect(qReport) == RC_SUCCESS);
 
             if (isUpdate) {
+                var processedRefList = parseRefIdJsonToList(checkFile["list.ref.id"]);
+                if (processedRefList.indexOf(paymentId) !== -1) {
+                    // Phiếu này đã được đồng bộ vào công nợ NCC trước đó (tránh cộng trùng khi phiếu có nhiều dòng accounting như trả treo + hoàn ứng kích hoạt nhiều lần)
+                    result.details.push({
+                        vendorId: vId,
+                        action: "SKIP_DUPLICATE",
+                        paymentId: paymentId,
+                        message: "Phiếu " + paymentId + " đã tồn tại trong list.ref.id, bỏ qua để tránh cộng dồn trùng lặp (case trả treo + hoàn ứng)."
+                    });
+                    continue;
+                }
+
                 var prevPayable = parseAmount(checkFile["total.payable.amount"]);
                 var prevPaid = parseAmount(checkFile["total.paid.amount"]);
                 var prevAdvance = parseAmount(checkFile["total.advance.amount"]);
@@ -310,6 +364,7 @@ function syncPaymentIncremental(paymentId, contractId, user) {
                 checkFile["total.paid.amount"] = String(newPaid);
                 checkFile["total.advance.amount"] = String(newAdvance);
                 checkFile["total.refund.amount"] = String(newRefund);
+                checkFile["list.ref.id"] = appendRefIdToJson(checkFile["list.ref.id"], paymentId);
                 checkFile["created.by"] = user;
                 checkFile["created.at"] = (system.functions && system.functions.tod) ? system.functions.tod() : new Date();
 
@@ -318,6 +373,7 @@ function syncPaymentIncremental(paymentId, contractId, user) {
                     result.details.push({
                         vendorId: vId,
                         action: "UPDATE",
+                        listRefId: checkFile["list.ref.id"],
                         prevPayable: prevPayable,
                         deltaDebt: item.debtAmount,
                         newPayable: newPayable,
@@ -336,6 +392,7 @@ function syncPaymentIncremental(paymentId, contractId, user) {
                 var newPaid = 0 + item.amount;
                 var newRefund = 0 + item.refundAmount;
                 var newAdvance = 0;
+                var initialListRefId = appendRefIdToJson("", paymentId);
 
                 var newRecord = {
                     "id": "",
@@ -347,6 +404,8 @@ function syncPaymentIncremental(paymentId, contractId, user) {
                     "total.paid.amount": String(newPaid),
                     "total.advance.amount": String(newAdvance),
                     "total.refund.amount": String(newRefund),
+                    "list.ref.id": initialListRefId,
+                    "_isIncremental": true,
                     "created.at": (system.functions && system.functions.tod) ? system.functions.tod() : new Date(),
                     "created.by": user
                 };
@@ -356,6 +415,7 @@ function syncPaymentIncremental(paymentId, contractId, user) {
                     result.details.push({
                         vendorId: vId,
                         action: "INSERT",
+                        listRefId: initialListRefId,
                         newPayable: newPayable,
                         newPaid: newPaid,
                         newRefund: newRefund,
@@ -462,19 +522,19 @@ function getPrepaymentTaxByDeduction(prepaymentId, primaryVendorId, knownVendorL
             // Nhận diện đầy đủ các dòng bút toán thuế:
             // - Theo mã entry.type / rule.code: "TU-BT-02", "TU_BT_02", "TU.BT.02", "BT-02", "THUE", "TAX", "VAT"
             var isTaxByCode = (
-                cleanType === "TUBT02" ||
-                cleanType === "TUBT2" ||
-                cleanType === "BT02" ||
-                cleanType === "BT2" ||
-                cleanType === "THUE" ||
-                cleanType === "TAX" ||
-                cleanType === "VAT" ||
-                cleanType.indexOf("TUBT02") !== -1 ||
-                cleanType.indexOf("BT02") !== -1 ||
-                upperEntryType.indexOf("TU-BT-02") !== -1 ||
-                upperEntryType.indexOf("TU_BT_02") !== -1 ||
-                upperEntryType.indexOf("THUE") !== -1 ||
-                upperEntryType.indexOf("THUẾ") !== -1
+                    cleanType === "TUBT02" ||
+                    cleanType === "TUBT2" ||
+                    cleanType === "BT02" ||
+                    cleanType === "BT2" ||
+                    cleanType === "THUE" ||
+                    cleanType === "TAX" ||
+                    cleanType === "VAT" ||
+                    cleanType.indexOf("TUBT02") !== -1 ||
+                    cleanType.indexOf("BT02") !== -1 ||
+                    upperEntryType.indexOf("TU-BT-02") !== -1 ||
+                    upperEntryType.indexOf("TU_BT_02") !== -1 ||
+                    upperEntryType.indexOf("THUE") !== -1 ||
+                    upperEntryType.indexOf("THUẾ") !== -1
             );
 
             // - Theo cấu trúc AP chuẩn: type = "AP" & ledger.type = "Standard" & account.type = "DEBIT"
@@ -725,6 +785,18 @@ function syncPrepaymentIncremental(prepaymentId, contractId, user) {
             var isUpdate = (checkFile.doSelect(qReport) == RC_SUCCESS);
 
             if (isUpdate) {
+                var processedPrepList = parseRefIdJsonToList(checkFile["list.ref.id"]);
+                if (processedPrepList.indexOf(prepaymentId) !== -1) {
+                    // Phiếu tạm ứng này đã được đồng bộ vào công nợ NCC trước đó
+                    result.details.push({
+                        vendorId: vId,
+                        action: "SKIP_DUPLICATE",
+                        prepaymentId: prepaymentId,
+                        message: "Phiếu tạm ứng " + prepaymentId + " đã tồn tại trong list.ref.id, bỏ qua để tránh cộng dồn trùng lặp."
+                    });
+                    continue;
+                }
+
                 var prevPayable = parseAmount(checkFile["total.payable.amount"]);
                 var prevPaid = parseAmount(checkFile["total.paid.amount"]);
                 var prevAdvance = parseAmount(checkFile["total.advance.amount"]);
@@ -744,6 +816,7 @@ function syncPrepaymentIncremental(prepaymentId, contractId, user) {
                 checkFile["total.paid.amount"] = String(newPaid);
                 checkFile["total.advance.amount"] = String(newAdvance);
                 checkFile["total.refund.amount"] = String(newRefund);
+                checkFile["list.ref.id"] = appendRefIdToJson(checkFile["list.ref.id"], prepaymentId);
                 checkFile["created.by"] = user;
                 checkFile["created.at"] = (system.functions && system.functions.tod) ? system.functions.tod() : new Date();
 
@@ -752,6 +825,7 @@ function syncPrepaymentIncremental(prepaymentId, contractId, user) {
                     result.details.push({
                         vendorId: vId,
                         action: "UPDATE",
+                        listRefId: checkFile["list.ref.id"],
                         prevPayable: prevPayable,
                         deltaTax: deltaTax,
                         newPayable: newPayable,
@@ -770,6 +844,7 @@ function syncPrepaymentIncremental(prepaymentId, contractId, user) {
                 var newPaid = 0 + deltaTax;
                 var newAdvance = 0 + deltaAdvance;
                 var newRefund = 0;
+                var initialListRefId = appendRefIdToJson("", prepaymentId);
 
                 var newRecord = {
                     "id": "",
@@ -781,6 +856,8 @@ function syncPrepaymentIncremental(prepaymentId, contractId, user) {
                     "total.paid.amount": String(newPaid),
                     "total.advance.amount": String(newAdvance),
                     "total.refund.amount": String(newRefund),
+                    "list.ref.id": initialListRefId,
+                    "_isIncremental": true,
                     "created.at": (system.functions && system.functions.tod) ? system.functions.tod() : new Date(),
                     "created.by": user
                 };
@@ -790,6 +867,7 @@ function syncPrepaymentIncremental(prepaymentId, contractId, user) {
                     result.details.push({
                         vendorId: vId,
                         action: "INSERT",
+                        listRefId: initialListRefId,
                         newPayable: newPayable,
                         deltaTax: deltaTax,
                         newPaid: newPaid,
@@ -877,7 +955,7 @@ function syncVendorDebtReport(filterContractId, filterVendorId, operatorName) {
             // 2.2. Tính toán các chỉ số tài chính NCC theo logic tab Công nợ & Full code SM
             var debtSummary = calculateVendorDebtMetrics(contractId, vendorId, vendorInfo.supplierId || supplierId);
 
-            // 2.3. Đóng gói dữ liệu bản ghi báo cáo theo đúng 11 trường của bảng esdHTKTreportVendorDebt
+            // 2.3. Đóng gói dữ liệu bản ghi báo cáo theo đúng 12 trường của bảng esdHTKTreportVendorDebt
             var reportRecord = {
                 "id": "",                                                              // 1. ID - VARCHAR(60) (Tự tăng khi INSERT)
                 "contract.id": contractId,                                             // 2. CONTRACT_ID - VARCHAR(60)
@@ -888,8 +966,9 @@ function syncVendorDebtReport(filterContractId, filterVendorId, operatorName) {
                 "total.advance.amount": String(debtSummary.totalAdvanceAmount || "0"), // 7. TOTAL_ADVANCE_AMOUNT - VARCHAR(100)
                 "total.refund.amount": String(debtSummary.totalRefundAmount || "0"),   // 8. TOTAL_REFUND_AMOUNT - VARCHAR(100)
                 "total.paid.amount": String(debtSummary.totalPaidAmount || "0"),       // 9. TOTAL_PAID_AMOUNT - VARCHAR(100)
-                "created.at": (system.functions && system.functions.tod) ? system.functions.tod() : new Date(), // 10. CREATED_AT - TIMESTAMP
-                "created.by": user                                                     // 11. CREATE_BY - VARCHAR(200)
+                "list.ref.id": JSON.stringify(debtSummary.refIds || []),               // 10. LIST_REF_ID - VARCHAR / TEXT (JSON array)
+                "created.at": (system.functions && system.functions.tod) ? system.functions.tod() : new Date(), // 11. CREATED_AT - TIMESTAMP
+                "created.by": user                                                     // 12. CREATE_BY - VARCHAR(200)
             };
 
             // 2.4. Lưu hoặc cập nhật trực tiếp vào bảng esdHTKTreportVendorDebt
@@ -1123,40 +1202,40 @@ function calculateVendorDebtMetrics(contractId, vendorId, supplierId) {
         totalPayableAmount: 0,  // Số công nợ phải trả NCC (Nợ 331 còn lại)
         totalAdvanceAmount: 0,  // Số tiền đã tạm ứng cho NCC (Không tính thuế)
         totalRefundAmount: 0,   // Số tiền hoàn ứng từ NCC
-        totalPaidAmount: 0      // Số tiền đã thanh toán thực tế cho NCC
+        totalPaidAmount: 0,     // Số tiền đã thanh toán thực tế cho NCC
+        refIds: []              // Danh sách các mã phiếu/bản ghi tham chiếu
     };
 
+    var allRefIds = [];
+    var seenRefIds = {};
+    function addRefId(id) {
+        id = String(id || "").trim();
+        if (id && !seenRefIds[id]) {
+            seenRefIds[id] = true;
+            allRefIds.push(id);
+        }
+    }
+
     // -------------------------------------------------------------------------
-    // A. TÍNH CÁC KHOẢN TẠM ỨNG & HOÀN ỨNG (Trường: total.advance.amount & total.refund.amount)
-    // Logic chuẩn: tính các bản ghi ĐNTƯ đã phê duyệt hoặc đã hạch toán
-    // (prep.status in ["approved", "accounted"])
-    // và bút toán hoàn ứng của phiếu ĐNTT đã phê duyệt hoặc đã hạch toán
+    // A. TÍNH CÁC KHOẢN TẠM ỨNG (Trường: total.advance.amount)
+    // Lấy theo các khoản TAM_UNG (phiếu ĐNTƯ approved/accounted)
     // -------------------------------------------------------------------------
     var totalAdvanceBase = 0; // Tiền tạm ứng trước thuế (sub.type = "TAM_UNG")
     var queryTamUng =
             "SELECT " +
             "ai.request.id AS requestId, " +
             "ai.prepayment.id AS prepaymentId, " +
-            "ai.amount AS advance_amount, " +
-            "pe.amount AS payment_entry_amount, " +
-            "pe.payment.id AS entry_payment_id, " +
-            "p.status AS entry_payment_status, " +
-            "aip.status AS ogl_status " +
+            "ai.amount AS advance_amount " +
             "FROM esdHTKTaccountingInformation ai " +
             "JOIN esdHTKTprepayment prep " +
             'ON (ai.prepayment.id = prep.id AND (prep.status = "approved" OR prep.status = "accounted")) ' +
-            "LEFT JOIN esdHTKTpaymentEntry pe " +
-            "ON (ai.prepayment.id = pe.ref.id AND pe.entry.type = \"PREPAYMENT\" AND (pe.vendor.id = \"" + escapeSmQueryValue(vendorId) + "\"" + (supplierId && supplierId !== vendorId ? " OR pe.vendor.id = \"" + escapeSmQueryValue(supplierId) + "\"" : "") + ")) " +
-            "LEFT JOIN esdHTKTpayment p ON (pe.payment.id = p.id) " +
-            "LEFT JOIN esdHTKTaccountingInformation aip " +
-            "ON (pe.accounting.request.id = aip.request.id) " +
             'WHERE ai.sub.type = "TAM_UNG" ' +
             'AND ai.contract.id = "' + escapeSmQueryValue(contractId) + '" ' +
             'AND (ai.vendor.id = "' + escapeSmQueryValue(vendorId) + '"' + (supplierId && supplierId !== vendorId ? ' OR ai.vendor.id = "' + escapeSmQueryValue(supplierId) + '"' : '') + ') ' +
             'AND ai.type = "AP"';
 
-    var tamUngMap = {};
-    var tamUngOrder = [];
+    var processedAiReqIds = {};
+    var processedPrepIds = {};
     var fileTamUng = null;
 
     try {
@@ -1165,41 +1244,19 @@ function calculateVendorDebtMetrics(contractId, vendorId, supplierId) {
         while (rcTu == RC_SUCCESS) {
             var tuReqId = String(fileTamUng["requestId"] || "").trim();
             var tuPreId = String(fileTamUng["prepaymentId"] || "").trim();
-            var tuKey = tuReqId + "|" + tuPreId;
-            var tuAmount = getNumberField(fileTamUng, ["advance_amount", "ai.amount", "amount"]);
-            var tuPeAmount = getNumberField(fileTamUng, ["payment_entry_amount", "pe.amount"]);
-            var tuPaymentStatus = String(fileTamUng["entry_payment_status"] || fileTamUng["p.status"] || "").trim().toLowerCase();
-            var tuOglStatus = String(fileTamUng["aip.status"] || "").trim().toLowerCase();
-
-            if (!tamUngMap[tuKey]) {
-                tamUngMap[tuKey] = {
-                    prepaymentId: tuPreId,
-                    amount: tuAmount,
-                    refunded_amount: 0
-                };
-                tamUngOrder.push(tuKey);
+            if (tuPreId) {
+                addRefId(tuPreId);
+                processedPrepIds[tuPreId] = true;
             }
-
-            var tuItem = tamUngMap[tuKey];
-            // Tính hoàn ứng: Phiếu ĐNTT ở trạng thái "approved" hoặc "accounted"
-            if (tuPeAmount > 0 && (tuPaymentStatus === "approved" || tuPaymentStatus === "accounted" || tuOglStatus === "completed")) {
-                tuItem.refunded_amount += tuPeAmount;
+            if (tuReqId && !processedAiReqIds[tuReqId]) {
+                processedAiReqIds[tuReqId] = true;
+                totalAdvanceBase += getNumberField(fileTamUng, ["advance_amount", "ai.amount", "amount"]);
             }
             rcTu = fileTamUng.getNext();
         }
     } catch (eTu) {
     } finally {
         closeSCFile(fileTamUng);
-    }
-
-    var processedPrepIds = {};
-    for (var i = 0; i < tamUngOrder.length; i++) {
-        var itemTu = tamUngMap[tamUngOrder[i]];
-        totalAdvanceBase += itemTu.amount;
-        metrics.totalRefundAmount += itemTu.refunded_amount;
-        if (itemTu.prepaymentId) {
-            processedPrepIds[itemTu.prepaymentId] = true;
-        }
     }
 
     // Bổ sung: Quét các phiếu ĐNTƯ approved hoặc accounted chưa có trong esdHTKTaccountingInformation
@@ -1219,30 +1276,9 @@ function calculateVendorDebtMetrics(contractId, vendorId, supplierId) {
                 var pId = String(prepvFile["prepayment_id"] || "").trim();
                 if (pId && !processedPrepIds[pId]) {
                     processedPrepIds[pId] = true;
+                    addRefId(pId);
                     var pAmt = getNumberField(prepvFile, ["amount", "pv.amount"]);
                     totalAdvanceBase += pAmt;
-
-                    // Quét hoàn ứng tương ứng nếu có
-                    var peRefund = null;
-                    try {
-                        peRefund = new SCFile("esdHTKTpaymentEntry", SCFILE_READONLY);
-                        var qPe = 'SELECT pe.amount AS amount, p.status AS payment_status ' +
-                                'FROM esdHTKTpaymentEntry pe ' +
-                                'JOIN esdHTKTpayment p ON (pe.payment.id = p.id) ' +
-                                'WHERE pe.ref.id = "' + escapeSmQueryValue(pId) + '" ' +
-                                'AND pe.entry.type = "PREPAYMENT" ' +
-                                'AND (pe.vendor.id = "' + escapeSmQueryValue(vendorId) + '"' +
-                                (supplierId && supplierId !== vendorId ? ' OR pe.vendor.id = "' + escapeSmQueryValue(supplierId) + '"' : '') + ') ' +
-                                'AND (p.status = "approved" OR p.status = "accounted")';
-                        if (peRefund.doSelect(qPe) == RC_SUCCESS) {
-                            do {
-                                metrics.totalRefundAmount += getNumberField(peRefund, ["amount", "pe.amount"]);
-                            } while (peRefund.getNext() == RC_SUCCESS);
-                        }
-                    } catch (ePe) {
-                    } finally {
-                        closeSCFile(peRefund);
-                    }
                 }
             } while (prepvFile.getNext() == RC_SUCCESS);
         }
@@ -1251,10 +1287,83 @@ function calculateVendorDebtMetrics(contractId, vendorId, supplierId) {
         closeSCFile(prepvFile);
     }
 
+    // -------------------------------------------------------------------------
+    // B. TÍNH CÁC KHOẢN HOÀN ỨNG TỪ NCC (Trường: total.refund.amount)
+    // Lấy theo trường refund.amount của các phiếu ĐNTT (phiếu approved/accounted).
+    // Quét trực tiếp từ bảng esdHTKTpaymentVendor theo từng (payment.id, vendor.id)
+    // để đảm bảo mỗi phiếu chỉ tính 1 lần duy nhất, tuyệt đối không bị nhân bản
+    // khi phiếu thanh toán có nhiều dòng accounting (trả treo + hoàn ứng...).
+    // -------------------------------------------------------------------------
+    var totalRefundFromPayVendor = 0;
+    var fileRefundPay = null;
+    var seenRefundPvIds = {};
+    try {
+        fileRefundPay = new SCFile("esdHTKTpaymentVendor", SCFILE_READONLY);
+        var queryRefund =
+                'SELECT pv.id AS id, pv.payment.id AS payment_id, pv.refund.amount AS refund_amount ' +
+                'FROM esdHTKTpaymentVendor pv ' +
+                'JOIN esdHTKTpayment p ON (pv.payment.id = p.id) ' +
+                'WHERE p.contract.id = "' + escapeSmQueryValue(contractId) + '" ' +
+                'AND (pv.vendor.id = "' + escapeSmQueryValue(vendorId) + '"' +
+                (supplierId && supplierId !== vendorId ? ' OR pv.vendor.id = "' + escapeSmQueryValue(supplierId) + '"' : '') + ') ' +
+                'AND (p.status = "approved" OR p.status = "accounted")';
+
+        var rcRefund = fileRefundPay.doSelect(queryRefund);
+        while (rcRefund == RC_SUCCESS) {
+            var rRowId = String(fileRefundPay["id"] || (fileRefundPay["payment_id"] + "_" + vendorId)).trim();
+            if (!seenRefundPvIds[rRowId]) {
+                seenRefundPvIds[rRowId] = true;
+                var rAmt = getNumberField(fileRefundPay, ["refund_amount", "refund.amount"]);
+                totalRefundFromPayVendor += rAmt;
+                var rPayId = String(fileRefundPay["payment_id"] || "").trim();
+                if (rPayId && rAmt > 0) addRefId(rPayId);
+            }
+            rcRefund = fileRefundPay.getNext();
+        }
+    } catch (eRefund) {
+    } finally {
+        closeSCFile(fileRefundPay);
+    }
+
+    // Dự phòng: nếu không tìm thấy hoàn ứng trong esdHTKTpaymentVendor, quét từ esdHTKTpaymentEntry (loại bỏ trùng lặp theo entry id)
+    if (totalRefundFromPayVendor === 0) {
+        var peRefundFile = null;
+        var seenPeIds = {};
+        try {
+            peRefundFile = new SCFile("esdHTKTpaymentEntry", SCFILE_READONLY);
+            var qPeDirect =
+                    'SELECT pe.id AS id, pe.payment.id AS payment_id, pe.amount AS amount ' +
+                    'FROM esdHTKTpaymentEntry pe ' +
+                    'JOIN esdHTKTpayment p ON (pe.payment.id = p.id) ' +
+                    'WHERE p.contract.id = "' + escapeSmQueryValue(contractId) + '" ' +
+                    'AND (pe.vendor.id = "' + escapeSmQueryValue(vendorId) + '"' +
+                    (supplierId && supplierId !== vendorId ? ' OR pe.vendor.id = "' + escapeSmQueryValue(supplierId) + '"' : '') + ') ' +
+                    'AND pe.entry.type = "PREPAYMENT" ' +
+                    'AND (p.status = "approved" OR p.status = "accounted")';
+            if (peRefundFile.doSelect(qPeDirect) == RC_SUCCESS) {
+                do {
+                    var peRowId = String(peRefundFile["id"] || "").trim();
+                    if (peRowId && !seenPeIds[peRowId]) {
+                        seenPeIds[peRowId] = true;
+                        var peAmt = getNumberField(peRefundFile, ["amount", "pe.amount"]);
+                        totalRefundFromPayVendor += peAmt;
+                        var pePayId = String(peRefundFile["payment_id"] || "").trim();
+                        if (pePayId && peAmt > 0) addRefId(pePayId);
+                    }
+                } while (peRefundFile.getNext() == RC_SUCCESS);
+            }
+        } catch (ePeD) {
+        } finally {
+            closeSCFile(peRefundFile);
+        }
+    }
+
+    metrics.totalRefundAmount = totalRefundFromPayVendor;
+
     // Tính thuế VAT của tạm ứng (sub.type = "THUE") từ các phiếu ĐNTƯ đã phê duyệt hoặc đã hạch toán
     var totalAdvanceTax = 0;
     var queryThue =
-            "SELECT ai.amount AS advance_amount FROM esdHTKTaccountingInformation ai " +
+            "SELECT ai.amount AS advance_amount, ai.prepayment.id AS prepaymentId FROM esdHTKTaccountingInformation ai " +
             "JOIN esdHTKTprepayment prep ON (ai.prepayment.id = prep.id AND (prep.status = \"approved\" OR prep.status = \"accounted\")) " +
             'WHERE ai.contract.id = "' + escapeSmQueryValue(contractId) + '" ' +
             'AND (ai.vendor.id = "' + escapeSmQueryValue(vendorId) + '"' + (supplierId && supplierId !== vendorId ? ' OR ai.vendor.id = "' + escapeSmQueryValue(supplierId) + '"' : '') + ') ' +
@@ -1266,6 +1375,8 @@ function calculateVendorDebtMetrics(contractId, vendorId, supplierId) {
         var rcThue = fileThue.doSelect(queryThue);
         while (rcThue == RC_SUCCESS) {
             totalAdvanceTax += getNumberField(fileThue, ["advance_amount", "amount", "ai.amount"]);
+            var thuePreId = String(fileThue["prepaymentId"] || fileThue["prepayment_id"] || "").trim();
+            if (thuePreId) addRefId(thuePreId);
             rcThue = fileThue.getNext();
         }
     } catch (eThue) {
@@ -1303,6 +1414,8 @@ function calculateVendorDebtMetrics(contractId, vendorId, supplierId) {
             if (!seenDebtPvIds[dRowId]) {
                 seenDebtPvIds[dRowId] = true;
                 totalDebtFromPayVendor += getNumberField(fileDebtPay, ["debt_amount", "debt.amount"]);
+                var dPayId = String(fileDebtPay["payment_id"] || "").trim();
+                if (dPayId) addRefId(dPayId);
             }
             rcDebt = fileDebtPay.getNext();
         }
@@ -1311,90 +1424,45 @@ function calculateVendorDebtMetrics(contractId, vendorId, supplierId) {
         closeSCFile(fileDebtPay);
     }
 
-    // Tính số tiền đã thanh toán từ accountingInformation (sub.type = "THANH_TOAN")
-    var queryPhaiTra =
+    // -------------------------------------------------------------------------
+    // C. TÍNH TỔNG TIỀN ĐÃ THANH TOÁN THỰC TẾ (Trường: total.paid.amount)
+    // = Tổng số tiền thuế trong ĐNTƯ (totalAdvanceTax) + Số tiền thanh toán dòng CORE của các phiếu ĐNTT (type="CORE")
+    // -------------------------------------------------------------------------
+    var totalCorePayment = 0;
+    var processedPaymentIds = {};
+    var fileCorePay = null;
+
+    var queryCorePay =
             "SELECT " +
             "ai.request.id AS requestId, " +
-            "ai.prepayment.id AS prepaymentId, " +
-            "ai.amount AS advance_amount, " +
-            "ai.data AS ai_data, " +
-            "pe.amount AS payment_entry_amount, " +
-            "pe.payment.id AS entry_payment_id, " +
-            "p.status AS entry_payment_status, " +
-            "aip.status AS ogl_status " +
+            "ai.prepayment.id AS paymentId, " +
+            "ai.amount AS core_amount " +
             "FROM esdHTKTaccountingInformation ai " +
             "JOIN esdHTKTpayment payment " +
             'ON (ai.prepayment.id = payment.id AND (payment.status = "approved" OR payment.status = "accounted")) ' +
-            "LEFT JOIN esdHTKTpaymentEntry pe " +
-            "ON (ai.prepayment.id = pe.ref.id AND pe.entry.type = \"PAYABLE\" AND pe.account.type = \"DEBIT\" AND (pe.vendor.id = \"" + escapeSmQueryValue(vendorId) + "\"" + (supplierId && supplierId !== vendorId ? " OR pe.vendor.id = \"" + escapeSmQueryValue(supplierId) + "\"" : "") + ")) " +
-            "LEFT JOIN esdHTKTpayment p ON (pe.payment.id = p.id) " +
-            "LEFT JOIN esdHTKTaccountingInformation aip " +
-            "ON (pe.accounting.request.id = aip.request.id) " +
-            'WHERE ai.sub.type = "THANH_TOAN" ' +
-            'AND ai.contract.id = "' + escapeSmQueryValue(contractId) + '" ' +
-            'AND (ai.vendor.id = "' + escapeSmQueryValue(vendorId) + '"' + (supplierId && supplierId !== vendorId ? ' OR ai.vendor.id = "' + escapeSmQueryValue(supplierId) + '"' : '') + ') ' +
-            'AND ai.type = "AP"';
-
-    var phaiTraMap = {};
-    var phaiTraOrder = [];
-    var filePhaiTra = null;
-    var totalPaidCompletedFromAi = 0;
+            'WHERE ai.type = "CORE" ' +
+            'AND (ai.contract.id = "' + escapeSmQueryValue(contractId) + '" OR payment.contract.id = "' + escapeSmQueryValue(contractId) + '") ' +
+            'AND (ai.vendor.id = "' + escapeSmQueryValue(vendorId) + '"' + (supplierId && supplierId !== vendorId ? ' OR ai.vendor.id = "' + escapeSmQueryValue(supplierId) + '"' : '') + ')';
 
     try {
-        filePhaiTra = new SCFile("esdHTKTaccountingInformation", SCFILE_READONLY);
-        var rcPt = filePhaiTra.doSelect(queryPhaiTra);
-        while (rcPt == RC_SUCCESS) {
-            var ptReqId = String(filePhaiTra["requestId"] || "").trim();
-            var ptPreId = String(filePhaiTra["prepaymentId"] || "").trim();
-            var ptKey = ptReqId + "|" + ptPreId;
-            var ptAmount = getNumberField(filePhaiTra, ["advance_amount", "ai.amount", "amount"]);
-            var ptPeAmount = getNumberField(filePhaiTra, ["payment_entry_amount", "pe.amount"]);
-            var ptPaymentStatus = String(filePhaiTra["entry_payment_status"] || filePhaiTra["p.status"] || "").trim().toLowerCase();
-            var ptOglStatus = String(filePhaiTra["aip.status"] || "").trim().toLowerCase();
-
-            if (!phaiTraMap[ptKey]) {
-                var initialPaid = 0;
-                var rawData = filePhaiTra["ai_data"] || filePhaiTra["data"];
-                if (rawData) {
-                    try {
-                        var parsed = JSON.parse(rawData);
-                        initialPaid = Number(parsed.amountPay || 0);
-                    } catch (ignore) {}
-                }
-                if (!initialPaid && ptAmount > 0) {
-                    initialPaid = ptAmount;
-                }
-
-                phaiTraMap[ptKey] = {
-                    paymentId: ptPreId,
-                    amount: ptAmount,
-                    paid_amount: initialPaid
-                };
-                phaiTraOrder.push(ptKey);
+        fileCorePay = new SCFile("esdHTKTaccountingInformation", SCFILE_READONLY);
+        var rcCore = fileCorePay.doSelect(queryCorePay);
+        while (rcCore == RC_SUCCESS) {
+            var cPayId = String(fileCorePay["paymentId"] || fileCorePay["payment_id"] || "").trim();
+            var cAmount = getNumberField(fileCorePay, ["core_amount", "amount", "ai.amount"]);
+            totalCorePayment += cAmount;
+            if (cPayId) {
+                processedPaymentIds[cPayId] = true;
+                addRefId(cPayId);
             }
-
-            var ptItem = phaiTraMap[ptKey];
-            // Tính khoản trả nợ: Phiếu ĐNTT ở trạng thái "approved" hoặc "accounted"
-            if (ptPeAmount > 0 && (ptPaymentStatus === "approved" || ptPaymentStatus === "accounted" || ptOglStatus === "completed")) {
-                ptItem.paid_amount += ptPeAmount;
-            }
-            rcPt = filePhaiTra.getNext();
+            rcCore = fileCorePay.getNext();
         }
-    } catch (ePt) {
+    } catch (eCore) {
     } finally {
-        closeSCFile(filePhaiTra);
+        closeSCFile(fileCorePay);
     }
 
-    var processedPaymentIds = {};
-    for (var j = 0; j < phaiTraOrder.length; j++) {
-        var itemPt = phaiTraMap[phaiTraOrder[j]];
-        totalPaidCompletedFromAi += itemPt.paid_amount;
-        if (itemPt.paymentId) {
-            processedPaymentIds[itemPt.paymentId] = true;
-        }
-    }
-
-    // Bổ sung: Quét các phiếu ĐNTT approved hoặc accounted chưa có trong esdHTKTaccountingInformation
+    // Bổ sung dự phòng: Quét các phiếu ĐNTT approved hoặc accounted chưa có trong esdHTKTaccountingInformation (ví dụ thanh toán tiền mặt)
     var payVendorFile = null;
     try {
         payVendorFile = new SCFile("esdHTKTpaymentVendor", SCFILE_READONLY);
@@ -1411,7 +1479,8 @@ function calculateVendorDebtMetrics(contractId, vendorId, supplierId) {
                 var payId = String(payVendorFile["payment_id"] || "").trim();
                 if (payId && !processedPaymentIds[payId]) {
                     processedPaymentIds[payId] = true;
-                    totalPaidCompletedFromAi += getNumberField(payVendorFile, ["amount", "pv.amount"]);
+                    addRefId(payId);
+                    totalCorePayment += getNumberField(payVendorFile, ["amount", "pv.amount"]);
                 }
             } while (payVendorFile.getNext() == RC_SUCCESS);
         }
@@ -1421,26 +1490,25 @@ function calculateVendorDebtMetrics(contractId, vendorId, supplierId) {
     }
 
     // Gán "Số công nợ phải trả NCC":
-    // Lấy trực tiếp từ trường debt.amount bảng paymentVendor (esdHTKTpaymentVendor) - KHÔNG fallback
-    metrics.totalPayableAmount = totalDebtFromPayVendor;
+    // = Tổng hóa đơn từ ĐNTT (totalDebtFromPayVendor) + Tổng thuế AP invoice từ ĐNTƯ (totalAdvanceTax)
+    metrics.totalPayableAmount = totalDebtFromPayVendor + totalAdvanceTax;
 
-    // -------------------------------------------------------------------------
-    // C. TÍNH TỔNG TIỀN ĐÃ THANH TOÁN THỰC TẾ (Trường: total.paid.amount)
-    // = Tổng số tiền thuế trong ĐNTƯ (totalAdvanceTax) + Số tiền đã thanh toán từ các phiếu ĐNTT (totalPaidCompletedFromAi)
-    // -------------------------------------------------------------------------
-    metrics.totalPaidAmount = totalAdvanceTax + totalPaidCompletedFromAi;
-    metrics.totalPaidCompletedFromAi = totalPaidCompletedFromAi;
+    // Tổng tiền đã thanh toán = Tổng thuế của ĐNTƯ + Số tiền thanh toán dòng CORE từ phiếu ĐNTT
+    metrics.totalPaidAmount = totalAdvanceTax + totalCorePayment;
+    metrics.totalPaidCompletedFromAi = totalCorePayment;
+    metrics.totalCorePayment = totalCorePayment;
     metrics.totalAdvanceTax = totalAdvanceTax;
     metrics.totalAdvanceBase = totalAdvanceBase;
     metrics.processedPrepIds = processedPrepIds;
     metrics.totalDebtFromPayVendor = totalDebtFromPayVendor;
+    metrics.refIds = allRefIds;
 
     return metrics;
 }
 
 /**
  * 2.4. Lưu hoặc cập nhật bản ghi trực tiếp vào bảng esdHTKTreportVendorDebt (Upsert)
- * Khớp 11 cột trong dbdict esdHTKTreportVendorDebt:
+ * Khớp 12 cột trong dbdict esdHTKTreportVendorDebt:
  *  1. id                   (character, VARCHAR(60))
  *  2. contract.id          (character, VARCHAR(60))
  *  3. vendor.id            (character, VARCHAR(60))
@@ -1450,8 +1518,9 @@ function calculateVendorDebtMetrics(contractId, vendorId, supplierId) {
  *  7. total.advance.amount (character, VARCHAR(100))
  *  8. total.refund.amount  (character, VARCHAR(100))
  *  9. total.paid.amount    (character, VARCHAR(100))
- * 10. created.at           (date/time, TIMESTAMP)
- * 11. created.by           (character, VARCHAR(200))
+ * 10. list.ref.id          (character / text, JSON array dạng text)
+ * 11. created.at           (date/time, TIMESTAMP)
+ * 12. created.by           (character, VARCHAR(200))
  */
 function saveReportVendorDebt(data) {
     var checkFile = null;
@@ -1464,6 +1533,9 @@ function saveReportVendorDebt(data) {
 
         if (isUpdate) {
             var existingId = String(checkFile["id"] || "").trim();
+            if (data["list.ref.id"] !== undefined && data["list.ref.id"] !== null) {
+                data["list.ref.id"] = mergeRefIdJson(checkFile["list.ref.id"], data["list.ref.id"]);
+            }
             applyReportVendorDebtFields(checkFile, data, true);
 
             var rcUpdate = checkFile.doUpdate();
@@ -1489,6 +1561,15 @@ function saveReportVendorDebt(data) {
             checkFile = new SCFile("esdHTKTreportVendorDebt");
             if (checkFile.doSelect(query) == RC_SUCCESS) {
                 var retryId = String(checkFile["id"] || "").trim();
+                if (data._isIncremental) {
+                    data["total.payable.amount"] = String(parseAmount(checkFile["total.payable.amount"]) + parseAmount(data["total.payable.amount"]));
+                    data["total.paid.amount"] = String(parseAmount(checkFile["total.paid.amount"]) + parseAmount(data["total.paid.amount"]));
+                    data["total.advance.amount"] = String(parseAmount(checkFile["total.advance.amount"]) + parseAmount(data["total.advance.amount"]));
+                    data["total.refund.amount"] = String(parseAmount(checkFile["total.refund.amount"]) + parseAmount(data["total.refund.amount"]));
+                }
+                if (data["list.ref.id"] !== undefined && data["list.ref.id"] !== null) {
+                    data["list.ref.id"] = mergeRefIdJson(checkFile["list.ref.id"], data["list.ref.id"]);
+                }
                 applyReportVendorDebtFields(checkFile, data, true);
                 var rcRetryUpdate = checkFile.doUpdate();
                 if (rcRetryUpdate == RC_SUCCESS || rcRetryUpdate === true) {
@@ -1507,7 +1588,7 @@ function saveReportVendorDebt(data) {
 }
 
 /**
- * Gán đúng 11 trường theo dbdict của bảng esdHTKTreportVendorDebt
+ * Gán đúng 12 trường theo dbdict của bảng esdHTKTreportVendorDebt
  */
 function applyReportVendorDebtFields(scFile, data, isUpdate) {
     if (!isUpdate) {
@@ -1522,6 +1603,10 @@ function applyReportVendorDebtFields(scFile, data, isUpdate) {
     scFile["total.advance.amount"] = String(data["total.advance.amount"] || "0").slice(0, 100);
     scFile["total.refund.amount"] = String(data["total.refund.amount"] || "0").slice(0, 100);
     scFile["total.paid.amount"] = String(data["total.paid.amount"] || "0").slice(0, 100);
+
+    if (data["list.ref.id"] !== undefined && data["list.ref.id"] !== null) {
+        scFile["list.ref.id"] = String(data["list.ref.id"]);
+    }
 
     if (!isUpdate || !scFile["created.at"]) {
         scFile["created.at"] = data["created.at"] || ((system.functions && system.functions.tod) ? system.functions.tod() : new Date());
@@ -1616,4 +1701,83 @@ function closeSCFile(file) {
     try {
         if (file) file.doClose();
     } catch (ignore) {}
+}
+
+/**
+ * Parse an toàn chuỗi JSON sang mảng chuỗi mã ref.id.
+ */
+function parseRefIdJsonToList(rawJson) {
+    var list = [];
+    if (!rawJson) return list;
+
+    var raw = String(rawJson).trim();
+    if (!raw || raw === "[]") return list;
+
+    try {
+        var parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+            for (var i = 0; i < parsed.length; i++) {
+                var item = parsed[i];
+                if (item !== null && item !== undefined) {
+                    var s = String(item).trim();
+                    if (s && list.indexOf(s) === -1) {
+                        list.push(s);
+                    }
+                }
+            }
+            return list;
+        } else if (typeof parsed === "string") {
+            var sStr = parsed.trim();
+            if (sStr) list.push(sStr);
+            return list;
+        }
+    } catch (eParse) {
+        // Fallback: nếu chuỗi cũ là định dạng chuỗi đơn hoặc phân cách phẩy
+        var parts = raw.replace(/[\[\]"]/g, "").split(",");
+        for (var p = 0; p < parts.length; p++) {
+            var piece = parts[p].trim();
+            if (piece && list.indexOf(piece) === -1) {
+                list.push(piece);
+            }
+        }
+    }
+
+    return list;
+}
+
+/**
+ * Thêm một mã bản ghi (recordId) vào chuỗi JSON danh sách mã tham chiếu (list.ref.id).
+ * - Lưu dạng JSON text: '["ID1","ID2",...]'
+ * - Chống trùng lặp (không thêm nếu mã đã tồn tại).
+ * - Xử lý an toàn chuỗi null, rỗng, hoặc định dạng không chuẩn.
+ */
+function appendRefIdToJson(currentJson, newRefId) {
+    newRefId = String(newRefId || "").trim();
+    if (!newRefId) {
+        return currentJson ? String(currentJson).trim() : "[]";
+    }
+
+    var list = parseRefIdJsonToList(currentJson);
+    if (list.indexOf(newRefId) === -1) {
+        list.push(newRefId);
+    }
+
+    return JSON.stringify(list);
+}
+
+/**
+ * Hợp nhất 2 chuỗi JSON (hoặc danh sách) mã tham chiếu, loại bỏ trùng lặp.
+ */
+function mergeRefIdJson(jsonA, jsonB) {
+    var listA = parseRefIdJsonToList(jsonA);
+    var listB = parseRefIdJsonToList(jsonB);
+
+    for (var i = 0; i < listB.length; i++) {
+        var item = listB[i];
+        if (listA.indexOf(item) === -1) {
+            listA.push(item);
+        }
+    }
+
+    return JSON.stringify(listA);
 }

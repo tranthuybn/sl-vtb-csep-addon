@@ -39,6 +39,7 @@ Table esdHTKTpayment {
   "total.contract" number // Tổng số hợp đồng/KMS; 
   "total.vendor" number // Tổng số NCC trên toàn phiếu;
   "total.transaction" number // Tổng số món (DC: tổng số món dự chi)
+  "po.id" varchar // Mã phiếu đặt hàng
 }
 
 
@@ -153,6 +154,32 @@ Table esdHTKTpaymentVendor {
   "payable.amount" decimal // Số tiền phải trả
   "bank.branch.code" varchar // Mã chi nhánh ngân hàng
   "debt.amount" decimal // Số tiền công nợ
+  "po.id" varchar // Mã phiếu đặt hàng
+}
+
+// Bảng số tiền giải ngân theo HHDV của từng NCC trong HĐ/KMS
+// KH-01: mỗi HHDV có 1 dòng, scope.type = HHDV và scope.id = hhdv.id.
+// KH-02: mỗi dòng con ĐV/PB có 1 dòng; tổng giải ngân của HHDV được tính bằng tổng các dòng con.
+Ref: esdHTKTpaymentHHDVDisbursement."payment.vendor.id" > esdHTKTpaymentVendor.id
+Ref: esdHTKTpaymentHHDVDisbursement."payment.id" > esdHTKTpayment.id
+Ref: esdHTKTpaymentHHDVDisbursement."vendor.id" > esdHTKTVendor.id
+Table esdHTKTpaymentHHDVDisbursement {
+  id varchar [pk] // Khóa kỹ thuật của dòng giải ngân HHDV
+  "payment.vendor.id" varchar [not null] // Khóa NCC thuộc một HĐ trong phiếu
+  "payment.id" varchar [not null] // Mã đề nghị tạm ứng/thanh toán
+  "contract.id" varchar [not null] // Mã HĐ/KMS chứa HHDV
+  "vendor.id" varchar [not null] // Mã NCC được giải ngân
+  "hhdv.id" varchar [not null] // Mã HHDV trên HĐ/KMS (esdhdcontracthhdvm1.ID)
+  "plan.type" varchar [not null] // Loại kế hoạch của HHDV: KH-01/KH-02
+  "plan.year" number [not null] // Năm kế hoạch tại thời điểm khai giải ngân
+  "scope.type" varchar [not null] // Phạm vi nhập tiền: HHDV/UNIT/DEPARTMENT/ALL
+  "scope.id" varchar [not null] // HHDV ID với KH-01; mã ĐV/PB với KH-02; ALL nếu Toàn hàng
+  "amount" decimal [not null] // Số tiền giải ngân lần này, đã gồm thuế và >= 0
+
+  indexes {
+    ("payment.vendor.id", "hhdv.id", "scope.type", "scope.id") [unique]
+    ("payment.id", "contract.id", "vendor.id")
+  }
 }
 
 Ref: esdHTKTpaymentInvoice."payment.id" > esdHTKTpayment.id
