@@ -10,8 +10,10 @@ var ACCOUNTING_SUB_TYPE = {
     TAM_UNG: "TAM_UNG",
     THUE: "THUE",
     THANH_TOAN: "THANH_TOAN",
+    DU_CHI: "DU_CHI",
     TAT_TOAN: "TAT_TOAN",
     INHOUSE: "INHOUSE", // CORE chuyển tiền trong hệ thống
+    HACH_TOAN_KHO: "HACH_TOAN_KHO",
     CITAD: "CITAD" // CORE chuyển tiền ngoài hệ thống di CITAD
 };
 
@@ -235,9 +237,8 @@ function processAccounting(esdHTKTprepayment) {
     try { if (itemEsdHTKTaccountingInfo) itemEsdHTKTaccountingInfo.doClose(); } catch (e) {}
 }
 
-//processAccounting({ id: 'TU.106.26.0000060' });
+//processAccounting({ id: 'DC.100.26.0000069' });
 //processAccounting({ id: 'TU.106.26.0000193' });
-
 function callApiAp(esdHTKTacountingInfo) {
     var success = false;
     if (!esdHTKTacountingInfo || !esdHTKTacountingInfo['request.id'] || !esdHTKTacountingInfo.data) {
@@ -254,10 +255,12 @@ function callApiAp(esdHTKTacountingInfo) {
     if (payload) {
         var apiResult = null;
         if (esdHTKTacountingInfo['sub.type'] == ACCOUNTING_SUB_TYPE.THANH_TOAN ||
+            esdHTKTacountingInfo['sub.type'] == ACCOUNTING_SUB_TYPE.DU_CHI ||
             esdHTKTacountingInfo['sub.type'] == ACCOUNTING_SUB_TYPE.TAM_UNG ||
+            esdHTKTacountingInfo['sub.type'] == ACCOUNTING_SUB_TYPE.HACH_TOAN_KHO ||
             esdHTKTacountingInfo['sub.type'] == ACCOUNTING_SUB_TYPE.THUE) {
             apiResult = lib.ESD_HTKT_INVOICE_OGL_INTEGRATION.createApInvoice(payload);
-//            response = { success: false }
+            //            apiResult = { success: false }
         } else if (esdHTKTacountingInfo['sub.type'] == ACCOUNTING_SUB_TYPE.TAT_TOAN) {
             apiResult = lib.ESD_HTKT_INVOICE_OGL_INTEGRATION.createApPayment(payload);
         } else {
@@ -283,7 +286,7 @@ function callApiAp(esdHTKTacountingInfo) {
                 // Chỉ lưu đúng raw body do API trả về, không chèn metadata HTTP vào JSON.
                 itemAccounting.response = rawResponseBody;
                 itemAccounting['response.http.status'] = httpStatus == null ? null : String(httpStatus);
-                
+
                 if (response.data && response.data.transactionId) {
                     itemAccounting['transaction.id'] = response.data.transactionId;
                 }
@@ -337,7 +340,7 @@ function callApiGl(esdHTKTacountingInfo) {
 
 
 // Goi API chuyen tien
-//checkCompleteAccounting('TU.106.26.0000013')
+//checkCompleteAccounting('DC.100.26.0000069')
 function callApiCore(esdHTKTacountingInfo) {
     // Đặt false để tắt giả lập và gọi lại CORE thật.
     var USE_FAKE_CORE_RESPONSE = false;
@@ -405,8 +408,7 @@ function callApiCore(esdHTKTacountingInfo) {
 
         if (response) {
             var responseData = response.data && typeof response.data === "object" ?
-                response.data :
-                {};
+                response.data : {};
             var hostRefNum = String(responseData.hostRefNum || "").trim();
 
             if (response.status) {
@@ -454,8 +456,10 @@ function checkAccountingInfo(requestId) {
     if (result == RC_SUCCESS) {
         var response = null;
         var prepId = itemAccounting['prepayment.id'];
-        if (itemAccounting.status !== ACCOUNTING_STATUS.NEW && itemAccounting.status !== ACCOUNTING_STATUS.PROCESSING) {
-            // chi check voi 2 trang thai NEW && PROCESSING
+        if (
+            itemAccounting.status !== ACCOUNTING_STATUS.NEW &&
+            itemAccounting.status !== ACCOUNTING_STATUS.PROCESSING) {
+            // Chi check voi cac trang thai NEW, PROCESSING.
             var currentStatus = itemAccounting.status;
             try { if (itemAccounting) itemAccounting.doClose(); } catch (e) {}
             if (currentStatus === ACCOUNTING_STATUS.COMPLETED && prepId) {
@@ -522,7 +526,7 @@ function createJobCheckAccounting(requestId) {
 }
 
 //createJobCheckAccounting('8257D136-145F-4B85-8C12-CAB1E6001A51');
-//checkAccountingInfo('1BCFEC01-BED7-4BBB-9E98-C376F7001A44');
+//checkAccountingInfo('704c54f8-da3b-40da-b9e1-0e3001a34315');
 
 
 // Moi lan kiem tra xong 1 row
@@ -559,6 +563,7 @@ function checkCompleteAccounting(prepaymentId) {
         }
 
         if (accountingInfoItem["sub.type"] == ACCOUNTING_SUB_TYPE.THANH_TOAN ||
+            accountingInfoItem["sub.type"] == ACCOUNTING_SUB_TYPE.DU_CHI ||
             accountingInfoItem["sub.type"] == ACCOUNTING_SUB_TYPE.TAT_TOAN) {
             isPayment = true;
         }
@@ -748,7 +753,6 @@ function jobCallCheckAccoutingStatus() {
         // logger.info('ESD_HTKT_ACCOUNTING_UTILS::jobCallCheckAccoutingStatus: no item for check');
     }
 }
-
 //jobCallCheckAccoutingStatus();
 
 function jobCallIntegrateRecordInQueue() {
@@ -761,7 +765,8 @@ function jobCallIntegrateRecordInQueue() {
     var sortFields = ["created.time"];
     var sortSeqs = [SCFILE_ASC];
     accountingInfoItem.setOrderBy(sortFields, sortSeqs);
-    var result = accountingInfoItem.doSelect(`transaction.id = NULL and status = "${ACCOUNTING_STATUS.IN_QUEUE}"`);
+    // Retry records left in CREATED when the initial integration did not finish.
+    var result = accountingInfoItem.doSelect(`transaction.id = NULL and (status = "${ACCOUNTING_STATUS.IN_QUEUE}" or status = "${ACCOUNTING_STATUS.CREATED}")`);
     var arrItem = [];
     while (result == RC_SUCCESS) {
         //        ['prepayment.id', 'request.id', 'status', 'type', 'created.time'].forEach(k => {
@@ -796,13 +801,18 @@ function checkAccount(accountId, napasCode) {
             return data;
         }
     } else if (napasCode) { // kiem tra ngoai he thong
+        //        var response = lib.ESD_HTKT_FUND_TRANSFER_INTEGRATION.checkNameAccountNapas(accountId, napasCode);
+        //        if (response && response.data && response.data.custInfo) {
+        //            var custInfo = response.data.custInfo;
+        //            if (custInfo && custInfo.length > 0 && response.data.custInfo[0].depAcctIdTo &&
+        //                response.data.custInfo[0].depAcctIdTo.refVal) {
+        //                return { acctName: response.data.custInfo[0].depAcctIdTo.refVal };
+        //            }
+        //        }
         var response = lib.ESD_HTKT_FUND_TRANSFER_INTEGRATION.checkNameAccountNapas(accountId, napasCode);
-        if (response && response.data && response.data.custInfo) {
-            var custInfo = response.data.custInfo;
-            if (custInfo && custInfo.length > 0 && response.data.custInfo[0].depAcctIdTo &&
-                response.data.custInfo[0].depAcctIdTo.refVal) {
-                return {acctName: response.data.custInfo[0].depAcctIdTo.refVal};
-            }
+        var resData = (response && response.body && response.body.data) ? response.body.data : (response ? response.data : null);
+        if (resData && resData.destHolder) {
+            return { acctName: resData.destHolder };
         }
     }
     return null;
