@@ -259,7 +259,6 @@ function getListAccountsPayable(input) {
     var vendorId = String(params.vendorId || "").trim();
     var contractId = String(params.contractId || "").trim();
     var currentPaymentId = String(params.paymentId || "").trim();
-
     if (!vendorId || !contractId) return [];
 
     var query =
@@ -427,7 +426,6 @@ function getListAccountsPayable(input) {
     } finally {
         closeSCFile(file);
     }
-
     return itemList;
 }
 
