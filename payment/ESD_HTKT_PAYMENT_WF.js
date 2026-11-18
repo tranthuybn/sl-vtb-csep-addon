@@ -71,7 +71,77 @@ var HTKT_WF_DSM_STATUS = {
  * 2. CÁC HÀM KIỂM TRA QUYỀN HẠN & TRẠNG THÁI (PERMISSION & ACTION CHECKS)
  * ============================================================================= */
 
+/* Chỉ khóa action khi hồ sơ được mở từ menu Hậu kiểm Thanh toán. */
+function isPaymentPostAuditContext(record) {
+    var localFlag = String(vars["$L.isFromHK"] || "").trim().toLowerCase();
+    if (localFlag === "true") return true;
+    var currentRecord = record || vars.$L_file || vars["$L.file"] || {};
+    if (String(currentRecord.isFromHK || "").trim().toLowerCase() === "true") return true;
+    var recordId = String(currentRecord["payment.id"] || currentRecord.id || "");
+    if (recordId.indexOf("DC.") === 0) {
+        return String(vars["$G.HTKT_DUCHI_MENU_CONTEXT"] || "").trim().toLowerCase() === "post_audit";
+    }
+    return String(vars["$G.HTKT_PAYMENT_MENU_CONTEXT"] || "").trim().toLowerCase() === "post_audit";
+}
+
+function isPostAuditOperator() {
+    if (!isPaymentPostAuditContext()) return false;
+    try {
+        var currentUser = "";
+
+        if (vars.$lo_operator) {
+            currentUser = vars.$lo_operator["contact.name"] ||
+                    vars.$lo_operator["contact"] ||
+                    vars.$lo_operator["name"] ||
+                    "";
+        }
+
+        currentUser = String(
+                currentUser ||
+                vars["$lo.contact.name"] ||
+                vars["$lo.user.name"] ||
+                htktWfCurrentUser() ||
+                ""
+        ).trim();
+
+        if (!currentUser) return false;
+
+        var rights = vars["$G.rights"] || [];
+        if (rights && rights.toArray) rights = rights.toArray();
+        if (typeof rights === "string") rights = [rights];
+
+        for (var i = 0; i < rights.length; i++) {
+            if (String(rights[i] || "").trim() === "0040040005000001") {
+                return true;
+            }
+        }
+
+        rights = lib.ESD_PERMS_RIGHTS.permsRight(currentUser) || [];
+        if (rights && rights.toArray) rights = rights.toArray();
+
+        for (var j = 0; j < rights.length; j++) {
+            if (String(rights[j] || "").trim() === "0040040005000001") {
+                return true;
+            }
+        }
+    } catch (ePostAudit) {
+        // Fail closed for the action itself; do not grant extra access.
+    }
+
+    return false;
+}
+
+function checkShowCancel(record) {
+    return isPaymentPostAuditContext(record) ? "F" : "T";
+}
+
+function checkShowPrint(record) {
+    return isPostAuditOperator() ? "F" : "T";
+}
+
 function checkShowApproval(record) {
+    if (isPostAuditOperator()) return "F";
+
     var currentUser = vars.$lo_operator["contact.name"];
     if ((record["created.by"] == currentUser && record["initial.role"] == "kttc") ||
             record["user.checker.kttc"] == currentUser) {
@@ -81,6 +151,8 @@ function checkShowApproval(record) {
 }
 
 function checkCanSave(record) {
+    if (isPostAuditOperator()) return "F";
+
     var currentUser = vars.$lo_operator["contact.name"];
     if ((record["created.by"] == currentUser && record["initial.role"] == "kttc" && record["current.phase"] == "initial_kttc") ||
             (record["created.by"] == currentUser && record["initial.role"] == "dmms" && record["current.phase"] == "initial_dmms") ||
@@ -92,6 +164,8 @@ function checkCanSave(record) {
 }
 
 function checkCanReturn(record) {
+    if (isPostAuditOperator()) return "F";
+
     var fieldCheck = null;
     var currentPhase = record.current_phase || record["current.phase"];
     var currentUser = vars.$lo_operator["contact.name"];
@@ -126,6 +200,11 @@ function checkCanReturn(record) {
 }
 
 function canEditInCurrenPhase(record) {
+    // Chi xem khi mo tu menu hau kiem, ke ca user co them role tao moi.
+    if (isPaymentPostAuditContext()) {
+        return false;
+    }
+
     var currentUser = vars.$lo_operator["contact.name"];
     var currentPhase = record.current_phase || record["current.phase"];
 
@@ -306,6 +385,10 @@ function createApprovalHistory(record) {
 }
 
 function cancelRequest(record) {
+    if (isPaymentPostAuditContext(record)) {
+        throw new Error("Cán bộ Hậu kiểm không được thực hiện thao tác này.");
+    }
+
     // Chỉ bổ sung vào action Xóa lớn của Workflow; không đụng nút xóa NCC/hóa đơn.
     var paymentIdForUnlink = String(record["id"] || record.id || "").trim();
     if (!paymentIdForUnlink) {
@@ -341,6 +424,8 @@ function cancelRequest(record) {
     }
 }
 
+
+
 function getReturnToUpdatePhase(record) {
     var initialRole = String(record && record["initial.role"] || "").trim().toLowerCase();
 
@@ -350,6 +435,10 @@ function getReturnToUpdatePhase(record) {
 }
 
 function returnToUpdate(record, documentsAlreadyDeleted) {
+    if (isPostAuditOperator()) {
+        throw new Error("Cán bộ Hậu kiểm không được thực hiện thao tác này.");
+    }
+
     if (documentsAlreadyDeleted !== true) {
         var deleteResult = deleteDocumentsBeforeReturn(record);
         if (!deleteResult || deleteResult.success !== true) {
@@ -362,6 +451,7 @@ function returnToUpdate(record, documentsAlreadyDeleted) {
     }
 
     // 1. Cập nhật trạng thái phiếu
+    record["current.phase"] = returnPhase;
     record.status = "request_edit";
 
     var currentUser = String(
@@ -989,6 +1079,12 @@ function validateVendorAndPaymentDetails(record) {
 //}
 
 function validateVendorAndPaymentDetailsOnWorkflow(record) {
+    // TT XDCB kiểm tra lại nguồn/NCC và số dư S4; quyền, phase và phê duyệt giữ ở workflow hiện tại.
+    if (lib.ESD_HTKT_PAYMENT_VENDOR.isPaymentXdcb(record)) {
+        var sourceErrors = lib.ESD_HTKT_PAYMENT_VENDOR.validatePaymentXdcbVendors(record);
+        if (sourceErrors && sourceErrors.length) return sourceErrors;
+    }
+    
     var paymentId = String(record.id || "");
     var vendor = new SCFile("esdHTKTpaymentVendor", SCFILE_READONLY);
     var rc = vendor.doSelect('payment.id="' + paymentId + '"');
@@ -1045,9 +1141,11 @@ function validateInvoices(paymentId) {
     }
 
     try { prepInvoiceFile.doClose(); } catch (e) {}
-
     if (hasInvalidInvoice) {
-        errorMss.push("Đề nghị thanh toán đang chứa hóa đơn quá hạn kiểm tra. Vui lòng kiểm tra lại các hóa đơn");
+        // Dự chi dùng chung thư viện chuyển bước này; nhận diện theo mã phiếu DC.*
+        errorMss.push(htktWfIsExpense({ id: paymentId })
+                ? "Phiếu Dự chi đang chứa hóa đơn quá hạn kiểm tra. Vui lòng kiểm tra lại các hóa đơn."
+                : "Đề nghị thanh toán đang chứa hóa đơn quá hạn kiểm tra. Vui lòng kiểm tra lại các hóa đơn");
     }
 
     return errorMss.length > 0 ? errorMss : null;
@@ -1203,6 +1301,8 @@ function isSignaturePhase(record) {
 
 // Kiểm tra quyền hiển thị Workflow Action Test ký.
 function checkCanSign(record) {
+    if (isPostAuditOperator()) return "F";
+
     var actorResult = validateLatestWorkflowActor(record);
 
     if (!actorResult || actorResult.success !== true) {
@@ -1331,6 +1431,13 @@ function getWorkflowConfig() {
 
 /* Trình phiếu: validate cũ -> sinh/upload PDF -> gọi nguyên updateNextStatus() */
 function submitForApproval(record) {
+    if (isPostAuditOperator()) {
+        return htktWfFail(
+                "POST_AUDIT_ACTION_NOT_ALLOWED",
+                "Cán bộ Hậu kiểm không được thực hiện thao tác này."
+        );
+    }
+
     var phase = htktWfPhase(record);
     if (!htktWfIsSubmissionPhaseValue(phase)) {
         return htktWfFail("INVALID_SUBMISSION_PHASE", "Chỉ được sinh bản trình ký tại bước Trình phê duyệt.", "currentPhase=" + phase);
@@ -1655,6 +1762,13 @@ function invalidateDocumentsBeforeReturn(record) {
 
 /* Xóa cứng ECM trước, sau đó mới gọi nguyên returnToUpdate() cũ. */
 function requestCorrection(record) {
+    if (isPostAuditOperator()) {
+        return htktWfFail(
+                "POST_AUDIT_ACTION_NOT_ALLOWED",
+                "Cán bộ Hậu kiểm không được thực hiện thao tác này."
+        );
+    }
+
     var phase = htktWfPhase(record);
 
     try {
