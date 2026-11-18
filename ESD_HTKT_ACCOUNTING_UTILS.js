@@ -694,14 +694,7 @@ function updatePaymentAccountingCompletedStatus(prepaymentId, isPayment) {
 
         var updatePrepaymentRc = itemPrepayment.doUpdate();
 
-        /*
-         * Logic mới chỉ áp dụng cho bảng Tạm Ứng:
-         * esdHTKTprepayment.id = esdHTKTinvoice.request.id.
-         *
-         * Không áp dụng khi isPayment = true vì quan hệ trên chỉ được chốt cho Tạm Ứng.
-         * Toàn bộ logic cũ của esdHTKTpayment được giữ nguyên.
-         */
-        if (updatePrepaymentRc == RC_SUCCESS && !isPayment) {
+        if (updatePrepaymentRc == RC_SUCCESS) {
             updateInvoiceAccountingStatusByRequestId(prepaymentId);
         }
     }
@@ -782,14 +775,6 @@ function checkAccount(accountId, napasCode) {
             return data;
         }
     } else if (napasCode) { // kiem tra ngoai he thong
-        //        var response = lib.ESD_HTKT_FUND_TRANSFER_INTEGRATION.checkNameAccountNapas(accountId, napasCode);
-        //        if (response && response.data && response.data.custInfo) {
-        //            var custInfo = response.data.custInfo;
-        //            if (custInfo && custInfo.length > 0 && response.data.custInfo[0].depAcctIdTo &&
-        //                response.data.custInfo[0].depAcctIdTo.refVal) {
-        //                return { acctName: response.data.custInfo[0].depAcctIdTo.refVal };
-        //            }
-        //        }
         var response = lib.ESD_HTKT_FUND_TRANSFER_INTEGRATION.checkNameAccountNapas(accountId, napasCode);
         var resData = (response && response.body && response.body.data) ? response.body.data : (response ? response.data : null);
         if (resData && resData.destHolder) {
